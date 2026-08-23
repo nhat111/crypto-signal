@@ -67,12 +67,13 @@ Check items as they land; each phase's commit message references the phase.
 ## Phase 10 — Web dashboard
 - [x] Market overview (health/risk grid + heatmap across timeframes).
 - [x] Symbol detail page.
-- [x] Charts: price+volume, spot CVD, futures CVD, OI, funding, liquidations,
-      health, risk.
-- [x] Signals list + historical signal performance page.
-- [ ] Signal markers overlaid directly on the price chart (deferred — plotted
-      as a separate list under the chart for MVP; overlay markers are a
-      polish item, not core data).
+- [x] Charts: price, spot CVD, futures CVD, OI, funding, liquidations,
+      health, risk (all 8, via `lightweight-charts`).
+- [x] Signals list + historical signal performance page (`/performance`,
+      shows "not enough data yet" as the headline when `sufficientData`
+      is false, not a footnote).
+- [x] Signal markers overlaid directly on the price chart, colored by
+      severity (`components/charts/PriceChart.tsx`).
 
 ## Phase 11 — Telegram bot
 - [x] `/start /status /btc /eth /sol /market /signals /alerts /help`
@@ -115,7 +116,6 @@ Check items as they land; each phase's commit message references the phase.
       (`openInterestHist`); anything older is unavailable.
 - [ ] AI summarization layer (spec §32) not built — explicitly optional/last
       in the spec's own priority order.
-- [ ] Signal markers on the price chart itself (vs. a list) — polish item.
 - [ ] Per-timeframe-specific thresholds (today one global threshold set
       applies across 5m/15m/1h/4h) — spec doesn't require per-timeframe
       tuning for MVP; noted as a future refinement once backtest data exists.

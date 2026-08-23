@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { getSymbolDetail } from '@/lib/api';
 import { usePolling } from '@/lib/usePolling';
@@ -23,17 +23,12 @@ export default function SymbolDetailPage() {
   const searchParams = useSearchParams();
   const symbol = (params.symbol ?? '').toUpperCase();
 
+  // Seeded once from the URL (e.g. a heatmap cell linking to a specific
+  // timeframe); the switcher takes over from there, same as any other local state.
   const [timeframe, setTimeframe] = useState<Timeframe>(() => {
     const fromQuery = searchParams.get('timeframe');
     return isTimeframe(fromQuery) ? fromQuery : '15m';
   });
-
-  // If the user arrives via a heatmap cell for a different timeframe, honor it.
-  useEffect(() => {
-    const fromQuery = searchParams.get('timeframe');
-    if (isTimeframe(fromQuery)) setTimeframe(fromQuery);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const fetcher = useCallback(
     () => getSymbolDetail(symbol, timeframe, HISTORY_LIMIT),
