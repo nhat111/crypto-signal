@@ -13,4 +13,9 @@ COPY tsconfig.base.json ./
 RUN npm install
 
 ENV NODE_ENV=production
-CMD ["npm", "run", "start", "-w", "@crypto-signal/worker"]
+# Migrations are idempotent (schema_migrations tracks what's applied), so
+# running them here too is harmless on docker-compose (which already runs
+# them via the separate `migrate` service) and is what makes a single
+# Dockerfile deployable standalone on platforms without an easy one-off job
+# step (e.g. Railway) — see DEPLOY.md.
+CMD ["sh", "-c", "node db/migrate.mjs && npm run start -w @crypto-signal/worker"]
