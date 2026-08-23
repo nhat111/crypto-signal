@@ -10,6 +10,7 @@ import {
   type IChartApi,
   type ISeriesApi,
   type ISeriesMarkersPluginApi,
+  type Time,
   type UTCTimestamp,
 } from 'lightweight-charts';
 
@@ -51,7 +52,7 @@ export function TimeSeriesChart({ series, markers, height = 200 }: TimeSeriesCha
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesHandlesRef = useRef<SimpleSeriesHandle[]>([]);
-  const markersPluginRef = useRef<ISeriesMarkersPluginApi<UTCTimestamp> | null>(null);
+  const markersPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
