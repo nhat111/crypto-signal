@@ -1,0 +1,19 @@
+# Next.js dashboard — pure client of apps/api (NEXT_PUBLIC_API_BASE_URL),
+# never touches Postgres or Binance directly.
+FROM node:22-slim
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+COPY packages ./packages
+COPY apps ./apps
+COPY tsconfig.base.json ./
+
+RUN npm install
+
+ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:4000
+ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+RUN npm run build -w @crypto-signal/web
+
+ENV NODE_ENV=production
+EXPOSE 3000
+CMD ["npm", "run", "start", "-w", "@crypto-signal/web"]

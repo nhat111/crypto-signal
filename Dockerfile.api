@@ -1,0 +1,16 @@
+# Read-only HTTP API over Postgres — shared domain layer for web + telegram
+# (rule 8). Never talks to Binance directly.
+FROM node:22-slim
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+COPY packages ./packages
+COPY apps ./apps
+COPY db ./db
+COPY tsconfig.base.json ./
+
+RUN npm install
+
+ENV NODE_ENV=production
+EXPOSE 4000
+CMD ["npm", "run", "start", "-w", "@crypto-signal/api"]

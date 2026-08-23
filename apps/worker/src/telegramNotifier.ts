@@ -1,0 +1,65 @@
+import type { Logger } from '@crypto-signal/shared';
+import type { Signal } from '@crypto-signal/signal-engine';
+import type { HealthResult, RiskResult } from '@crypto-signal/health-engine';
+
+/**
+ * Sends the proactive alert push directly to Telegram's Bot API. This is
+ * intentionally separate from apps/telegram (the interactive bot): the
+ * interactive bot answers /commands by calling apps/api, same as the web
+ * dashboard (rule 8, "Telegram và Web dùng chung API/domain layer"); this
+ * module is the one-way alert push, which has no "domain logic" to share —
+ * it just formats an already-computed Signal into text.
+ */
+export class TelegramNotifier {
+  constructor(
+    private readonly botToken: string,
+    private readonly logger: Logger,
+  ) {}
+
+  get enabled(): boolean {
+    return this.botToken.length > 0;
+  }
+
+  async send(chatId: string, text: string): Promise<void> {
+    if (!this.enabled) return;
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${this.botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
+      });
+      if (!res.ok) {
+        this.logger.warn({ status: res.status, chatId }, 'telegram sendMessage failed');
+      }
+    } catch (err) {
+      this.logger.warn({ err, chatId }, 'telegram sendMessage error');
+    }
+  }
+}
+
+const SEVERITY_EMOJI: Record<Signal['severity'], string> = {
+  INFO: 'ℹ️',
+  LOW: '🟡',
+  MEDIUM: '🟠',
+  HIGH: '🔴',
+  EXTREME: '🚨',
+};
+
+export function formatAlertMessage(signal: Signal, health: HealthResult, risk: RiskResult): string {
+  const lines = [
+    `${SEVERITY_EMOJI[signal.severity]} <b>MARKET HEALTH ALERT</b>`,
+    '',
+    `<b>${signal.symbol}</b> — ${signal.timeframe}`,
+    '',
+    `Signal: <b>${signal.signalType.replace(/_/g, ' ')}</b>`,
+    `Severity: ${signal.severity}`,
+    `Confidence: ${signal.confidence}%`,
+    '',
+    `Health: ${health.score}/100 (${health.status.replace('_', ' ')})`,
+    `Leverage Risk: ${risk.score}/100`,
+    '',
+    '<b>Why:</b>',
+    ...signal.reasons.map((r, i) => `${i + 1}. ${r}`),
+  ];
+  return lines.join('\n');
+}

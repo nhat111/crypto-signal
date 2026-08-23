@@ -1,0 +1,16 @@
+# Runs the collector/indicator/signal/health pipeline. Not part of the API
+# request path (rule 7) — it's the only process that talks to Binance and
+# writes to Postgres/Redis; api/web/telegram only ever read what it produced.
+FROM node:22-slim
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+COPY packages ./packages
+COPY apps ./apps
+COPY db ./db
+COPY tsconfig.base.json ./
+
+RUN npm install
+
+ENV NODE_ENV=production
+CMD ["npm", "run", "start", "-w", "@crypto-signal/worker"]

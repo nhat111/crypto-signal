@@ -1,0 +1,25 @@
+{
+  "name": "@crypto-signal/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@crypto-signal/shared": "*",
+    "@crypto-signal/market-data": "*",
+    "@crypto-signal/indicators": "*",
+    "@crypto-signal/signal-engine": "*",
+    "@crypto-signal/health-engine": "*",
+    "@crypto-signal/db": "*",
+    "ioredis": "^5.4.2"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

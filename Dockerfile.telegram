@@ -1,0 +1,14 @@
+# Interactive Telegram bot — calls apps/api only, never Postgres or Binance
+# directly (rule 8, "Không để Telegram/web gọi trực tiếp Binance").
+FROM node:22-slim
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+COPY packages ./packages
+COPY apps ./apps
+COPY tsconfig.base.json ./
+
+RUN npm install
+
+ENV NODE_ENV=production
+CMD ["npm", "run", "start", "-w", "@crypto-signal/telegram"]

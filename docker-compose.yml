@@ -1,0 +1,103 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: crypto
+      POSTGRES_PASSWORD: crypto
+      POSTGRES_DB: crypto_market_health
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U crypto -d crypto_market_health']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    command: ['node', 'db/migrate.mjs']
+    environment:
+      DATABASE_URL: postgres://crypto:crypto@postgres:5432/crypto_market_health
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://crypto:crypto@postgres:5432/crypto_market_health
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://crypto:crypto@postgres:5432/crypto_market_health
+      REDIS_URL: redis://redis:6379
+      API_HOST: 0.0.0.0
+      API_PORT: 4000
+    ports:
+      - '4000:4000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:4000
+    ports:
+      - '3000:3000'
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  telegram:
+    build:
+      context: .
+      dockerfile: Dockerfile.telegram
+    env_file:
+      - .env
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://api:4000
+    depends_on:
+      - api
+    restart: unless-stopped
+    # No-op (process exits immediately) if TELEGRAM_BOT_TOKEN is unset — see apps/telegram/src/main.ts.
+
+volumes:
+  postgres_data:
