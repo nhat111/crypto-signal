@@ -8,7 +8,7 @@ import { CandlePairBuffer } from './state.js';
 import { SnapshotCache } from './redisCache.js';
 import { TelegramNotifier } from './telegramNotifier.js';
 import { processFuturesOnlyCandle, processMatchedCandles } from './pipeline.js';
-import { backfillHistory } from './backfill.js';
+import { backfillHistory, registerSymbols } from './backfill.js';
 import { startSchedulers } from './scheduler.js';
 
 async function main(): Promise<void> {
@@ -66,6 +66,9 @@ async function main(): Promise<void> {
     gemConfig: gemConfig.enabled ? gemConfig : null,
   };
 
+  // Registration first: a symbol must be visible to the read side even if
+  // its history backfill later fails.
+  await registerSymbols(ctx);
   await backfillHistory(ctx);
 
   // Spot WS only ever subscribes to symbols known to have a Spot listing —

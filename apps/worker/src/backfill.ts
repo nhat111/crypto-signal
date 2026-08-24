@@ -15,11 +15,42 @@ const BACKFILL_CANDLES = 100;
  * e.g. HYPEUSDT) skip every spot-side fetch entirely rather than fetching
  * and discarding — see ASSUMPTIONS.md §15.
  */
+/**
+ * Registers every configured symbol in the `symbols` table, which is what
+ * the API reads to decide which symbols exist.
+ *
+ * Deliberately separate from (and run before) backfilling: registration is
+ * one cheap local write per symbol, while backfill makes dozens of network
+ * calls each. Bundling them meant a symbol added to the config could stay
+ * invisible to the whole read side just because its history fetch failed,
+ * or because an earlier symbol's did.
+ */
+export async function registerSymbols(ctx: WorkerContext): Promise<void> {
+  const allSymbols = [...ctx.config.symbols, ...ctx.config.futuresOnlySymbols];
+
+  if (allSymbols.length === 0) {
+    ctx.logger.error('no symbols configured — set SYMBOLS and/or FUTURES_ONLY_SYMBOLS');
+    return;
+  }
+
+  for (const symbol of allSymbols) {
+    try {
+      await ensureSymbol(ctx.pool, symbol);
+    } catch (err) {
+      ctx.logger.error({ err, symbol }, 'failed to register symbol — it will not appear anywhere on the read side');
+    }
+  }
+
+  ctx.logger.info(
+    { symbols: ctx.config.symbols, futuresOnlySymbols: ctx.config.futuresOnlySymbols },
+    'symbols registered',
+  );
+}
+
 export async function backfillHistory(ctx: WorkerContext): Promise<void> {
   const allSymbols = [...ctx.config.symbols, ...ctx.config.futuresOnlySymbols];
 
   for (const symbol of allSymbols) {
-    await ensureSymbol(ctx.pool, symbol);
     const isFuturesOnly = ctx.futuresOnlySymbolSet.has(symbol);
 
     for (const timeframe of ctx.config.timeframes) {
