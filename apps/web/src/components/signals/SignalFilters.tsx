@@ -1,7 +1,8 @@
+'use client';
+
 import { SIGNAL_TYPE_LABEL } from '@/lib/severity';
 import { SIGNAL_TYPES, TIMEFRAMES, type SignalType, type Timeframe } from '@/lib/types';
-
-const SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'];
+import { useTrackedSymbols } from '@/lib/useTrackedSymbols';
 
 export interface SignalFilterState {
   symbol: string;
@@ -18,6 +19,8 @@ const selectClass =
   'rounded-md border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-sm text-slate-200 focus:border-sky-500 focus:outline-none';
 
 export function SignalFilters({ value, onChange }: SignalFiltersProps) {
+  const symbols = useTrackedSymbols();
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <select
@@ -26,7 +29,7 @@ export function SignalFilters({ value, onChange }: SignalFiltersProps) {
         onChange={(e) => onChange({ ...value, symbol: e.target.value })}
       >
         <option value="">All symbols</option>
-        {SYMBOLS.map((s) => (
+        {symbols.map((s) => (
           <option key={s} value={s}>
             {s}
           </option>

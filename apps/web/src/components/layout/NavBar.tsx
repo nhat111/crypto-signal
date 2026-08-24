@@ -3,8 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cx } from '@/lib/format';
-
-const SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'];
+import { useTrackedSymbols } from '@/lib/useTrackedSymbols';
 
 const LINKS = [
   { href: '/', label: 'Overview' },
@@ -16,6 +15,7 @@ const LINKS = [
 /** Top nav: section links + quick jumps to each symbol's detail page. */
 export function NavBar() {
   const pathname = usePathname();
+  const symbols = useTrackedSymbols();
 
   return (
     <header className="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 backdrop-blur">
@@ -46,7 +46,7 @@ export function NavBar() {
         </nav>
 
         <div className="ml-auto flex items-center gap-1">
-          {SYMBOLS.map((symbol) => {
+          {symbols.map((symbol) => {
             const active = pathname === `/symbol/${symbol}`;
             return (
               <Link
