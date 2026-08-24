@@ -41,6 +41,21 @@ export const gemEnvSchema = z.object({
   GEM_ALERT_MIN_SCORE: numeric(70),
   GEM_ALERT_COOLDOWN_HOURS: numeric(24),
 
+  /**
+   * Position watches ("/watch SYMBOL" on the bot). Independent of the
+   * discovery thresholds above — a watch tracks one already-bought token
+   * against a sell condition, not whether it's still a fresh discovery.
+   */
+  GEM_WATCH_CHECK_INTERVAL_MINUTES: numeric(15),
+  /** Alert if price has fallen this many percent from entry. */
+  GEM_WATCH_STOP_LOSS_PCT: numeric(25),
+  /** Alert if price has risen this many percent from entry. */
+  GEM_WATCH_TAKE_PROFIT_PCT: numeric(50),
+  /** Alert if liquidity has fallen to this % or less of what it was at entry. */
+  GEM_WATCH_LIQUIDITY_COLLAPSE_PCT: numeric(50),
+  /** Alert if the risk score (from the token's latest regular scan, if any) reaches this — matches the web dashboard's own "very weak" red band. */
+  GEM_WATCH_RISK_SCORE_ALERT: numeric(80),
+
   RUGCHECK_API_KEY: z.string().default(''),
 });
 
@@ -91,6 +106,15 @@ export const GEM_RISK_WEIGHTS: GemRiskWeights = {
   pumpExhaustion: 15,
 };
 
+/** Sell-trigger thresholds for a position watch. See WatchThresholds in watchEvaluator.ts for how these are applied. */
+export interface GemWatchConfig {
+  checkIntervalMinutes: number;
+  stopLossPct: number;
+  takeProfitPct: number;
+  liquidityCollapsePct: number;
+  riskScoreAlert: number;
+}
+
 export interface GemConfig {
   enabled: boolean;
   chains: string[];
@@ -99,6 +123,7 @@ export interface GemConfig {
   scoreWeights: GemScoreWeights;
   riskWeights: GemRiskWeights;
   alert: { minScore: number; cooldownHours: number };
+  watch: GemWatchConfig;
   rugcheckApiKey: string;
 }
 
@@ -132,6 +157,13 @@ export function loadGemConfig(env: NodeJS.ProcessEnv = process.env): GemConfig {
     scoreWeights: GEM_SCORE_WEIGHTS,
     riskWeights: GEM_RISK_WEIGHTS,
     alert: { minScore: parsed.GEM_ALERT_MIN_SCORE, cooldownHours: parsed.GEM_ALERT_COOLDOWN_HOURS },
+    watch: {
+      checkIntervalMinutes: parsed.GEM_WATCH_CHECK_INTERVAL_MINUTES,
+      stopLossPct: parsed.GEM_WATCH_STOP_LOSS_PCT,
+      takeProfitPct: parsed.GEM_WATCH_TAKE_PROFIT_PCT,
+      liquidityCollapsePct: parsed.GEM_WATCH_LIQUIDITY_COLLAPSE_PCT,
+      riskScoreAlert: parsed.GEM_WATCH_RISK_SCORE_ALERT,
+    },
     rugcheckApiKey: parsed.RUGCHECK_API_KEY,
   };
 }

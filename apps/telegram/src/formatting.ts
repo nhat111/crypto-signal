@@ -1,4 +1,4 @@
-import type { GemRow, LatestSymbolState, OverviewRow, SignalRow } from './apiClient.js';
+import type { GemRow, GemWatchDTO, LatestSymbolState, OverviewRow, SignalRow } from './apiClient.js';
 
 function healthLine(row: OverviewRow): string {
   const score = row.healthScore === null ? 'N/A' : String(row.healthScore);
@@ -106,6 +106,38 @@ export function formatGemList(gems: GemRow[]): string {
   return lines.join('\n');
 }
 
+export function formatWatchConfirmation(watch: GemWatchDTO): string {
+  return [
+    `👀 Watching <b>${escapeHtml(watch.symbol)}</b>`,
+    '',
+    `Entry price: $${watch.entryPrice}`,
+    `Sell alert if:`,
+    `• price falls ${watch.stopLossPct}% (stop-loss)`,
+    `• price rises ${watch.takeProfitPct}% (take-profit)`,
+    `• liquidity drops to ${watch.liquidityCollapsePct}% of entry`,
+    `• risk score reaches ${watch.riskScoreAlert}/100, or safety turns dangerous`,
+    '',
+    '<i>Checked automatically in the background — you\'ll get a message here the moment one of these fires. This watch closes itself once it does; /watch it again to re-arm.</i>',
+  ].join('\n');
+}
+
+export function formatWatchList(watches: GemWatchDTO[]): string {
+  if (watches.length === 0) {
+    return 'No active watches.\n\nUse /watch SYMBOL right after seeing it in /gems to start tracking a position.';
+  }
+
+  const lines = ['👀 <b>ACTIVE WATCHES</b>', ''];
+  for (const w of watches) {
+    lines.push(
+      `<b>${escapeHtml(w.symbol)}</b> · ${w.chainId} — entry $${w.entryPrice}`,
+      `stop-loss ${w.stopLossPct}% · take-profit ${w.takeProfitPct}% · liq floor ${w.liquidityCollapsePct}%`,
+      '',
+    );
+  }
+  lines.push('<i>Use /unwatch SYMBOL to stop tracking one manually.</i>');
+  return lines.join('\n');
+}
+
 /** Token names/symbols come from on-chain metadata that anyone can set, so they're escaped before entering an HTML-parsed message. */
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -134,6 +166,9 @@ export function buildHelpText(symbols: string[]): string {
     `${symbolCommands} — symbol detail`,
     '/signals — recent signals',
     '/gems — small-cap candidates from DEX data',
+    '/watch SYMBOL — track a position you bought, get a sell alert here',
+    '/watches — list your active watches',
+    '/unwatch SYMBOL — stop tracking one',
     '/alerts on|off — toggle alert push to this chat',
     '/help — this message',
     '',

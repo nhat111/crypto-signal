@@ -184,6 +184,32 @@ export async function getGemByAddress(pool: Pool, chainId: string, tokenAddress:
   return row ? toGemRow(row) : undefined;
 }
 
+/**
+ * Resolves a "/watch SYMBOL" command to the most recently scanned token
+ * carrying that ticker, across all chains — good enough while only one
+ * chain is enabled. Symbols aren't unique on-chain (anyone can name a
+ * token "DINGER"), so this is "most recently seen," not a guarantee of
+ * which token the caller meant.
+ */
+export async function getLatestGemBySymbol(pool: Pool, symbol: string): Promise<GemRow | undefined> {
+  const { rows } = await pool.query(
+    `SELECT s.scan_id, s.chain_id, s.token_address, s.gem_score, s.gem_components, s.risk_score,
+            s.risk_components, s.reasons, s.price_usd, s.liquidity_usd, s.volume_24h_usd, s.fdv_usd,
+            s.price_change_24h_pct, s.buys_24h, s.sells_24h, s.age_days, s.safety_verdict,
+            s.safety_flags, s.top_holder_pct, s.lp_locked,
+            extract(epoch from s.scanned_at)*1000 AS ts,
+            t.symbol, t.name, t.dex_id, t.dexscreener_url
+     FROM gem_scans s
+     JOIN gem_tokens t ON t.chain_id = s.chain_id AND t.token_address = s.token_address
+     WHERE lower(t.symbol) = lower($1)
+     ORDER BY s.scanned_at DESC
+     LIMIT 1`,
+    [symbol],
+  );
+  const row = rows[0];
+  return row ? toGemRow(row) : undefined;
+}
+
 function toGemRow(r: Record<string, unknown>): GemRow {
   return {
     scanId: r['scan_id'] as string,

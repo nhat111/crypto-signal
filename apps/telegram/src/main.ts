@@ -1,7 +1,7 @@
 import { Telegraf } from 'telegraf';
 import { createLogger, loadConfig, type Logger } from '@crypto-signal/shared';
-import { ApiClient } from './apiClient.js';
-import { buildHelpText, formatGemList, formatHeatmap, formatOverview, formatSignalList, formatSymbolDetail } from './formatting.js';
+import { ApiClient, ApiError } from './apiClient.js';
+import { buildHelpText, formatGemList, formatHeatmap, formatOverview, formatSignalList, formatSymbolDetail, formatWatchConfirmation, formatWatchList } from './formatting.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -100,6 +100,59 @@ async function main(): Promise<void> {
     }
   });
 
+  bot.command('watch', async (ctx) => {
+    const chatId = String(ctx.chat.id);
+    const symbol = ctx.message.text.split(' ')[1]?.toUpperCase();
+    if (!symbol) {
+      await ctx.reply('Usage: /watch SYMBOL — e.g. /watch DINGER (must be a symbol you\'ve seen in /gems).');
+      return;
+    }
+    try {
+      const { watch } = await api.watchGem(chatId, symbol);
+      await ctx.reply(formatWatchConfirmation(watch), { parse_mode: 'HTML' });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        await ctx.reply(err.message);
+        return;
+      }
+      logger.error({ err, symbol }, '/watch failed');
+      await ctx.reply('Could not start watching that right now — try again shortly.');
+    }
+  });
+
+  bot.command('watches', async (ctx) => {
+    const chatId = String(ctx.chat.id);
+    try {
+      const { watches } = await api.getWatches(chatId);
+      await ctx.reply(formatWatchList(watches), { parse_mode: 'HTML' });
+    } catch (err) {
+      logger.error({ err }, '/watches failed');
+      await ctx.reply('Could not load your watches right now — try again shortly.');
+    }
+  });
+
+  bot.command('unwatch', async (ctx) => {
+    const chatId = String(ctx.chat.id);
+    const symbol = ctx.message.text.split(' ')[1]?.toUpperCase();
+    if (!symbol) {
+      await ctx.reply('Usage: /unwatch SYMBOL');
+      return;
+    }
+    try {
+      const { watches } = await api.getWatches(chatId);
+      const match = watches.find((w) => w.symbol.toUpperCase() === symbol);
+      if (!match) {
+        await ctx.reply(`No active watch for ${symbol}.`);
+        return;
+      }
+      await api.unwatch(chatId, match.id);
+      await ctx.reply(`Stopped watching ${symbol}.`);
+    } catch (err) {
+      logger.error({ err, symbol }, '/unwatch failed');
+      await ctx.reply('Could not unwatch that right now — try again shortly.');
+    }
+  });
+
   bot.command('alerts', async (ctx) => {
     const chatId = String(ctx.chat.id);
     const arg = ctx.message.text.split(' ')[1]?.toLowerCase();
@@ -128,6 +181,9 @@ async function main(): Promise<void> {
       ...symbols.map((symbol) => ({ command: commandNameFor(symbol), description: `${symbol} detail` })),
       { command: 'signals', description: 'Recent signals' },
       { command: 'gems', description: 'Small-cap candidates' },
+      { command: 'watch', description: 'Track a position, get a sell alert' },
+      { command: 'watches', description: 'List your active watches' },
+      { command: 'unwatch', description: 'Stop tracking a position' },
       { command: 'alerts', description: 'Toggle alerts for this chat' },
       { command: 'help', description: 'Show help' },
     ]);

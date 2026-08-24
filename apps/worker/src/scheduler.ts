@@ -9,6 +9,7 @@ import {
 import { ALL_SIGNAL_TYPES } from '@crypto-signal/signal-engine';
 import { processMatchedCandles } from './pipeline.js';
 import { runGemOutcomeTracker, runGemScanCycle, type GemScanDeps } from './gemScan.js';
+import { runGemWatchCycle, type GemWatchDeps } from './gemWatch.js';
 import type { WorkerContext } from './context.js';
 
 const HORIZONS: OutcomeHorizon[] = ['15m', '1h', '4h', '24h'];
@@ -93,6 +94,13 @@ export function startSchedulers(ctx: WorkerContext): () => void {
     );
 
     void runGemScanCycle(gemDeps).catch((err) => ctx.logger.error({ err }, 'initial gem scan failed'));
+
+    // Position watches run on their own cadence, independent of the
+    // discovery scan interval — a stop-loss check shouldn't wait 30
+    // minutes just because that's how often new candidates get scanned.
+    const watchDeps: GemWatchDeps = { pool: ctx.pool, logger: ctx.logger, notifier: ctx.notifier };
+    const watchIntervalMs = ctx.gemConfig.watch.checkIntervalMinutes * 60_000;
+    timers.push(setInterval(() => void runGemWatchCycle(watchDeps).catch((err) => ctx.logger.error({ err }, 'gem watch cycle failed')), watchIntervalMs));
   }
 
   timers.push(setInterval(() => void runOutcomeTracker(ctx).catch((err) => ctx.logger.error({ err }, 'outcome tracker failed')), 5 * 60_000));

@@ -80,6 +80,32 @@ export interface GemRow {
   safetyFlags: string[] | null;
 }
 
+export interface GemWatchDTO {
+  id: string;
+  chatId: string;
+  chainId: string;
+  tokenAddress: string;
+  symbol: string;
+  entryPrice: number;
+  entryLiquidityUsd: number | null;
+  stopLossPct: number;
+  takeProfitPct: number;
+  liquidityCollapsePct: number;
+  riskScoreAlert: number;
+  status: 'active' | 'triggered' | 'closed';
+  createdAt: number;
+}
+
+/** Thrown for a non-2xx /api/watches response so callers can read the API's own error message instead of a generic "failed: 4xx". */
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 export class ApiClient {
   constructor(private readonly baseUrl: string) {}
 
@@ -95,7 +121,14 @@ export class ApiClient {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`API POST ${path} failed: ${res.status}`);
+    if (!res.ok) {
+      // /api/watches replies with a plain-language {error} on 4xx (already
+      // watching, unknown symbol, etc.) that's worth showing the user
+      // directly rather than a generic "failed: 409".
+      const parsed = await res.json().catch(() => undefined);
+      const message = parsed && typeof parsed === 'object' && 'error' in parsed ? String((parsed as { error: unknown }).error) : `API POST ${path} failed: ${res.status}`;
+      throw new ApiError(res.status, message);
+    }
     return (await res.json()) as T;
   }
 
@@ -113,6 +146,18 @@ export class ApiClient {
 
   getGems(limit = 10): Promise<{ gems: GemRow[] }> {
     return this.get(`/api/gems?limit=${limit}`);
+  }
+
+  watchGem(chatId: string, symbol: string): Promise<{ watch: GemWatchDTO }> {
+    return this.post('/api/watches', { chatId, symbol });
+  }
+
+  getWatches(chatId: string): Promise<{ watches: GemWatchDTO[] }> {
+    return this.get(`/api/watches/${chatId}`);
+  }
+
+  unwatch(chatId: string, id: string): Promise<{ closed: true }> {
+    return this.post(`/api/watches/${id}/close`, { chatId });
   }
 
   registerUser(chatId: string, username: string | undefined): Promise<{ settings: BotSettings }> {

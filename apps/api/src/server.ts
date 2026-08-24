@@ -2,18 +2,20 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import pg from 'pg';
 import { createLogger, loadConfig } from '@crypto-signal/shared';
+import { loadGemConfig } from '@crypto-signal/gem-scanner';
 import { registerRoutes } from './routes/index.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger('api', config.logLevel);
+  const gemConfig = loadGemConfig();
 
   const pool = new pg.Pool({ connectionString: config.databaseUrl, max: 10 });
 
   const app = Fastify({ logger: false });
   await app.register(cors, { origin: true });
 
-  registerRoutes(app, { pool, config });
+  registerRoutes(app, { pool, config, gemConfig: gemConfig.enabled ? gemConfig : null });
 
   app.setErrorHandler((err, _req, reply) => {
     logger.error({ err }, 'unhandled API error');

@@ -118,10 +118,22 @@ On the **`worker`** service only, add:
   unauthenticated and degrades to "unverified", never to "safe"
 
 Everything else has working defaults (`.env.example` lists them). No change
-is needed on `api`, `web`, or `telegram` — they read what the worker
-persisted, though the bot needs a restart to register its `/gems` command.
+is needed on `web` — it only reads what the worker persisted, through
+`api`. The bot needs a restart to register its `/gems` command.
 
 Migration `004_gem_scanner.sql` runs automatically on the worker's next
 boot. Give it one scan interval (default 30 min) before expecting anything
 in `/gems`, and note that the performance panel deliberately shows "not
 enough data yet" until 20 surfaced tokens have a recorded outcome.
+
+### Position watches ("/watch SYMBOL")
+
+Unlike the rest of the gem scanner, this one **does** need `api` configured
+too, not just `worker`: `/api/watches` reads its own `GEM_SCAN_ENABLED` and
+`GEM_WATCH_*` env vars to know the sell-trigger defaults for a new watch, so
+add the same `GEM_SCAN_ENABLED=true` (and optionally the `GEM_WATCH_*`
+overrides) to the **`api`** service's variables as well. Without it,
+`/watch` replies with "gem scanner is disabled" even while the worker is
+scanning fine. Migration `005_gem_watches.sql` runs automatically on the
+worker's next boot, same as the others. The bot needs a restart to register
+`/watch`, `/watches`, `/unwatch`.

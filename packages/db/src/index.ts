@@ -8,3 +8,4 @@ export * from './botUsers.js';
 export * from './symbols.js';
 export * from './queries.js';
 export * from './gems.js';
+export * from './gemWatches.js';
