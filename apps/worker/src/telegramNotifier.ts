@@ -45,7 +45,7 @@ const SEVERITY_EMOJI: Record<Signal['severity'], string> = {
   EXTREME: '🚨',
 };
 
-export function formatAlertMessage(signal: Signal, health: HealthResult, risk: RiskResult): string {
+export function formatAlertMessage(signal: Signal, health: HealthResult | null, risk: RiskResult): string {
   const lines = [
     `${SEVERITY_EMOJI[signal.severity]} <b>MARKET HEALTH ALERT</b>`,
     '',
@@ -55,7 +55,7 @@ export function formatAlertMessage(signal: Signal, health: HealthResult, risk: R
     `Severity: ${signal.severity}`,
     `Confidence: ${signal.confidence}%`,
     '',
-    `Health: ${health.score}/100 (${health.status.replace('_', ' ')})`,
+    health ? `Health: ${health.score}/100 (${health.status.replace('_', ' ')})` : 'Health: N/A (futures-only symbol)',
     `Leverage Risk: ${risk.score}/100`,
     '',
     '<b>Why:</b>',

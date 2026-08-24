@@ -67,6 +67,17 @@ export const HEALTH_COLORS: Record<HealthStatus, HealthColorSet> = {
   },
 };
 
+/** For futures-only symbols (healthScore/healthStatus null — no Spot listing on Binance, so Health Score can't be computed). Neutral gray, distinct from any real band. */
+export const HEALTH_NA_COLORS: HealthColorSet = {
+  text: 'text-slate-400',
+  bg: 'bg-slate-500/10',
+  border: 'border-slate-500/30',
+  dot: 'bg-slate-500',
+  bar: 'bg-slate-600',
+};
+
+export const HEALTH_NA_HEX = '#64748b';
+
 /** Hex equivalents of the palette above, for lightweight-charts series (no Tailwind there). */
 export const HEALTH_HEX: Record<HealthStatus, string> = {
   VERY_HEALTHY: '#34d399',

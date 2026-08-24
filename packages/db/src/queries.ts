@@ -6,8 +6,9 @@ export interface OverviewRow {
   timestamp: number;
   priceClose: number;
   priceChangePct: number;
-  healthScore: number;
-  healthStatus: string;
+  /** Null for futures-only symbols (no Spot listing) — see ASSUMPTIONS.md §15. */
+  healthScore: number | null;
+  healthStatus: string | null;
   riskScore: number;
   dataQualityScore: number;
 }
@@ -44,7 +45,7 @@ export interface SymbolTimeseriesPoint {
   fundingRatePct: number | null;
   liquidationLongUsd: number | null;
   liquidationShortUsd: number | null;
-  healthScore: number;
+  healthScore: number | null;
   riskScore: number;
 }
 
@@ -84,7 +85,8 @@ export async function getSymbolTimeseries(
 }
 
 export interface LatestSymbolState extends OverviewRow {
-  spotCvd: number;
+  /** Null for futures-only symbols. */
+  spotCvd: number | null;
   futuresCvd: number;
   openInterest: number;
   fundingRatePct: number;
@@ -101,7 +103,7 @@ export async function getLatestSymbolState(pool: Pool, symbol: string, timeframe
   if (!overview) return undefined;
   return {
     ...overview,
-    spotCvd: point.spotCvdCumulative ?? 0,
+    spotCvd: point.spotCvdCumulative,
     futuresCvd: point.futuresCvdCumulative ?? 0,
     openInterest: point.openInterest ?? 0,
     fundingRatePct: point.fundingRatePct ?? 0,

@@ -21,12 +21,12 @@ export function LiquidationChart({ points, height = 180 }: LiquidationChartProps
       {
         kind: 'histogram' as const,
         color: '#34d399',
-        data: points.map((p) => ({ timestamp: p.timestamp, value: p.liquidationLongUsd })),
+        data: points.map((p) => ({ timestamp: p.timestamp, value: p.liquidationLongUsd ?? 0 })),
       },
       {
         kind: 'histogram' as const,
         color: '#fb7185',
-        data: points.map((p) => ({ timestamp: p.timestamp, value: -p.liquidationShortUsd })),
+        data: points.map((p) => ({ timestamp: p.timestamp, value: -(p.liquidationShortUsd ?? 0) })),
       },
     ],
     [points],
@@ -40,9 +40,9 @@ export function LiquidationChart({ points, height = 180 }: LiquidationChartProps
       lastValue={
         last ? (
           <>
-            <span className="text-emerald-400">L {formatUsd(last.liquidationLongUsd)}</span>
+            <span className="text-emerald-400">L {formatUsd(last.liquidationLongUsd ?? 0)}</span>
             {' / '}
-            <span className="text-rose-400">S {formatUsd(last.liquidationShortUsd)}</span>
+            <span className="text-rose-400">S {formatUsd(last.liquidationShortUsd ?? 0)}</span>
           </>
         ) : undefined
       }

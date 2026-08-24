@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Candle, ConfidenceWeights, Thresholds } from '@crypto-signal/shared';
-import type { MarketSnapshot } from '@crypto-signal/indicators';
+import type { MarketSnapshot, VolumeAnomalyLevel } from '@crypto-signal/indicators';
 import { evaluateSignals } from './engine.js';
 import type { SignalType } from './types.js';
 
@@ -54,7 +54,7 @@ function baseSnapshot(overrides: {
   shortLiquidationUsd?: number;
   liquidationAnomalyRatio?: number;
   liquidationSpike?: boolean;
-  spotVolumeAnomaly?: MarketSnapshot['spot']['volumeAnomaly'];
+  spotVolumeAnomaly?: VolumeAnomalyLevel;
   dataQualityScore?: number;
 } = {}): MarketSnapshot {
   return {

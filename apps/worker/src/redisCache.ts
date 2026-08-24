@@ -5,7 +5,8 @@ import type { Signal } from '@crypto-signal/signal-engine';
 
 export interface CachedState {
   snapshot: MarketSnapshot;
-  health: HealthResult;
+  /** Null for futures-only symbols — no Spot data to score Health against (ASSUMPTIONS.md §15). */
+  health: HealthResult | null;
   risk: RiskResult;
   signals: Signal[];
   updatedAt: number;

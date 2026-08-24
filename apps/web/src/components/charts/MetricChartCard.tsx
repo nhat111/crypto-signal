@@ -29,16 +29,20 @@ export function MetricChartCard({
   height = 180,
 }: MetricChartCardProps) {
   const data = useMemo(
-    () => points.map((p) => ({ timestamp: p.timestamp, value: p[valueKey] })),
+    () =>
+      points
+        .filter((p): p is typeof p & Record<NumericKey, number> => p[valueKey] !== null)
+        .map((p) => ({ timestamp: p.timestamp, value: p[valueKey] })),
     [points, valueKey],
   );
   const series = useMemo(() => [{ kind: 'line' as const, color, lineWidth: 2 as const, data }], [color, data]);
   const last = points.at(-1);
+  const lastValue = last ? last[valueKey] : undefined;
 
   return (
     <ChartPanel
       title={title}
-      lastValue={last ? formatter(last[valueKey]) : undefined}
+      lastValue={lastValue != null ? formatter(lastValue) : 'N/A'}
       lastValueClassName={cx('text-sm font-bold tabular-nums', lastValueClassName)}
     >
       <TimeSeriesChart series={series} height={height} />

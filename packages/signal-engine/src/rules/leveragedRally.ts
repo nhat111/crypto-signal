@@ -8,6 +8,7 @@ import { buildSignal, pct } from './ruleHelpers.js';
  */
 export function leveragedRally(ctx: RuleContext): Signal | null {
   const { snapshot: s, thresholds: t } = ctx;
+  if (!s.spot) return null; // futures-only symbol — no spot leg to compare against (ASSUMPTIONS.md §15)
 
   const priceUp = s.price.changePct >= t.priceChangePct;
   const spotSelling = s.spot.cvdSkewRatio <= -t.cvdSkewRatio;

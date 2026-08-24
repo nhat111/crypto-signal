@@ -10,10 +10,17 @@ const BACKFILL_CANDLES = 100;
  * live candle already has a meaningful volume average / ATR / CVD baseline
  * instead of a cold-start distortion. Also seeds sequence guards so the
  * first live WS candle isn't misread as a gap.
+ *
+ * Futures-only symbols (ctx.futuresOnlySymbolSet — no Binance Spot listing,
+ * e.g. HYPEUSDT) skip every spot-side fetch entirely rather than fetching
+ * and discarding — see ASSUMPTIONS.md §15.
  */
 export async function backfillHistory(ctx: WorkerContext): Promise<void> {
-  for (const symbol of ctx.config.symbols) {
+  const allSymbols = [...ctx.config.symbols, ...ctx.config.futuresOnlySymbols];
+
+  for (const symbol of allSymbols) {
     await ensureSymbol(ctx.pool, symbol);
+    const isFuturesOnly = ctx.futuresOnlySymbolSet.has(symbol);
 
     for (const timeframe of ctx.config.timeframes) {
       const state = ctx.states.get(stateKey(symbol, timeframe));
@@ -21,7 +28,7 @@ export async function backfillHistory(ctx: WorkerContext): Promise<void> {
 
       try {
         const [spotCandles, futuresCandles] = await Promise.all([
-          ctx.spotAdapter.fetchKlines(symbol, timeframe, { limit: BACKFILL_CANDLES }),
+          isFuturesOnly ? Promise.resolve([]) : ctx.spotAdapter.fetchKlines(symbol, timeframe, { limit: BACKFILL_CANDLES }),
           ctx.futuresAdapter.fetchKlines(symbol, timeframe, { limit: BACKFILL_CANDLES }),
         ]);
 
@@ -41,9 +48,11 @@ export async function backfillHistory(ctx: WorkerContext): Promise<void> {
         }
         state.previousFuturesClose = previousClose;
 
-        state.spotCumulativeCvd = await getLatestCumulativeCvd(ctx.pool, symbol, 'spot', timeframe);
-        if (state.spotCumulativeCvd === 0 && spotCandles.length > 0) {
-          state.spotCumulativeCvd = buildCvdSeries(spotCandles).at(-1)?.cumulative ?? 0;
+        if (!isFuturesOnly) {
+          state.spotCumulativeCvd = await getLatestCumulativeCvd(ctx.pool, symbol, 'spot', timeframe);
+          if (state.spotCumulativeCvd === 0 && spotCandles.length > 0) {
+            state.spotCumulativeCvd = buildCvdSeries(spotCandles).at(-1)?.cumulative ?? 0;
+          }
         }
         state.futuresCumulativeCvd = await getLatestCumulativeCvd(ctx.pool, symbol, 'futures', timeframe);
         if (state.futuresCumulativeCvd === 0 && futuresCandles.length > 0) {
@@ -59,7 +68,7 @@ export async function backfillHistory(ctx: WorkerContext): Promise<void> {
         for (const point of oiHistory) await insertOpenInterest(ctx.pool, point);
 
         ctx.logger.info(
-          { symbol, timeframe, spotCandles: spotCandles.length, futuresCandles: futuresCandles.length, oiPoints: oiHistory.length },
+          { symbol, timeframe, futuresOnly: isFuturesOnly, spotCandles: spotCandles.length, futuresCandles: futuresCandles.length, oiPoints: oiHistory.length },
           'backfill complete',
         );
       } catch (err) {

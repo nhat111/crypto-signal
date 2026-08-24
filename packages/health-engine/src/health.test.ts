@@ -110,7 +110,8 @@ describe('spec §37 Scenario 1 — Healthy Rally', () => {
     const health = computeHealth(snapshot, signals, thresholds, healthWeights);
     const risk = computeRisk(snapshot, signals, thresholds, riskWeights);
 
-    expect(health.score).toBeGreaterThanOrEqual(65);
+    expect(health).not.toBeNull();
+    expect(health!.score).toBeGreaterThanOrEqual(65);
     expect(risk.score).toBeLessThanOrEqual(50);
   });
 });
@@ -129,7 +130,9 @@ describe('spec §37 Scenario 2 — Leveraged Rally', () => {
     const healthyRisk = computeRisk(healthySnapshot, healthySignals, thresholds, riskWeights);
     const leveragedRisk = computeRisk(leveragedSnapshot, leveragedSignals, thresholds, riskWeights);
 
-    expect(leveragedHealth.score).toBeLessThan(healthyHealth.score);
+    expect(healthyHealth).not.toBeNull();
+    expect(leveragedHealth).not.toBeNull();
+    expect(leveragedHealth!.score).toBeLessThan(healthyHealth!.score);
     expect(leveragedRisk.score).toBeGreaterThan(healthyRisk.score);
   });
 });
@@ -152,7 +155,8 @@ describe('Health and Risk are independent axes (spec §14)', () => {
     const health = computeHealth(snapshot, signals, thresholds, healthWeights);
     const risk = computeRisk(snapshot, signals, thresholds, riskWeights);
 
-    expect(health.score).toBeGreaterThanOrEqual(50);
+    expect(health).not.toBeNull();
+    expect(health!.score).toBeGreaterThanOrEqual(50);
     expect(risk.score).toBeGreaterThanOrEqual(50);
   });
 });
@@ -164,5 +168,22 @@ describe('classifyHealth buckets (spec §2 exact numbers)', () => {
     expect(classifyHealth(55)).toBe('NEUTRAL');
     expect(classifyHealth(40)).toBe('WEAK');
     expect(classifyHealth(10)).toBe('VERY_WEAK');
+  });
+});
+
+describe('Futures-only symbols (no Spot listing, e.g. HYPEUSDT — ASSUMPTIONS.md §15)', () => {
+  it('computeHealth returns null when snapshot.spot is null, but Risk still computes fully', () => {
+    const snapshot = { ...baseSnapshot({ priceChangePct: 0.8, futuresCvdSkewRatio: 0.25, oiChangePct: 4, fundingBias: 'elevated_positive' }), spot: null };
+    const confidenceWeights = { dataQuality: 0.25, confirmation: 0.3, magnitude: 0.25, historical: 0.2 };
+    const signals = evaluateSignals(snapshot, { thresholds, confidenceWeights });
+    const health = computeHealth(snapshot, signals, thresholds, healthWeights);
+    const risk = computeRisk(snapshot, signals, thresholds, riskWeights);
+
+    expect(health).toBeNull();
+    expect(risk.score).toBeGreaterThanOrEqual(0);
+    expect(risk.score).toBeLessThanOrEqual(100);
+    // Spot-dependent signals must never fire without spot data.
+    expect(signals.map((s) => s.signalType)).not.toContain('LEVERAGED_RALLY');
+    expect(signals.map((s) => s.signalType)).not.toContain('SPOT_CONFIRMED_RALLY');
   });
 });

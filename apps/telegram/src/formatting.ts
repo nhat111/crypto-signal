@@ -1,7 +1,9 @@
 import type { LatestSymbolState, OverviewRow, SignalRow } from './apiClient.js';
 
 function healthLine(row: OverviewRow): string {
-  return `${row.symbol.padEnd(8)} ${String(row.healthScore).padStart(3)}  ${row.healthStatus.replace(/_/g, ' ')}`;
+  const score = row.healthScore === null ? 'N/A' : String(row.healthScore);
+  const status = row.healthStatus === null ? 'futures-only' : row.healthStatus.replace(/_/g, ' ');
+  return `${row.symbol.padEnd(8)} ${score.padStart(3)}  ${status}`;
 }
 
 /** Spec §17 dashboard mock, adapted to plain text for /status and /market. */
@@ -18,7 +20,8 @@ export function formatHeatmap(rows: OverviewRow[], symbols: string[], timeframes
   for (const symbol of symbols) {
     const cells = timeframes.map((tf) => {
       const row = rows.find((r) => r.symbol === symbol && r.timeframe === tf);
-      return (row ? String(row.healthScore) : '-').padStart(6);
+      const cell = row ? (row.healthScore === null ? 'N/A' : String(row.healthScore)) : '-';
+      return cell.padStart(6);
     });
     lines.push(`${symbol.padEnd(8)}${cells.join('')}`);
   }
@@ -31,11 +34,13 @@ export function formatSymbolDetail(state: LatestSymbolState, activeSignals: Sign
     `<b>${state.symbol}</b>`,
     '',
     state.timeframe,
-    `Health: ${state.healthScore}  (${state.healthStatus.replace(/_/g, ' ')})`,
+    state.healthScore === null
+      ? 'Health: N/A (futures-only symbol, no Spot data)'
+      : `Health: ${state.healthScore}  (${(state.healthStatus ?? '').replace(/_/g, ' ')})`,
     `Risk: ${state.riskScore}`,
     '',
     `Price       ${state.priceChangePct >= 0 ? '+' : ''}${state.priceChangePct.toFixed(2)}%`,
-    `Spot CVD    ${formatLargeNumber(state.spotCvd)}`,
+    `Spot CVD    ${state.spotCvd === null ? 'N/A' : formatLargeNumber(state.spotCvd)}`,
     `Futures CVD ${formatLargeNumber(state.futuresCvd)}`,
     `OI          ${formatLargeNumber(state.openInterest)}`,
     `Funding     ${state.fundingRatePct.toFixed(4)}%`,

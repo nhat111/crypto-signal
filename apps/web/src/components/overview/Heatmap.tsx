@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { HEALTH_COLORS } from '@/lib/health';
+import { HEALTH_COLORS, HEALTH_NA_COLORS } from '@/lib/health';
 import type { OverviewRow, Timeframe } from '@/lib/types';
 import { cx, formatScore } from '@/lib/format';
 
@@ -58,7 +58,7 @@ export function Heatmap({ symbols, timeframes, rows }: HeatmapProps) {
                     </td>
                   );
                 }
-                const colors = HEALTH_COLORS[cell.healthStatus];
+                const colors = cell.healthStatus ? HEALTH_COLORS[cell.healthStatus] : HEALTH_NA_COLORS;
                 return (
                   <td key={tf} className="px-3 py-2 text-center">
                     <Link
@@ -69,9 +69,9 @@ export function Heatmap({ symbols, timeframes, rows }: HeatmapProps) {
                         colors.border,
                         colors.text,
                       )}
-                      title={`${symbol} ${tf}: ${cell.healthStatus.replace('_', ' ')}`}
+                      title={cell.healthStatus ? `${symbol} ${tf}: ${cell.healthStatus.replace('_', ' ')}` : `${symbol} ${tf}: no Health Score (futures-only)`}
                     >
-                      {formatScore(cell.healthScore)}
+                      {cell.healthScore === null ? 'N/A' : formatScore(cell.healthScore)}
                     </Link>
                   </td>
                 );

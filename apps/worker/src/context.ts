@@ -18,6 +18,8 @@ export interface WorkerContext {
   futuresAdapter: BinanceFuturesAdapter;
   states: Map<string, SymbolTimeframeState>;
   pairBuffer: CandlePairBuffer;
+  /** Symbols with only a Binance Futures listing — routed straight to processFuturesOnlyCandle, never through pairBuffer (there's no spot side to wait for). */
+  futuresOnlySymbolSet: Set<SymbolId>;
   connectionStatus: {
     spot: MarketConnectionState;
     futures: MarketConnectionState;

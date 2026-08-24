@@ -4,6 +4,7 @@ import { buildSignal, pct } from './ruleHelpers.js';
 /** Spec §7 Pattern B / §3 Phase 3 item 1's opposite case — "market khỏe hơn". */
 export function spotConfirmedRally(ctx: RuleContext): Signal | null {
   const { snapshot: s, thresholds: t } = ctx;
+  if (!s.spot) return null; // futures-only symbol — no spot leg to compare against (ASSUMPTIONS.md §15)
 
   const priceUp = s.price.changePct >= t.priceChangePct;
   const spotConfirms = s.spot.cvdSkewRatio > 0;

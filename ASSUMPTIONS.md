@@ -156,3 +156,43 @@ and last in the build order ("AI last"). `TODO.md` tracks it. The
 architecture already isolates it correctly: an AI summarizer would sit
 strictly downstream of the signal engine's JSON output and would only ever
 receive already-computed deterministic numbers, never produce them.
+
+## 15. Futures-only symbols (no Binance Spot listing — e.g. HYPEUSDT)
+
+Some symbols (confirmed for HYPEUSDT at time of writing, via
+`https://www.binance.com/en/futures/hypeusdt`) trade on Binance USDⓈ-M
+Futures but have no Binance Spot listing. The spec's whole methodology is
+built on comparing Spot vs Futures — without a Spot leg that comparison is
+simply impossible, not something to approximate.
+
+Added via the `FUTURES_ONLY_SYMBOLS` env var (disjoint from `SYMBOLS`),
+these symbols get a **reduced** feature set rather than being silently
+skipped or silently faked:
+
+- **Available**: price, Futures CVD, OI (level/change/velocity), funding,
+  liquidations, volatility, and the 5 signals that don't need Spot data
+  (`SHORT_COVERING_POSSIBLE`, `LONG_LIQUIDATION`, `SHORT_LIQUIDATION`,
+  `LONG_CROWDING`, `SHORT_CROWDING`) — verified none of these rules read
+  `snapshot.spot` anywhere in `packages/signal-engine`.
+- **Unavailable, reported as `null`/absent rather than guessed**: Spot CVD,
+  basis (needs both a spot and futures close price), Health Score (spec
+  §13's entire premise is spot-confirmed vs leverage-driven, which is
+  unanswerable without spot), and the 4 spot-dependent signals
+  (`LEVERAGED_RALLY`, `SPOT_CONFIRMED_RALLY`, `BULLISH_SPOT_DIVERGENCE`,
+  `SELLING_ABSORPTION_POSSIBLE`).
+- **Still fully computed**: Leverage Risk Score — it never depended on spot
+  data in the first place (`packages/health-engine/src/riskScore.ts` has no
+  `snapshot.spot` reference).
+
+Mechanically: `MarketSnapshot.spot` is `SpotSnapshot | null`
+(`packages/indicators/src/types.ts`); `computeFuturesOnlySnapshot` builds a
+snapshot with `spot: null` and `basisPct/basisAbsolute` at `0` (not derived,
+since there's no spot price to derive it from); every spot-dependent
+signal rule starts with `if (!s.spot) return null;`; `computeHealth`
+returns `null` when `snapshot.spot` is `null`; the worker never subscribes
+these symbols on the Spot WebSocket at all (avoids the real operational
+risk that one invalid stream name in a combined-stream subscription could
+reject the whole connection, taking BTC/ETH/SOL spot data down with it) and
+routes their futures candles straight to `processFuturesOnlyCandle`,
+bypassing the spot/futures candle-pairing buffer entirely since there's
+nothing to pair.

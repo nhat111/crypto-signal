@@ -4,6 +4,7 @@ import { buildSignal, pct } from './ruleHelpers.js';
 /** Spec §7 Pattern D: price down while spot is actively buying. */
 export function bullishSpotDivergence(ctx: RuleContext): Signal | null {
   const { snapshot: s, thresholds: t } = ctx;
+  if (!s.spot) return null; // futures-only symbol — no spot leg to compare against (ASSUMPTIONS.md §15)
 
   const priceDown = s.price.changePct <= -t.priceChangePct;
   const spotBuying = s.spot.cvdSkewRatio >= t.cvdSkewRatio;

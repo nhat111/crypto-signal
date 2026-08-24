@@ -108,6 +108,11 @@ Check items as they land; each phase's commit message references the phase.
 - [x] `docker-compose.yml`: postgres, redis, api, worker, web, telegram.
 - [x] Dockerfiles per app.
 
+## Phase 16 — Futures-only symbols (post-MVP, added on request)
+- [x] `FUTURES_ONLY_SYMBOLS` config for symbols with a Binance Futures
+      listing but no Spot listing (e.g. HYPEUSDT) — reduced feature set,
+      never fabricated spot data. See ASSUMPTIONS.md §15.
+
 ## Known limitations (carried forward, not silently hidden)
 - [ ] Liquidation history cannot be backfilled on a cold start (exchange
       limitation, see ASSUMPTIONS §1/§6) — 24h rolling average anomaly needs

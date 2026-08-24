@@ -1,6 +1,5 @@
-import type { Candle } from '@crypto-signal/shared';
-import type { OpenInterestPoint } from '@crypto-signal/shared';
-import { computeMarketSnapshot, computeTrueRange } from '@crypto-signal/indicators';
+import type { Candle, OpenInterestPoint, SymbolId, Timeframe } from '@crypto-signal/shared';
+import { computeFuturesOnlySnapshot, computeMarketSnapshot, computeTrueRange, type MarketSnapshot } from '@crypto-signal/indicators';
 import { evaluateSignals, SEVERITY_ORDER, type Signal } from '@crypto-signal/signal-engine';
 import { computeHealth, computeRisk, type HealthResult, type RiskResult } from '@crypto-signal/health-engine';
 import {
@@ -20,31 +19,24 @@ import {
 import { assessDataQuality } from './dataQuality.js';
 import { shouldSendAlert } from './alerting.js';
 import { formatAlertMessage } from './telegramNotifier.js';
-import { stateKey } from './state.js';
+import { stateKey, type SymbolTimeframeState } from './state.js';
 import type { WorkerContext } from './context.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export async function processMatchedCandles(ctx: WorkerContext, spotCandle: Candle, futuresCandle: Candle): Promise<void> {
-  const { symbol, timeframe } = futuresCandle;
-  const key = stateKey(symbol, timeframe);
-  const state = ctx.states.get(key);
-  if (!state) return;
+interface FuturesInputs {
+  currentOI: OpenInterestPoint;
+  previousOI: OpenInterestPoint | undefined;
+  oiStale: boolean;
+  fundingRateFraction: number;
+  fundingStale: boolean;
+  liquidationEvents: Awaited<ReturnType<typeof getLiquidationEventsInWindow>>;
+  rollingLiquidation24hUsd: number;
+  liquidationBaselineReady: boolean;
+}
 
-  const spotResult = state.spotGuard.accept(spotCandle);
-  if (!spotResult.accepted) {
-    ctx.logger.warn({ symbol, timeframe, market: 'spot', reason: spotResult.reason, openTime: spotCandle.openTime }, 'candle rejected by sequence guard');
-    return;
-  }
-  const futuresResult = state.futuresGuard.accept(futuresCandle);
-  if (!futuresResult.accepted) {
-    ctx.logger.warn({ symbol, timeframe, market: 'futures', reason: futuresResult.reason, openTime: futuresCandle.openTime }, 'candle rejected by sequence guard');
-    return;
-  }
-
-  await upsertCandle(ctx.pool, spotCandle);
-  await upsertCandle(ctx.pool, futuresCandle);
-
+/** Everything that only depends on the futures candle — shared by both the normal (spot+futures) and futures-only pipelines. */
+async function gatherFuturesInputs(ctx: WorkerContext, symbol: SymbolId, timeframe: Timeframe, futuresCandle: Candle): Promise<FuturesInputs> {
   let currentOI: OpenInterestPoint | undefined;
   let previousOI: OpenInterestPoint | undefined;
   try {
@@ -83,52 +75,17 @@ export async function processMatchedCandles(ctx: WorkerContext, spotCandle: Cand
   const { totalUsd: rollingLiquidation24hUsd, earliestEventMs } = await getRolling24hLiquidationUsd(ctx.pool, symbol, futuresCandle.closeTime);
   const liquidationBaselineReady = earliestEventMs !== null && futuresCandle.closeTime - earliestEventMs >= DAY_MS * 0.9;
 
-  const dataQuality = assessDataQuality(
-    symbol,
-    timeframe,
-    {
-      spotWsHealthy: ctx.connectionStatus.spot === 'open',
-      futuresWsHealthy: ctx.connectionStatus.futures === 'open',
-      spotGapCandles: spotResult.gapCandles,
-      futuresGapCandles: futuresResult.gapCandles,
-      openInterestStale: oiStale,
-      fundingStale,
-      liquidationBaselineReady,
-    },
-    Date.now(),
-  );
+  return { currentOI, previousOI, oiStale, fundingRateFraction, fundingStale, liquidationEvents, rollingLiquidation24hUsd, liquidationBaselineReady };
+}
 
-  const snapshot = computeMarketSnapshot({
-    symbol,
-    timeframe,
-    spotCandle,
-    futuresCandle,
-    previousSpotCumulativeCvd: state.spotCumulativeCvd,
-    previousFuturesCumulativeCvd: state.futuresCumulativeCvd,
-    spotVolumeHistory: state.spotVolumeHistory,
-    futuresVolumeHistory: state.futuresVolumeHistory,
-    previousOpenInterest: previousOI,
-    currentOpenInterest: currentOI,
-    fundingRateFraction,
-    liquidationEventsInWindow: liquidationEvents,
-    rollingLiquidation24hUsd,
-    previousFuturesClose: state.previousFuturesClose,
-    recentTrueRanges: state.recentTrueRanges,
-    dataQuality,
-    thresholds: ctx.config.thresholds,
-  });
-
-  state.spotCumulativeCvd = snapshot.spot.cvdCumulative;
-  state.futuresCumulativeCvd = snapshot.futures.cvdCumulative;
-  state.pushVolumeHistory('spot', spotCandle.volume);
-  state.pushVolumeHistory('futures', futuresCandle.volume);
-  state.pushTrueRange(computeTrueRange(futuresCandle, state.previousFuturesClose));
-  state.previousFuturesClose = futuresCandle.close;
-  state.lastProcessedOpenTime = futuresCandle.openTime;
-
-  await saveSpotMetrics(ctx.pool, snapshot);
-  await saveFuturesMetrics(ctx.pool, snapshot);
-
+/**
+ * The shared tail once a MarketSnapshot exists, regardless of which
+ * pipeline built it: signals, health/risk, persistence, cache, alerts.
+ * `health`/`risk` are null for futures-only symbols (no Spot data to score
+ * Health against — see health-engine's computeHealth doc comment); Risk is
+ * still fully computed since it never depended on Spot.
+ */
+async function finishSnapshot(ctx: WorkerContext, snapshot: MarketSnapshot): Promise<void> {
   const signals = evaluateSignals(snapshot, {
     thresholds: ctx.config.thresholds,
     confidenceWeights: ctx.config.confidenceWeights,
@@ -149,28 +106,22 @@ export async function processMatchedCandles(ctx: WorkerContext, spotCandle: Cand
   for (const signal of signals) {
     const signalId = await insertSignal(ctx.pool, signal, {
       price: snapshot.price.close,
-      healthScore: health.score,
+      healthScore: health?.score ?? null,
       riskScore: risk.score,
-      spotCvd: snapshot.spot.cvdCumulative,
+      spotCvd: snapshot.spot?.cvdCumulative ?? null,
       futuresCvd: snapshot.futures.cvdCumulative,
       openInterest: snapshot.futures.openInterest,
       fundingRate: snapshot.futures.fundingRate,
       volume: snapshot.futures.volume,
     });
 
-    ctx.logger.info({ symbol, timeframe, signalType: signal.signalType, severity: signal.severity, confidence: signal.confidence }, 'signal fired');
+    ctx.logger.info({ symbol: snapshot.symbol, timeframe: snapshot.timeframe, signalType: signal.signalType, severity: signal.severity, confidence: signal.confidence }, 'signal fired');
 
     await dispatchAlert(ctx, signal, signalId, health, risk);
   }
 }
 
-async function dispatchAlert(
-  ctx: WorkerContext,
-  signal: Signal,
-  signalId: string,
-  health: HealthResult,
-  risk: RiskResult,
-): Promise<void> {
+async function dispatchAlert(ctx: WorkerContext, signal: Signal, signalId: string, health: HealthResult | null, risk: RiskResult): Promise<void> {
   const lastAlert = await getLastAlertEvent(ctx.pool, signal.symbol, signal.timeframe, signal.signalType);
   const shouldAlert = shouldSendAlert(signal, lastAlert, ctx.config.alert.cooldownMinutes, ctx.config.alert.confidenceDeltaRetrigger, Date.now());
   if (!shouldAlert) return;
@@ -199,4 +150,133 @@ async function dispatchAlert(
     await ctx.notifier.send(chatId, text);
     await insertAlertEvent(ctx.pool, signalId, signal, chatId);
   }
+}
+
+export async function processMatchedCandles(ctx: WorkerContext, spotCandle: Candle, futuresCandle: Candle): Promise<void> {
+  const { symbol, timeframe } = futuresCandle;
+  const state = ctx.states.get(stateKey(symbol, timeframe));
+  if (!state) return;
+
+  const spotResult = state.spotGuard.accept(spotCandle);
+  if (!spotResult.accepted) {
+    ctx.logger.warn({ symbol, timeframe, market: 'spot', reason: spotResult.reason, openTime: spotCandle.openTime }, 'candle rejected by sequence guard');
+    return;
+  }
+  const futuresResult = state.futuresGuard.accept(futuresCandle);
+  if (!futuresResult.accepted) {
+    ctx.logger.warn({ symbol, timeframe, market: 'futures', reason: futuresResult.reason, openTime: futuresCandle.openTime }, 'candle rejected by sequence guard');
+    return;
+  }
+
+  await upsertCandle(ctx.pool, spotCandle);
+  await upsertCandle(ctx.pool, futuresCandle);
+
+  const inputs = await gatherFuturesInputs(ctx, symbol, timeframe, futuresCandle);
+
+  const dataQuality = assessDataQuality(
+    symbol,
+    timeframe,
+    {
+      futuresWsHealthy: ctx.connectionStatus.futures === 'open',
+      futuresGapCandles: futuresResult.gapCandles,
+      openInterestStale: inputs.oiStale,
+      fundingStale: inputs.fundingStale,
+      liquidationBaselineReady: inputs.liquidationBaselineReady,
+      spot: { wsHealthy: ctx.connectionStatus.spot === 'open', gapCandles: spotResult.gapCandles },
+    },
+    Date.now(),
+  );
+
+  const snapshot = computeMarketSnapshot({
+    symbol,
+    timeframe,
+    spotCandle,
+    futuresCandle,
+    previousSpotCumulativeCvd: state.spotCumulativeCvd,
+    previousFuturesCumulativeCvd: state.futuresCumulativeCvd,
+    spotVolumeHistory: state.spotVolumeHistory,
+    futuresVolumeHistory: state.futuresVolumeHistory,
+    previousOpenInterest: inputs.previousOI,
+    currentOpenInterest: inputs.currentOI,
+    fundingRateFraction: inputs.fundingRateFraction,
+    liquidationEventsInWindow: inputs.liquidationEvents,
+    rollingLiquidation24hUsd: inputs.rollingLiquidation24hUsd,
+    previousFuturesClose: state.previousFuturesClose,
+    recentTrueRanges: state.recentTrueRanges,
+    dataQuality,
+    thresholds: ctx.config.thresholds,
+  });
+
+  updateStateAfterSnapshot(state, snapshot, spotCandle, futuresCandle);
+
+  await saveSpotMetrics(ctx.pool, snapshot);
+  await saveFuturesMetrics(ctx.pool, snapshot);
+
+  await finishSnapshot(ctx, snapshot);
+}
+
+/** For symbols with only a Binance Futures listing — spec §7 divergence signals and Health Score are unavailable (see MarketSnapshot's doc comment / ASSUMPTIONS.md §15). */
+export async function processFuturesOnlyCandle(ctx: WorkerContext, futuresCandle: Candle): Promise<void> {
+  const { symbol, timeframe } = futuresCandle;
+  const state = ctx.states.get(stateKey(symbol, timeframe));
+  if (!state) return;
+
+  const futuresResult = state.futuresGuard.accept(futuresCandle);
+  if (!futuresResult.accepted) {
+    ctx.logger.warn({ symbol, timeframe, market: 'futures', reason: futuresResult.reason, openTime: futuresCandle.openTime }, 'candle rejected by sequence guard');
+    return;
+  }
+
+  await upsertCandle(ctx.pool, futuresCandle);
+
+  const inputs = await gatherFuturesInputs(ctx, symbol, timeframe, futuresCandle);
+
+  const dataQuality = assessDataQuality(
+    symbol,
+    timeframe,
+    {
+      futuresWsHealthy: ctx.connectionStatus.futures === 'open',
+      futuresGapCandles: futuresResult.gapCandles,
+      openInterestStale: inputs.oiStale,
+      fundingStale: inputs.fundingStale,
+      liquidationBaselineReady: inputs.liquidationBaselineReady,
+      // no `spot` field — this is exactly what marks the symbol as futures-only in dataQuality.issues.
+    },
+    Date.now(),
+  );
+
+  const snapshot = computeFuturesOnlySnapshot({
+    symbol,
+    timeframe,
+    futuresCandle,
+    previousFuturesCumulativeCvd: state.futuresCumulativeCvd,
+    futuresVolumeHistory: state.futuresVolumeHistory,
+    previousOpenInterest: inputs.previousOI,
+    currentOpenInterest: inputs.currentOI,
+    fundingRateFraction: inputs.fundingRateFraction,
+    liquidationEventsInWindow: inputs.liquidationEvents,
+    rollingLiquidation24hUsd: inputs.rollingLiquidation24hUsd,
+    previousFuturesClose: state.previousFuturesClose,
+    recentTrueRanges: state.recentTrueRanges,
+    dataQuality,
+    thresholds: ctx.config.thresholds,
+  });
+
+  updateStateAfterSnapshot(state, snapshot, null, futuresCandle);
+
+  await saveFuturesMetrics(ctx.pool, snapshot);
+
+  await finishSnapshot(ctx, snapshot);
+}
+
+function updateStateAfterSnapshot(state: SymbolTimeframeState, snapshot: MarketSnapshot, spotCandle: Candle | null, futuresCandle: Candle): void {
+  if (snapshot.spot && spotCandle) {
+    state.spotCumulativeCvd = snapshot.spot.cvdCumulative;
+    state.pushVolumeHistory('spot', spotCandle.volume);
+  }
+  state.futuresCumulativeCvd = snapshot.futures.cvdCumulative;
+  state.pushVolumeHistory('futures', futuresCandle.volume);
+  state.pushTrueRange(computeTrueRange(futuresCandle, state.previousFuturesClose));
+  state.previousFuturesClose = futuresCandle.close;
+  state.lastProcessedOpenTime = futuresCandle.openTime;
 }

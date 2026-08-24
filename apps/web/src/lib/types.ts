@@ -39,8 +39,9 @@ export interface OverviewRow {
   timestamp: number;
   priceClose: number;
   priceChangePct: number;
-  healthScore: number;
-  healthStatus: HealthStatus;
+  /** Null for futures-only symbols (no Binance Spot listing) — Health Score needs a spot leg to compare against. */
+  healthScore: number | null;
+  healthStatus: HealthStatus | null;
   riskScore: number;
   dataQualityScore: number;
 }
@@ -68,7 +69,8 @@ export interface SignalsResponse {
 }
 
 export interface SymbolLatest extends OverviewRow {
-  spotCvd: number;
+  /** Null for futures-only symbols. */
+  spotCvd: number | null;
   futuresCvd: number;
   openInterest: number;
   fundingRatePct: number;
@@ -79,13 +81,13 @@ export interface SymbolLatest extends OverviewRow {
 export interface SymbolSeriesPoint {
   timestamp: number;
   priceClose: number;
-  spotCvdCumulative: number;
-  futuresCvdCumulative: number;
-  openInterest: number;
-  fundingRatePct: number;
-  liquidationLongUsd: number;
-  liquidationShortUsd: number;
-  healthScore: number;
+  spotCvdCumulative: number | null;
+  futuresCvdCumulative: number | null;
+  openInterest: number | null;
+  fundingRatePct: number | null;
+  liquidationLongUsd: number | null;
+  liquidationShortUsd: number | null;
+  healthScore: number | null;
   riskScore: number;
 }
 

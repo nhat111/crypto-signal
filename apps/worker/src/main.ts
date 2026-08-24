@@ -6,7 +6,7 @@ import { buildStates, connectionStatusToState, type WorkerContext } from './cont
 import { CandlePairBuffer } from './state.js';
 import { SnapshotCache } from './redisCache.js';
 import { TelegramNotifier } from './telegramNotifier.js';
-import { processMatchedCandles } from './pipeline.js';
+import { processFuturesOnlyCandle, processMatchedCandles } from './pipeline.js';
 import { backfillHistory } from './backfill.js';
 import { startSchedulers } from './scheduler.js';
 
@@ -14,7 +14,7 @@ async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger('worker', config.logLevel);
 
-  logger.info({ symbols: config.symbols, timeframes: config.timeframes }, 'starting worker');
+  logger.info({ symbols: config.symbols, futuresOnlySymbols: config.futuresOnlySymbols, timeframes: config.timeframes }, 'starting worker');
 
   const pool = new pg.Pool({ connectionString: config.databaseUrl, max: 10 });
   const cache = new SnapshotCache(config.redisUrl);
@@ -37,6 +37,8 @@ async function main(): Promise<void> {
     logger,
   });
 
+  const allSymbols = [...config.symbols, ...config.futuresOnlySymbols];
+
   const ctx: WorkerContext = {
     pool,
     cache,
@@ -45,14 +47,18 @@ async function main(): Promise<void> {
     config,
     spotAdapter,
     futuresAdapter,
-    states: buildStates(config.symbols, config.timeframes),
+    states: buildStates(allSymbols, config.timeframes),
     pairBuffer: new CandlePairBuffer(),
+    futuresOnlySymbolSet: new Set(config.futuresOnlySymbols),
     connectionStatus: { spot: 'connecting', futures: 'connecting', liquidation: 'connecting' },
     historicalScores: new Map(),
   };
 
   await backfillHistory(ctx);
 
+  // Spot WS only ever subscribes to symbols known to have a Spot listing —
+  // a futures-only symbol in this list would risk the combined-stream
+  // connection rejecting the whole subscription (ASSUMPTIONS.md §15).
   const unsubscribeSpot = spotAdapter.subscribeKlines(
     config.symbols,
     config.timeframes,
@@ -66,9 +72,13 @@ async function main(): Promise<void> {
   );
 
   const unsubscribeFutures = futuresAdapter.subscribeKlines(
-    config.symbols,
+    allSymbols,
     config.timeframes,
     (candle) => {
+      if (ctx.futuresOnlySymbolSet.has(candle.symbol)) {
+        void processFuturesOnlyCandle(ctx, candle).catch((err) => logger.error({ err }, 'pipeline error'));
+        return;
+      }
       const pair = ctx.pairBuffer.add(candle);
       if (pair) void processMatchedCandles(ctx, pair.spot, pair.futures).catch((err) => logger.error({ err }, 'pipeline error'));
     },
@@ -78,7 +88,7 @@ async function main(): Promise<void> {
   );
 
   const unsubscribeLiquidations = futuresAdapter.subscribeLiquidations(
-    config.symbols,
+    allSymbols,
     (event) => {
       void insertLiquidation(pool, event).catch((err) => logger.error({ err }, 'failed to persist liquidation event'));
     },

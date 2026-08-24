@@ -21,7 +21,7 @@ export function registerHealthRoute(app: FastifyInstance, deps: ApiDeps): void {
          FROM market_health_snapshots
          WHERE symbol = ANY($1) AND timeframe = ANY($2)
          ORDER BY timestamp DESC LIMIT 1`,
-        [deps.config.symbols, deps.config.timeframes],
+        [[...deps.config.symbols, ...deps.config.futuresOnlySymbols], deps.config.timeframes],
       );
       const latest = rows[0];
       if (!latest) {

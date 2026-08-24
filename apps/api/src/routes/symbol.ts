@@ -12,7 +12,7 @@ interface SymbolQuery {
 export function registerSymbolRoute(app: FastifyInstance, deps: ApiDeps): void {
   app.get<{ Params: { symbol: string }; Querystring: SymbolQuery }>('/api/symbols/:symbol', async (req, reply) => {
     const symbol = req.params.symbol.toUpperCase();
-    if (!deps.config.symbols.includes(symbol)) {
+    if (!deps.config.symbols.includes(symbol) && !deps.config.futuresOnlySymbols.includes(symbol)) {
       return reply.code(404).send({ error: `Unknown symbol ${symbol}` });
     }
     const timeframe = (req.query.timeframe ?? '15m') as Timeframe;

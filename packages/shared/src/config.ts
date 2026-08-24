@@ -27,6 +27,8 @@ const envSchema = z.object({
   TELEGRAM_ALERT_CHAT_IDS: z.string().default(''),
 
   SYMBOLS: z.string().default('BTCUSDT,ETHUSDT,SOLUSDT'),
+  /** Futures-only symbols (no Binance Spot listing) — see ASSUMPTIONS.md §15. Tracked with a reduced indicator/signal set. */
+  FUTURES_ONLY_SYMBOLS: z.string().default(''),
   TIMEFRAMES: z.string().default('5m,15m,1h,4h'),
 
   BINANCE_SPOT_REST_BASE: z.string().default('https://api.binance.com'),
@@ -110,6 +112,8 @@ export interface AppConfig {
   telegramBotToken: string;
   telegramAlertChatIds: string[];
   symbols: string[];
+  /** Symbols tracked in reduced (Futures-only, no Spot) mode — disjoint from `symbols`. */
+  futuresOnlySymbols: string[];
   timeframes: Timeframe[];
   binance: {
     spotRestBase: string;
@@ -182,6 +186,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     telegramBotToken: parsed.TELEGRAM_BOT_TOKEN,
     telegramAlertChatIds: parsed.TELEGRAM_ALERT_CHAT_IDS.split(',').map((s) => s.trim()).filter(Boolean),
     symbols: parsed.SYMBOLS.split(',').map((s) => s.trim()).filter(Boolean),
+    futuresOnlySymbols: parsed.FUTURES_ONLY_SYMBOLS.split(',').map((s) => s.trim()).filter(Boolean),
     timeframes: parsed.TIMEFRAMES.split(',').map((s) => s.trim()).filter(Boolean) as Timeframe[],
     binance: {
       spotRestBase: parsed.BINANCE_SPOT_REST_BASE,

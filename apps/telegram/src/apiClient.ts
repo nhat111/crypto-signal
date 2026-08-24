@@ -11,8 +11,9 @@ export interface OverviewRow {
   timestamp: number;
   priceClose: number;
   priceChangePct: number;
-  healthScore: number;
-  healthStatus: string;
+  /** Null for futures-only symbols (no Binance Spot listing) — Health Score needs a spot leg to compare against. */
+  healthScore: number | null;
+  healthStatus: string | null;
   riskScore: number;
   dataQualityScore: number;
 }
@@ -24,7 +25,7 @@ export interface OverviewResponse {
 }
 
 export interface LatestSymbolState extends OverviewRow {
-  spotCvd: number;
+  spotCvd: number | null;
   futuresCvd: number;
   openInterest: number;
   fundingRatePct: number;

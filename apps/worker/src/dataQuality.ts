@@ -2,13 +2,19 @@ import type { DataQuality, DataQualityIssue, SymbolId, Timeframe } from '@crypto
 import { clamp } from '@crypto-signal/shared';
 
 export interface DataQualityInputs {
-  spotWsHealthy: boolean;
   futuresWsHealthy: boolean;
-  spotGapCandles: number;
   futuresGapCandles: number;
   openInterestStale: boolean;
   fundingStale: boolean;
   liquidationBaselineReady: boolean;
+  /**
+   * Omit for futures-only symbols (no Binance Spot listing) — this is a
+   * structural fact, not a collection problem, so it's recorded as the
+   * `no_spot_market` issue without discounting the score (unlike every
+   * other issue here, which does represent something actually missing
+   * that should have been there).
+   */
+  spot?: { wsHealthy: boolean; gapCandles: number };
 }
 
 /**
@@ -27,14 +33,28 @@ export function assessDataQuality(
   const issues: DataQualityIssue[] = [];
   let score = 100;
 
-  if (!inputs.spotWsHealthy || !inputs.futuresWsHealthy) {
-    issues.push('ws_disconnected');
-    score -= 40;
+  if (inputs.spot) {
+    if (!inputs.spot.wsHealthy || !inputs.futuresWsHealthy) {
+      issues.push('ws_disconnected');
+      score -= 40;
+    }
+    const gapCandles = inputs.spot.gapCandles + inputs.futuresGapCandles;
+    if (gapCandles > 0) {
+      issues.push('candle_gap');
+      score -= Math.min(30, 10 * gapCandles);
+    }
+  } else {
+    issues.push('no_spot_market');
+    if (!inputs.futuresWsHealthy) {
+      issues.push('ws_disconnected');
+      score -= 40;
+    }
+    if (inputs.futuresGapCandles > 0) {
+      issues.push('candle_gap');
+      score -= Math.min(30, 10 * inputs.futuresGapCandles);
+    }
   }
-  if (inputs.spotGapCandles > 0 || inputs.futuresGapCandles > 0) {
-    issues.push('candle_gap');
-    score -= Math.min(30, 10 * (inputs.spotGapCandles + inputs.futuresGapCandles));
-  }
+
   if (inputs.openInterestStale) {
     issues.push('stale_open_interest');
     score -= 15;

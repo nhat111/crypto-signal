@@ -3,9 +3,11 @@ import type { Signal } from '@crypto-signal/signal-engine';
 
 export interface SignalExtras {
   price: number;
-  healthScore: number;
+  /** Null for futures-only symbols — no Spot data to score Health against (ASSUMPTIONS.md §15). */
+  healthScore: number | null;
   riskScore: number;
-  spotCvd: number;
+  /** Null for futures-only symbols. */
+  spotCvd: number | null;
   futuresCvd: number;
   openInterest: number;
   fundingRate: number;
@@ -134,9 +136,9 @@ export async function getRecentSignals(
     reasons: r.reasons,
     metrics: r.metrics,
     price: Number(r.price),
-    healthScore: r.health_score,
+    healthScore: r.health_score === null ? null : Number(r.health_score),
     riskScore: r.risk_score,
-    spotCvd: Number(r.spot_cvd),
+    spotCvd: r.spot_cvd === null ? null : Number(r.spot_cvd),
     futuresCvd: Number(r.futures_cvd),
     openInterest: Number(r.open_interest),
     fundingRate: Number(r.funding_rate),

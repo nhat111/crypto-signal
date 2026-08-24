@@ -11,6 +11,16 @@ import type { OiPriceInterpretation } from './openInterest.js';
  * downstream re-derives a number from raw candles, everything reads it from
  * here (rule: "Tách indicator khỏi signal engine", still one clean seam).
  */
+export interface SpotSnapshot {
+  candle: Candle;
+  volume: number;
+  cvdDelta: number;
+  cvdSkewRatio: number;
+  cvdCumulative: number;
+  volumeRatio: number;
+  volumeAnomaly: VolumeAnomalyLevel;
+}
+
 export interface MarketSnapshot {
   symbol: SymbolId;
   timeframe: Timeframe;
@@ -24,15 +34,15 @@ export interface MarketSnapshot {
     atrPct: number;
     structureScore: number;
   };
-  spot: {
-    candle: Candle;
-    volume: number;
-    cvdDelta: number;
-    cvdSkewRatio: number;
-    cvdCumulative: number;
-    volumeRatio: number;
-    volumeAnomaly: VolumeAnomalyLevel;
-  };
+  /**
+   * Null for symbols that only trade on Binance Futures (no Spot listing —
+   * e.g. HYPEUSDT as of writing). Every spot-dependent computation (Spot
+   * CVD, spot-vs-futures divergence signals, Health Score's spot
+   * confirmation component, basis) is unavailable for those symbols and
+   * must be treated as "no data", never approximated — see
+   * ASSUMPTIONS.md §15 and packages/signal-engine's spot-null guards.
+   */
+  spot: SpotSnapshot | null;
   futures: {
     candle: Candle;
     volume: number;

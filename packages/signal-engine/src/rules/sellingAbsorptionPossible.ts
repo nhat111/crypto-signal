@@ -8,6 +8,7 @@ import { buildSignal, pct } from './ruleHelpers.js';
  */
 export function sellingAbsorptionPossible(ctx: RuleContext): Signal | null {
   const { snapshot: s, thresholds: t } = ctx;
+  if (!s.spot) return null; // futures-only symbol — no spot leg to compare against (ASSUMPTIONS.md §15)
 
   const spotSelling = s.spot.cvdSkewRatio <= -t.cvdSkewRatio;
   const priceHolding = Math.abs(s.price.changePct) < t.priceChangePct;

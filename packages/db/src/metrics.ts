@@ -3,7 +3,9 @@ import type { MarketSnapshot } from '@crypto-signal/indicators';
 import type { HealthResult, RiskResult } from '@crypto-signal/health-engine';
 import type { FundingRatePoint, OpenInterestPoint } from '@crypto-signal/shared';
 
+/** No-op for futures-only symbols — nothing to persist without a Spot leg. Callers only invoke this from the spot+futures pipeline path, where `snapshot.spot` is always present; this guard just makes that contract explicit at the type level. */
 export async function saveSpotMetrics(pool: Pool, snapshot: MarketSnapshot): Promise<void> {
+  if (!snapshot.spot) return;
   await pool.query(
     `INSERT INTO spot_metrics (symbol, timeframe, timestamp, cvd_delta, cvd_skew_ratio, cvd_cumulative, volume, volume_ratio, volume_anomaly)
      VALUES ($1,$2,to_timestamp($3/1000.0),$4,$5,$6,$7,$8,$9)
@@ -68,10 +70,11 @@ export async function saveFuturesMetrics(pool: Pool, snapshot: MarketSnapshot): 
   );
 }
 
+/** `health` is null for futures-only symbols (no Spot data to score — ASSUMPTIONS.md §15); stored as SQL NULL rather than a fabricated value. */
 export async function saveHealthSnapshot(
   pool: Pool,
   snapshot: MarketSnapshot,
-  health: HealthResult,
+  health: HealthResult | null,
   risk: RiskResult,
 ): Promise<void> {
   await pool.query(
@@ -90,9 +93,9 @@ export async function saveHealthSnapshot(
       snapshot.timestamp,
       snapshot.price.close,
       snapshot.price.changePct,
-      health.score,
-      health.status,
-      JSON.stringify(health.components),
+      health?.score ?? null,
+      health?.status ?? null,
+      health ? JSON.stringify(health.components) : null,
       risk.score,
       JSON.stringify(risk.components),
       snapshot.dataQuality.score,

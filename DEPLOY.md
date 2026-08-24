@@ -56,6 +56,11 @@ subdirectory juggling.
      proactive alert pushes from the worker itself.
    - Everything else (`SYMBOLS`, `TIMEFRAMES`, all `THRESH_*`) has working
      defaults — only set them if you want to override.
+   - `FUTURES_ONLY_SYMBOLS` — comma-separated symbols with a Binance
+     Futures listing but no Spot listing (e.g. `HYPEUSDT`). Reduced feature
+     set, no Health Score, no fabricated spot data — see ASSUMPTIONS.md §15.
+     **Set this on the `worker` service only**; `api`/`web`/`telegram` need
+     no change, they just render whatever the worker persisted.
 4. Deploy. First boot runs migrations automatically (`db/migrate.mjs`, see
    the `Dockerfile.worker` CMD) then starts backfilling history — check logs
    for `"backfill complete"` per symbol/timeframe.

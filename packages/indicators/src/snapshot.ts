@@ -6,17 +6,14 @@ import { computeBasis } from './basis.js';
 import { classifyVolumeAnomaly, computeVolumeRatio, rollingAverage } from './volumeAnomaly.js';
 import { computeAtr, computeAtrPct, computePriceStructureScore, computeReturnPct, computeTrueRange } from './volatility.js';
 import { aggregateLiquidations, computeLiquidationAnomalyRatio, isLiquidationSpike } from './liquidationAnomaly.js';
-import type { MarketSnapshot } from './types.js';
+import type { MarketSnapshot, SpotSnapshot } from './types.js';
 
-export interface ComputeSnapshotInput {
+interface FuturesOnlyInput {
   symbol: SymbolId;
   timeframe: Timeframe;
-  spotCandle: Candle;
   futuresCandle: Candle;
-  previousSpotCumulativeCvd: number;
   previousFuturesCumulativeCvd: number;
   /** Recent volumes, most recent last, NOT including the current candle. */
-  spotVolumeHistory: number[];
   futuresVolumeHistory: number[];
   previousOpenInterest: OpenInterestPoint | undefined;
   currentOpenInterest: OpenInterestPoint;
@@ -26,18 +23,14 @@ export interface ComputeSnapshotInput {
   previousFuturesClose: number | undefined;
   /** Recent true ranges, NOT including the current candle. */
   recentTrueRanges: number[];
+  /** Futures close matched to this candle's spot counterpart, when one exists — null for futures-only symbols (spec §11 basis needs both legs). */
+  spotCloseForBasis: number | null;
   dataQuality: DataQuality;
   thresholds: Thresholds;
 }
 
-export function computeMarketSnapshot(input: ComputeSnapshotInput): MarketSnapshot {
-  const { spotCandle, futuresCandle, thresholds } = input;
-
-  const spotCvdDelta = computeCandleDelta(spotCandle);
-  const spotCvdSkew = computeSkewRatio(spotCandle);
-  const spotCvdCumulative = accumulateCvd(input.previousSpotCumulativeCvd, spotCandle);
-  const spotVolumeAvg = rollingAverage(input.spotVolumeHistory);
-  const spotVolumeRatio = computeVolumeRatio(spotCandle.volume, spotVolumeAvg);
+function buildSnapshotCore(input: FuturesOnlyInput): Omit<MarketSnapshot, 'spot'> {
+  const { futuresCandle, thresholds } = input;
 
   const futuresCvdDelta = computeCandleDelta(futuresCandle);
   const futuresCvdSkew = computeSkewRatio(futuresCandle);
@@ -50,7 +43,8 @@ export function computeMarketSnapshot(input: ComputeSnapshotInput): MarketSnapsh
   const oiInterpretation = interpretOiVsPrice(priceChangePct, oiChange.changePct, thresholds.priceChangePct, thresholds.oiChangePct);
 
   const fundingBias = classifyFunding(input.fundingRateFraction, thresholds);
-  const basis = computeBasis(futuresCandle.close, spotCandle.close);
+  // No spot leg (futures-only symbol) => basis is undefined, not zero-by-coincidence — reported as 0/neutral and flagged via dataQuality.issues rather than guessed (ASSUMPTIONS.md §15).
+  const basis = input.spotCloseForBasis !== null ? computeBasis(futuresCandle.close, input.spotCloseForBasis) : { absolute: 0, pct: 0 };
 
   const trueRange = computeTrueRange(futuresCandle, input.previousFuturesClose);
   const atr = computeAtr([...input.recentTrueRanges, trueRange]);
@@ -71,15 +65,6 @@ export function computeMarketSnapshot(input: ComputeSnapshotInput): MarketSnapsh
       changePct: priceChangePct,
       atrPct,
       structureScore: computePriceStructureScore(atrPct),
-    },
-    spot: {
-      candle: spotCandle,
-      volume: spotCandle.volume,
-      cvdDelta: spotCvdDelta,
-      cvdSkewRatio: spotCvdSkew,
-      cvdCumulative: spotCvdCumulative,
-      volumeRatio: spotVolumeRatio,
-      volumeAnomaly: classifyVolumeAnomaly(spotVolumeRatio, thresholds),
     },
     futures: {
       candle: futuresCandle,
@@ -104,4 +89,75 @@ export function computeMarketSnapshot(input: ComputeSnapshotInput): MarketSnapsh
     },
     dataQuality: input.dataQuality,
   };
+}
+
+export interface ComputeSnapshotInput {
+  symbol: SymbolId;
+  timeframe: Timeframe;
+  spotCandle: Candle;
+  futuresCandle: Candle;
+  previousSpotCumulativeCvd: number;
+  previousFuturesCumulativeCvd: number;
+  /** Recent volumes, most recent last, NOT including the current candle. */
+  spotVolumeHistory: number[];
+  futuresVolumeHistory: number[];
+  previousOpenInterest: OpenInterestPoint | undefined;
+  currentOpenInterest: OpenInterestPoint;
+  fundingRateFraction: number;
+  liquidationEventsInWindow: LiquidationEvent[];
+  rollingLiquidation24hUsd: number;
+  previousFuturesClose: number | undefined;
+  /** Recent true ranges, NOT including the current candle. */
+  recentTrueRanges: number[];
+  dataQuality: DataQuality;
+  thresholds: Thresholds;
+}
+
+/** For symbols with both a Binance Spot and Futures listing (the normal case: BTCUSDT, ETHUSDT, SOLUSDT). */
+export function computeMarketSnapshot(input: ComputeSnapshotInput): MarketSnapshot {
+  const spotCvdDelta = computeCandleDelta(input.spotCandle);
+  const spotCvdSkew = computeSkewRatio(input.spotCandle);
+  const spotCvdCumulative = accumulateCvd(input.previousSpotCumulativeCvd, input.spotCandle);
+  const spotVolumeAvg = rollingAverage(input.spotVolumeHistory);
+  const spotVolumeRatio = computeVolumeRatio(input.spotCandle.volume, spotVolumeAvg);
+
+  const spot: SpotSnapshot = {
+    candle: input.spotCandle,
+    volume: input.spotCandle.volume,
+    cvdDelta: spotCvdDelta,
+    cvdSkewRatio: spotCvdSkew,
+    cvdCumulative: spotCvdCumulative,
+    volumeRatio: spotVolumeRatio,
+    volumeAnomaly: classifyVolumeAnomaly(spotVolumeRatio, input.thresholds),
+  };
+
+  const core = buildSnapshotCore({ ...input, spotCloseForBasis: input.spotCandle.close });
+  return { ...core, spot };
+}
+
+export interface ComputeFuturesOnlySnapshotInput {
+  symbol: SymbolId;
+  timeframe: Timeframe;
+  futuresCandle: Candle;
+  previousFuturesCumulativeCvd: number;
+  futuresVolumeHistory: number[];
+  previousOpenInterest: OpenInterestPoint | undefined;
+  currentOpenInterest: OpenInterestPoint;
+  fundingRateFraction: number;
+  liquidationEventsInWindow: LiquidationEvent[];
+  rollingLiquidation24hUsd: number;
+  previousFuturesClose: number | undefined;
+  recentTrueRanges: number[];
+  dataQuality: DataQuality;
+  thresholds: Thresholds;
+}
+
+/**
+ * For symbols with a Binance Futures listing but no Spot listing (e.g.
+ * HYPEUSDT). `spot` is null throughout — see MarketSnapshot's doc comment
+ * and ASSUMPTIONS.md §15 for exactly what becomes unavailable downstream.
+ */
+export function computeFuturesOnlySnapshot(input: ComputeFuturesOnlySnapshotInput): MarketSnapshot {
+  const core = buildSnapshotCore({ ...input, spotCloseForBasis: null });
+  return { ...core, spot: null };
 }

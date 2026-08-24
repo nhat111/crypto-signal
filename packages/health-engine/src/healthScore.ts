@@ -1,4 +1,4 @@
-import type { MarketSnapshot } from '@crypto-signal/indicators';
+import type { MarketSnapshot, VolumeAnomalyLevel } from '@crypto-signal/indicators';
 import type { Signal, SignalType } from '@crypto-signal/signal-engine';
 import { clamp, type HealthWeights, type Thresholds } from '@crypto-signal/shared';
 import type { HealthComponents, HealthResult, HealthStatus } from './types.js';
@@ -51,7 +51,7 @@ function liquidationScore(spike: boolean, ratio: number, thresholds: Thresholds)
   return clamp(85 - over * 50, 10, 85);
 }
 
-function volumeScore(anomaly: MarketSnapshot['spot']['volumeAnomaly'], ratio: number): number {
+function volumeScore(anomaly: VolumeAnomalyLevel, ratio: number): number {
   if (anomaly === 'extreme') return 30;
   if (anomaly === 'abnormal') return 55;
   if (anomaly === 'elevated') return 80;
@@ -74,11 +74,19 @@ function divergenceScore(activeSignals: Signal[]): number {
   return 65;
 }
 
+/**
+ * Null for futures-only symbols (no Spot listing) — Health Score's entire
+ * premise (spec §13) is whether the move is confirmed by real spot demand,
+ * which is simply unanswerable without spot data. Returning a partial or
+ * approximated score would misrepresent that as an answer; null says
+ * plainly "not applicable" (ASSUMPTIONS.md §15).
+ */
 export function computeHealthComponents(
   snapshot: MarketSnapshot,
   activeSignals: Signal[],
   thresholds: Thresholds,
-): HealthComponents {
+): HealthComponents | null {
+  if (!snapshot.spot) return null;
   return {
     spotConfirmation: directionalAgreementScore(snapshot.price.changePct, snapshot.spot.cvdSkewRatio, thresholds.cvdSkewRatio),
     futuresPositioning: futuresPositioningScore(snapshot.spot.cvdSkewRatio, snapshot.futures.cvdSkewRatio, thresholds.cvdSkewRatio),
@@ -119,8 +127,9 @@ export function computeHealth(
   activeSignals: Signal[],
   thresholds: Thresholds,
   weights: HealthWeights,
-): HealthResult {
+): HealthResult | null {
   const components = computeHealthComponents(snapshot, activeSignals, thresholds);
+  if (!components) return null;
   const score = computeHealthScore(components, weights);
   return { score, status: classifyHealth(score), components };
 }

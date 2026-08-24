@@ -5,9 +5,10 @@ import type { ApiDeps } from '../deps.js';
 /** Backs the market overview cards + heatmap (spec §17/§19). */
 export function registerOverviewRoute(app: FastifyInstance, deps: ApiDeps): void {
   app.get('/api/overview', async () => {
-    const rows = await getOverview(deps.pool, deps.config.symbols, deps.config.timeframes);
+    const allSymbols = [...deps.config.symbols, ...deps.config.futuresOnlySymbols];
+    const rows = await getOverview(deps.pool, allSymbols, deps.config.timeframes);
     return {
-      symbols: deps.config.symbols,
+      symbols: allSymbols,
       timeframes: deps.config.timeframes,
       rows,
     };

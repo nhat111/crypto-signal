@@ -62,7 +62,7 @@ export function SymbolCard({ symbol, overviewRow, snapshot, activeSignalCount, l
       </div>
 
       <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-        <Metric label="Spot CVD" value={snapshot ? formatSignedUsd(snapshot.spotCvd) : '—'} />
+        <Metric label="Spot CVD" value={snapshot?.spotCvd != null ? formatSignedUsd(snapshot.spotCvd) : '—'} />
         <Metric label="Futures CVD" value={snapshot ? formatSignedUsd(snapshot.futuresCvd) : '—'} />
         <Metric label="Open Interest" value={snapshot ? formatUsd(snapshot.openInterest) : '—'} />
         <Metric label="Funding" value={snapshot ? formatPct(snapshot.fundingRatePct, 3) : '—'} />

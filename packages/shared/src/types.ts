@@ -92,7 +92,8 @@ export type DataQualityIssue =
   | 'stale_open_interest'
   | 'stale_funding'
   | 'stale_liquidation_baseline'
-  | 'insufficient_history';
+  | 'insufficient_history'
+  | 'no_spot_market';
 
 export interface DataQuality {
   symbol: SymbolId;
