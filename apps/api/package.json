@@ -14,6 +14,7 @@
     "@crypto-signal/db": "*",
     "@crypto-signal/signal-engine": "*",
     "@crypto-signal/gem-scanner": "*",
+    "@crypto-signal/indicators": "*",
     "@fastify/cors": "^10.0.1",
     "fastify": "^5.2.0",
     "pg": "^8.13.1"

@@ -1,4 +1,4 @@
-import type { GemRow, GemWatchDTO, LatestSymbolState, OverviewRow, SignalRow } from './apiClient.js';
+import type { GemRow, GemWatchDTO, LatestSymbolState, OverviewRow, PriceLevels, SignalRow } from './apiClient.js';
 
 function healthLine(row: OverviewRow): string {
   const score = row.healthScore === null ? 'N/A' : String(row.healthScore);
@@ -29,7 +29,7 @@ export function formatHeatmap(rows: OverviewRow[], symbols: string[], timeframes
 }
 
 /** Spec §20 exact /btc example shape. */
-export function formatSymbolDetail(state: LatestSymbolState, activeSignals: SignalRow[]): string {
+export function formatSymbolDetail(state: LatestSymbolState, activeSignals: SignalRow[], priceLevels: PriceLevels | null): string {
   const lines = [
     `<b>${state.symbol}</b>`,
     '',
@@ -39,13 +39,21 @@ export function formatSymbolDetail(state: LatestSymbolState, activeSignals: Sign
       : `Health: ${state.healthScore}  (${(state.healthStatus ?? '').replace(/_/g, ' ')})`,
     `Risk: ${state.riskScore}`,
     '',
-    `Price       ${state.priceChangePct >= 0 ? '+' : ''}${state.priceChangePct.toFixed(2)}%`,
+    `Price       $${formatPrice(state.priceClose)}  (${state.priceChangePct >= 0 ? '+' : ''}${state.priceChangePct.toFixed(2)}%)`,
     `Spot CVD    ${state.spotCvd === null ? 'N/A' : formatLargeNumber(state.spotCvd)}`,
     `Futures CVD ${formatLargeNumber(state.futuresCvd)}`,
     `OI          ${formatLargeNumber(state.openInterest)}`,
     `Funding     ${state.fundingRatePct.toFixed(4)}%`,
     `Liquidation  L $${formatLargeNumber(state.liquidationLongUsd)} / S $${formatLargeNumber(state.liquidationShortUsd)}`,
   ];
+
+  if (priceLevels) {
+    lines.push(
+      '',
+      `Range(20)   $${formatPrice(priceLevels.lower)} – $${formatPrice(priceLevels.upper)}`,
+      '<i>Bollinger 20,2 — reference only, not a buy/sell instruction.</i>',
+    );
+  }
 
   if (activeSignals.length === 0) {
     lines.push('', 'Signal: none active');
@@ -143,6 +151,11 @@ export function formatWatchList(watches: GemWatchDTO[]): string {
 /** Token names/symbols come from on-chain metadata that anyone can set, so they're escaped before entering an HTML-parsed message. */
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** Full precision with thousands separators — unlike formatLargeNumber, a price should never compact to "78.58K". */
+function formatPrice(n: number): string {
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function formatLargeNumber(n: number): string {

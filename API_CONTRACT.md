@@ -70,7 +70,8 @@ startup). This single payload backs both the health/risk overview cards
       "reasons": ["Price +0.80% (>= 0.3% threshold)", "..."],
       "metrics": { "priceChangePct": 0.8, "spotCvdSkewRatio": -0.21 }
     }
-  ]
+  ],
+  "priceLevels": { "upper": 66200.0, "middle": 65100.0, "lower": 64000.0 }
 }
 ```
 `series` is ordered oldest→newest, one point per closed candle for that
@@ -78,6 +79,12 @@ startup). This single payload backs both the health/risk overview cards
 still warming up) — render an empty/loading state, not an error.
 `signals` is the most recent 20 signals for this symbol+timeframe (any
 type/severity) — use these as chart markers and/or a list under the charts.
+
+`priceLevels` is a 20-period Bollinger Band (2 standard deviations) computed
+fresh from the last 20 closed futures candles on this (symbol, timeframe) —
+`upper`/`lower` are reference range edges (recent resistance/support-ish
+levels), not a buy/sell instruction. `null` until 20 closed candles exist
+for that timeframe.
 
 Charts required (spec §18), all sourced from `series`:
 1. Price (+ can overlay `signals` as markers)

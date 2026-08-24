@@ -5,5 +5,6 @@ export * from './basis.js';
 export * from './volumeAnomaly.js';
 export * from './volatility.js';
 export * from './liquidationAnomaly.js';
+export * from './bollinger.js';
 export * from './types.js';
 export * from './snapshot.js';

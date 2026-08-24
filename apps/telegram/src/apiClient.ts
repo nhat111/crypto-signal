@@ -45,11 +45,19 @@ export interface SignalRow {
   metrics: Record<string, number | string | boolean>;
 }
 
+/** 20-period Bollinger Band (2 stddev) — reference range, not a buy/sell instruction. Null until 20 closed candles exist. */
+export interface PriceLevels {
+  upper: number;
+  middle: number;
+  lower: number;
+}
+
 export interface SymbolResponse {
   symbol: string;
   timeframe: string;
   latest: LatestSymbolState | null;
   signals: SignalRow[];
+  priceLevels: PriceLevels | null;
 }
 
 export interface BotSettings {

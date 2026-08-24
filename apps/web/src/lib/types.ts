@@ -91,12 +91,24 @@ export interface SymbolSeriesPoint {
   riskScore: number;
 }
 
+/**
+ * 20-period Bollinger Band (2 stddev) off the last 20 closed futures
+ * candles. A reference range, not a buy/sell instruction — see
+ * API_CONTRACT.md. Null until 20 closed candles exist for the timeframe.
+ */
+export interface PriceLevels {
+  upper: number;
+  middle: number;
+  lower: number;
+}
+
 export interface SymbolDetailResponse {
   symbol: string;
   timeframe: Timeframe;
   latest: SymbolLatest | null;
   series: SymbolSeriesPoint[];
   signals: Signal[];
+  priceLevels: PriceLevels | null;
 }
 
 export interface PerformanceResult {

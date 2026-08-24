@@ -72,7 +72,7 @@ async function main(): Promise<void> {
           await ctx.reply(`No data yet for ${symbol} — the collector may still be warming up.`);
           return;
         }
-        await ctx.reply(formatSymbolDetail(detail.latest, detail.signals), { parse_mode: 'HTML' });
+        await ctx.reply(formatSymbolDetail(detail.latest, detail.signals, detail.priceLevels), { parse_mode: 'HTML' });
       } catch (err) {
         logger.error({ err, symbol }, `/${command} failed`);
         await ctx.reply(`Could not load ${symbol} right now — try again shortly.`);

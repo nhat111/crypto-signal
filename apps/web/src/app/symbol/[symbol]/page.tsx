@@ -42,7 +42,7 @@ export default function SymbolDetailPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         {detail.data?.latest ? (
-          <SymbolHeader symbol={symbol} latest={detail.data.latest} />
+          <SymbolHeader symbol={symbol} latest={detail.data.latest} priceLevels={detail.data.priceLevels} />
         ) : (
           <h1 className="text-xl font-bold text-slate-100">{symbol}</h1>
         )}
