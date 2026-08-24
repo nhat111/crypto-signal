@@ -112,10 +112,23 @@ export interface GemRow {
   lpLocked: boolean | null;
 }
 
+/**
+ * A token that stops qualifying (thresholds tightened, it fell out of the
+ * eligible band, safety turned bad) is simply never re-persisted — the scan
+ * loop drops ineligible pairs rather than writing a "no longer eligible"
+ * row (see runScan in gem-scanner). So its last-eligible row would
+ * otherwise sit here forever, looking freshly surfaced, until the 30-day
+ * prune. Six scan cycles' worth of staleness is the cutoff instead: long
+ * enough to tolerate one missed cycle, short enough that a token which
+ * stopped qualifying actually disappears from the list within a few hours
+ * rather than lingering on stale data.
+ */
+const DEFAULT_MAX_AGE_MINUTES = 180;
+
 /** Latest scan row per token, highest score first — what the /gems list shows. */
 export async function getLatestGems(
   pool: Pool,
-  filters: { chainId?: string; minScore?: number; limit?: number } = {},
+  filters: { chainId?: string; minScore?: number; limit?: number; maxAgeMinutes?: number } = {},
 ): Promise<GemRow[]> {
   const params: unknown[] = [];
   const conditions: string[] = [];
@@ -128,6 +141,8 @@ export async function getLatestGems(
     params.push(filters.minScore);
     conditions.push(`s.gem_score >= $${params.length}`);
   }
+  params.push(filters.maxAgeMinutes ?? DEFAULT_MAX_AGE_MINUTES);
+  conditions.push(`s.scanned_at >= now() - ($${params.length} || ' minutes')::interval`);
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   params.push(filters.limit ?? 50);
 
