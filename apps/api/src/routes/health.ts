@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { getEnabledSymbols } from '@crypto-signal/db';
 import type { ApiDeps } from '../deps.js';
 
 /** Spec §11 "health check endpoint": DB reachability + how fresh the most recent computed snapshot is, per configured symbol/timeframe. */
@@ -21,7 +22,7 @@ export function registerHealthRoute(app: FastifyInstance, deps: ApiDeps): void {
          FROM market_health_snapshots
          WHERE symbol = ANY($1) AND timeframe = ANY($2)
          ORDER BY timestamp DESC LIMIT 1`,
-        [[...deps.config.symbols, ...deps.config.futuresOnlySymbols], deps.config.timeframes],
+        [await getEnabledSymbols(deps.pool), deps.config.timeframes],
       );
       const latest = rows[0];
       if (!latest) {

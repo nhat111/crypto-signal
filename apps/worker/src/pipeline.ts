@@ -134,8 +134,11 @@ async function dispatchAlert(ctx: WorkerContext, signal: Signal, signalId: strin
   const dbSubscribers = await getAllAlertSubscribers(ctx.pool);
   const minSeverityOk = (minSeverity: string): boolean =>
     SEVERITY_ORDER.indexOf(signal.severity) >= SEVERITY_ORDER.indexOf(minSeverity as Signal['severity']);
+  // An empty `symbols` means "every tracked symbol" (migration 003) — without
+  // that, a chat created before a symbol was added would never receive its
+  // alerts.
   const dbChatIds = dbSubscribers
-    .filter((s) => s.symbols.includes(signal.symbol) && minSeverityOk(s.minSeverity))
+    .filter((s) => (s.symbols.length === 0 || s.symbols.includes(signal.symbol)) && minSeverityOk(s.minSeverity))
     .map((s) => s.chatId);
   const chatIds = Array.from(new Set([...ctx.config.telegramAlertChatIds, ...dbChatIds]));
 

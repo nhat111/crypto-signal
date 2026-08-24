@@ -1,7 +1,7 @@
 import { Telegraf } from 'telegraf';
-import { createLogger, loadConfig } from '@crypto-signal/shared';
+import { createLogger, loadConfig, type Logger } from '@crypto-signal/shared';
 import { ApiClient } from './apiClient.js';
-import { formatHeatmap, formatOverview, formatSignalList, formatSymbolDetail, HELP_TEXT } from './formatting.js';
+import { buildHelpText, formatHeatmap, formatOverview, formatSignalList, formatSymbolDetail } from './formatting.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -15,6 +15,13 @@ async function main(): Promise<void> {
   const api = new ApiClient(config.apiBaseUrl);
   const bot = new Telegraf(config.telegramBotToken);
 
+  // Telegraf needs every command registered before launch, so the symbol
+  // list is read once here from the API (which reads it from the database,
+  // where the collector registered it). Adding a symbol therefore only
+  // needs the worker's config changed — but the bot must be restarted to
+  // pick up the new /command.
+  const symbols = await fetchSymbolsWithRetry(api, logger);
+
   bot.use(async (ctx, next) => {
     if (ctx.chat) {
       try {
@@ -26,12 +33,14 @@ async function main(): Promise<void> {
     await next();
   });
 
+  const helpText = buildHelpText(symbols);
+
   bot.command('start', async (ctx) => {
-    await ctx.reply(`Welcome. ${HELP_TEXT}`, { parse_mode: 'HTML' });
+    await ctx.reply(`Welcome. ${helpText}`, { parse_mode: 'HTML' });
   });
 
   bot.command('help', async (ctx) => {
-    await ctx.reply(HELP_TEXT, { parse_mode: 'HTML' });
+    await ctx.reply(helpText, { parse_mode: 'HTML' });
   });
 
   bot.command('status', async (ctx) => {
@@ -54,11 +63,8 @@ async function main(): Promise<void> {
     }
   });
 
-  for (const [command, symbol] of [
-    ['btc', 'BTCUSDT'],
-    ['eth', 'ETHUSDT'],
-    ['sol', 'SOLUSDT'],
-  ] as const) {
+  for (const symbol of symbols) {
+    const command = commandNameFor(symbol);
     bot.command(command, async (ctx) => {
       try {
         const detail = await api.getSymbol(symbol, '15m');
@@ -95,7 +101,7 @@ async function main(): Promise<void> {
       }
       const { settings } = await api.getSettings(chatId);
       await ctx.reply(
-        `Alerts are currently ${settings.alertsEnabled ? 'ON' : 'OFF'} for this chat.\nUse /alerts on or /alerts off to change.\nSymbols: ${settings.symbols.join(', ')}\nMin severity: ${settings.minSeverity}`,
+        `Alerts are currently ${settings.alertsEnabled ? 'ON' : 'OFF'} for this chat.\nUse /alerts on or /alerts off to change.\nSymbols: ${settings.symbols.length === 0 ? 'all tracked symbols' : settings.symbols.join(', ')}\nMin severity: ${settings.minSeverity}`,
       );
     } catch (err) {
       logger.error({ err }, '/alerts failed');
@@ -103,11 +109,57 @@ async function main(): Promise<void> {
     }
   });
 
+  // Populates Telegram's own command menu so /hype (and any future symbol)
+  // is discoverable without reading /help.
+  try {
+    await bot.telegram.setMyCommands([
+      { command: 'status', description: 'Health overview (15m)' },
+      { command: 'market', description: 'Heatmap across timeframes' },
+      ...symbols.map((symbol) => ({ command: commandNameFor(symbol), description: `${symbol} detail` })),
+      { command: 'signals', description: 'Recent signals' },
+      { command: 'alerts', description: 'Toggle alerts for this chat' },
+      { command: 'help', description: 'Show help' },
+    ]);
+  } catch (err) {
+    logger.warn({ err }, 'setMyCommands failed (non-fatal)');
+  }
+
   await bot.launch();
-  logger.info('telegram bot started');
+  logger.info({ symbols }, 'telegram bot started');
 
   process.once('SIGINT', () => bot.stop('SIGINT'));
   process.once('SIGTERM', () => bot.stop('SIGTERM'));
+}
+
+/** "BTCUSDT" -> "btc". Telegram commands are lowercase and can't contain most punctuation. */
+function commandNameFor(symbol: string): string {
+  const base = symbol.endsWith('USDT') ? symbol.slice(0, -4) : symbol;
+  return base.toLowerCase().replace(/[^a-z0-9_]/g, '');
+}
+
+const SYMBOL_FETCH_ATTEMPTS = 5;
+
+/**
+ * The API may still be booting when this service starts (both deploy at
+ * once), so retry briefly rather than starting a bot with no symbol
+ * commands at all. Falls back to whatever this service has configured
+ * locally — better a partial bot than none.
+ */
+async function fetchSymbolsWithRetry(api: ApiClient, logger: Logger): Promise<string[]> {
+  for (let attempt = 1; attempt <= SYMBOL_FETCH_ATTEMPTS; attempt += 1) {
+    try {
+      const overview = await api.getOverview();
+      if (overview.symbols.length > 0) return overview.symbols;
+      logger.warn({ attempt }, 'API returned an empty symbol list');
+    } catch (err) {
+      logger.warn({ err, attempt }, 'could not fetch symbol list from API');
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
+  }
+
+  const fallback = [...loadConfig().symbols, ...loadConfig().futuresOnlySymbols];
+  logger.error({ fallback }, 'giving up on the API symbol list, falling back to local config');
+  return fallback;
 }
 
 main().catch((err) => {

@@ -75,13 +75,22 @@ function formatLargeNumber(n: number): string {
   return `${sign}${abs.toFixed(2)}`;
 }
 
-export const HELP_TEXT = [
-  '<b>Market Health Monitor</b>',
-  '',
-  '/status — quick health overview (15m)',
-  '/market — full heatmap across timeframes',
-  '/btc /eth /sol — symbol detail',
-  '/signals — recent signals',
-  '/alerts on|off — toggle alert push to this chat',
-  '/help — this message',
-].join('\n');
+/** Symbol commands are derived from the tracked symbol list, so /help never drifts from what the bot actually accepts. */
+export function buildHelpText(symbols: string[]): string {
+  const symbolCommands = symbols
+    .map((s) => `/${(s.endsWith('USDT') ? s.slice(0, -4) : s).toLowerCase()}`)
+    .join(' ');
+
+  return [
+    '<b>Market Health Monitor</b>',
+    '',
+    '/status — quick health overview (15m)',
+    '/market — full heatmap across timeframes',
+    `${symbolCommands} — symbol detail`,
+    '/signals — recent signals',
+    '/alerts on|off — toggle alert push to this chat',
+    '/help — this message',
+    '',
+    '<i>Symbols listed on Binance Futures but not Spot show Health: N/A — the score compares spot demand against futures, which needs both.</i>',
+  ].join('\n');
+}

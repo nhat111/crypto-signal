@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { getLatestSymbolState, getRecentSignals, getSymbolTimeseries } from '@crypto-signal/db';
+import { getEnabledSymbols, getLatestSymbolState, getRecentSignals, getSymbolTimeseries } from '@crypto-signal/db';
 import type { Timeframe } from '@crypto-signal/shared';
 import type { ApiDeps } from '../deps.js';
 
@@ -12,7 +12,8 @@ interface SymbolQuery {
 export function registerSymbolRoute(app: FastifyInstance, deps: ApiDeps): void {
   app.get<{ Params: { symbol: string }; Querystring: SymbolQuery }>('/api/symbols/:symbol', async (req, reply) => {
     const symbol = req.params.symbol.toUpperCase();
-    if (!deps.config.symbols.includes(symbol) && !deps.config.futuresOnlySymbols.includes(symbol)) {
+    const knownSymbols = await getEnabledSymbols(deps.pool);
+    if (!knownSymbols.includes(symbol)) {
       return reply.code(404).send({ error: `Unknown symbol ${symbol}` });
     }
     const timeframe = (req.query.timeframe ?? '15m') as Timeframe;

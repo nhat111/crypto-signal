@@ -201,6 +201,8 @@ CREATE TABLE bot_settings (
   chat_id TEXT PRIMARY KEY REFERENCES bot_users (chat_id) ON DELETE CASCADE,
   alerts_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   min_severity TEXT NOT NULL DEFAULT 'MEDIUM',
+  -- Superseded by migration 003, which redefines an empty array as "every
+  -- tracked symbol". Left as-is here: never edit an applied migration.
   symbols TEXT[] NOT NULL DEFAULT ARRAY['BTCUSDT', 'ETHUSDT', 'SOLUSDT'],
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

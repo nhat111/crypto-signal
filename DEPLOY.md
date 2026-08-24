@@ -59,8 +59,13 @@ subdirectory juggling.
    - `FUTURES_ONLY_SYMBOLS` — comma-separated symbols with a Binance
      Futures listing but no Spot listing (e.g. `HYPEUSDT`). Reduced feature
      set, no Health Score, no fabricated spot data — see ASSUMPTIONS.md §15.
-     **Set this on the `worker` service only**; `api`/`web`/`telegram` need
-     no change, they just render whatever the worker persisted.
+
+   **Symbols are configured on the `worker` service only.** The worker
+   registers each one in the `symbols` table at startup, and `api` reads
+   the list back from there (`getEnabledSymbols`), so `api`/`web` need no
+   symbol config of their own. The `telegram` service reads the list from
+   the API at boot to register its per-symbol commands — **restart it after
+   adding a symbol** or the new `/command` won't exist yet.
 4. Deploy. First boot runs migrations automatically (`db/migrate.mjs`, see
    the `Dockerfile.worker` CMD) then starts backfilling history — check logs
    for `"backfill complete"` per symbol/timeframe.
