@@ -37,6 +37,7 @@ export class BinanceSpotAdapter implements ExchangeAdapter {
     const streams = symbols.flatMap((symbol) => timeframes.map((tf) => klineStreamName(symbol, tf)));
 
     const client = new CombinedStreamClient({
+      name: 'spot-klines',
       baseWsUrl: this.opts.wsBase,
       streams,
       logger: this.opts.logger,

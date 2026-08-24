@@ -4,14 +4,38 @@ import { computeBackoffDelay } from '../backoff.js';
 import type { ConnectionStatus } from '../types.js';
 
 export interface CombinedStreamOptions {
+  /** Identifies this connection in logs — several run at once (spot klines, futures klines, liquidations) and they are otherwise indistinguishable. */
+  name: string;
   baseWsUrl: string;
   streams: string[];
   onMessage: (streamName: string, data: unknown) => void;
   onStatus?: (status: ConnectionStatus) => void;
   logger: Logger;
-  /** Force a reconnect if no message (including Binance's own ping) arrives within this window — protects against a socket that looks open but stopped delivering. */
+  /**
+   * Force a reconnect if nothing at all arrives within this window —
+   * protects against a socket that looks open but stopped delivering.
+   *
+   * Must stay comfortably above Binance's server-side ping interval, or it
+   * will kill healthy connections on sparse streams. See DEFAULT_STALE_TIMEOUT_MS.
+   */
   staleTimeoutMs?: number;
 }
+
+/**
+ * Ten minutes, not one.
+ *
+ * The watchdog is reset by *any* traffic, including Binance's periodic
+ * server ping. But some streams are naturally sparse — `@forceOrder` only
+ * fires when someone is actually liquidated, which can easily be quiet for
+ * minutes — so the only thing keeping such a connection visibly alive is
+ * that ping. A timeout shorter than the ping interval therefore terminates
+ * perfectly healthy sockets on a fixed cycle, forever.
+ *
+ * Missing data is caught properly elsewhere (candle-gap detection feeding
+ * the data-quality score), so this only needs to be a last-resort net for a
+ * truly dead socket, and it is far better for it to be late than wrong.
+ */
+const DEFAULT_STALE_TIMEOUT_MS = 10 * 60_000;
 
 /**
  * Wraps a single Binance "combined stream" WebSocket connection
@@ -42,6 +66,7 @@ export class CombinedStreamClient {
       this.attempt = 0;
       this.armStaleWatch();
       this.emitStatus({ state: 'open' });
+      this.opts.logger.info({ stream: this.opts.name, streamCount: this.opts.streams.length }, 'binance ws open');
     });
 
     socket.on('message', (raw) => {
@@ -50,12 +75,17 @@ export class CombinedStreamClient {
         const parsed = JSON.parse(raw.toString()) as { stream: string; data: unknown };
         this.opts.onMessage(parsed.stream, parsed.data);
       } catch (err) {
-        this.opts.logger.error({ err }, 'failed to parse binance ws message');
+        this.opts.logger.error({ err, stream: this.opts.name }, 'failed to parse binance ws message');
       }
     });
 
+    // Control frames never surface as 'message', so without these a sparse
+    // stream looks silent even while the server is actively keeping it alive.
+    socket.on('ping', () => this.armStaleWatch());
+    socket.on('pong', () => this.armStaleWatch());
+
     socket.on('error', (err) => {
-      this.opts.logger.warn({ err }, 'binance ws error');
+      this.opts.logger.warn({ err, stream: this.opts.name }, 'binance ws error');
       this.emitStatus({ state: 'error', message: err.message });
     });
 
@@ -78,15 +108,15 @@ export class CombinedStreamClient {
     this.attempt += 1;
     const delayMs = computeBackoffDelay(this.attempt);
     this.emitStatus({ state: 'reconnecting', attempt: this.attempt, delayMs });
-    this.opts.logger.warn({ attempt: this.attempt, delayMs }, 'reconnecting binance ws');
+    this.opts.logger.warn({ stream: this.opts.name, attempt: this.attempt, delayMs }, 'reconnecting binance ws');
     this.reconnectTimer = setTimeout(() => this.connect(), delayMs);
   }
 
   private armStaleWatch(): void {
     this.clearStaleWatch();
-    const timeoutMs = this.opts.staleTimeoutMs ?? 60_000;
+    const timeoutMs = this.opts.staleTimeoutMs ?? DEFAULT_STALE_TIMEOUT_MS;
     this.staleTimer = setTimeout(() => {
-      this.opts.logger.warn({ timeoutMs }, 'binance ws stale, forcing reconnect');
+      this.opts.logger.warn({ stream: this.opts.name, timeoutMs }, 'binance ws stale, forcing reconnect');
       this.socket?.terminate();
     }, timeoutMs);
   }

@@ -76,6 +76,7 @@ export class BinanceFuturesAdapter implements FuturesAdapter {
     const streams = symbols.flatMap((symbol) => timeframes.map((tf) => klineStreamName(symbol, tf)));
 
     const client = new CombinedStreamClient({
+      name: 'futures-klines',
       baseWsUrl: this.opts.wsBase,
       streams,
       logger: this.opts.logger,
@@ -158,6 +159,7 @@ export class BinanceFuturesAdapter implements FuturesAdapter {
     const streams = symbols.map((symbol) => forceOrderStreamName(symbol));
 
     const client = new CombinedStreamClient({
+      name: 'futures-liquidations',
       baseWsUrl: this.opts.wsBase,
       streams,
       logger: this.opts.logger,
