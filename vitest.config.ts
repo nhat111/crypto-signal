@@ -15,6 +15,7 @@ export default defineConfig({
       '@crypto-signal/indicators': alias('indicators'),
       '@crypto-signal/signal-engine': alias('signal-engine'),
       '@crypto-signal/health-engine': alias('health-engine'),
+      '@crypto-signal/gem-scanner': alias('gem-scanner'),
       '@crypto-signal/db': alias('db'),
     },
   },

@@ -9,6 +9,7 @@ const SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'];
 const LINKS = [
   { href: '/', label: 'Overview' },
   { href: '/signals', label: 'Signals' },
+  { href: '/gems', label: 'Gems' },
   { href: '/performance', label: 'Performance' },
 ];
 

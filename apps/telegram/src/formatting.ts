@@ -1,4 +1,4 @@
-import type { LatestSymbolState, OverviewRow, SignalRow } from './apiClient.js';
+import type { GemRow, LatestSymbolState, OverviewRow, SignalRow } from './apiClient.js';
 
 function healthLine(row: OverviewRow): string {
   const score = row.healthScore === null ? 'N/A' : String(row.healthScore);
@@ -66,6 +66,51 @@ export function formatSignalList(signals: SignalRow[]): string {
     .join('\n');
 }
 
+/**
+ * Small-cap candidates. Deliberately leads with the risk score and ends
+ * with an explicit non-recommendation: these are screening results from
+ * public DEX data, and the downside here is total loss, not a drawdown.
+ */
+export function formatGemList(gems: GemRow[]): string {
+  if (gems.length === 0) {
+    return 'No small-cap candidates currently pass the filters.\n\n<i>Either the scanner is disabled, has not run yet, or nothing in its sample qualified.</i>';
+  }
+
+  const lines = ['💎 <b>SMALL-CAP CANDIDATES</b>', ''];
+
+  for (const gem of gems) {
+    const safety =
+      gem.safetyVerdict === 'safe'
+        ? '✅ screened'
+        : gem.safetyVerdict === 'caution'
+          ? '⚠️ caution'
+          : gem.safetyVerdict === 'danger'
+            ? '⛔ danger'
+            : '❔ unverified';
+
+    lines.push(
+      `<b>${escapeHtml(gem.symbol)}</b> · ${gem.chainId}`,
+      `Gem ${gem.gemScore}/100 · Risk ${gem.riskScore}/100 · ${safety}`,
+      `Liq $${gem.liquidityUsd === null ? '?' : formatLargeNumber(gem.liquidityUsd)} · Vol24h $${gem.volume24hUsd === null ? '?' : formatLargeNumber(gem.volume24hUsd)}${
+        gem.priceChange24hPct === null ? '' : ` · ${gem.priceChange24hPct >= 0 ? '+' : ''}${gem.priceChange24hPct.toFixed(1)}%`
+      }`,
+      ...(gem.url ? [gem.url] : []),
+      '',
+    );
+  }
+
+  lines.push(
+    '<i>Screening results from public DEX data, not recommendations. Small-cap tokens can lose most or all of their value quickly, and a safety screen cannot rule out every risk.</i>',
+  );
+
+  return lines.join('\n');
+}
+
+/** Token names/symbols come from on-chain metadata that anyone can set, so they're escaped before entering an HTML-parsed message. */
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function formatLargeNumber(n: number): string {
   const abs = Math.abs(n);
   const sign = n < 0 ? '-' : '';
@@ -88,6 +133,7 @@ export function buildHelpText(symbols: string[]): string {
     '/market — full heatmap across timeframes',
     `${symbolCommands} — symbol detail`,
     '/signals — recent signals',
+    '/gems — small-cap candidates from DEX data',
     '/alerts on|off — toggle alert push to this chat',
     '/help — this message',
     '',

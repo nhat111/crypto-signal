@@ -8,6 +8,7 @@ import {
 } from '@crypto-signal/db';
 import { ALL_SIGNAL_TYPES } from '@crypto-signal/signal-engine';
 import { processMatchedCandles } from './pipeline.js';
+import { runGemOutcomeTracker, runGemScanCycle, type GemScanDeps } from './gemScan.js';
 import type { WorkerContext } from './context.js';
 
 const HORIZONS: OutcomeHorizon[] = ['15m', '1h', '4h', '24h'];
@@ -69,6 +70,30 @@ export async function resolveTimedOutPairs(ctx: WorkerContext): Promise<void> {
 
 export function startSchedulers(ctx: WorkerContext): () => void {
   const timers: ReturnType<typeof setInterval>[] = [];
+
+  // Small-cap discovery is opt-in (GEM_SCAN_ENABLED) and completely
+  // independent of the Binance pipeline — a failure in one must not affect
+  // the other, so it gets its own timers and its own try/catch.
+  if (ctx.gemConfig?.enabled) {
+    const gemDeps: GemScanDeps = {
+      pool: ctx.pool,
+      logger: ctx.logger,
+      gemConfig: ctx.gemConfig,
+      notifier: ctx.notifier,
+      telegramAlertChatIds: ctx.config.telegramAlertChatIds,
+    };
+    const intervalMs = ctx.gemConfig.scanIntervalMinutes * 60_000;
+
+    timers.push(setInterval(() => void runGemScanCycle(gemDeps).catch((err) => ctx.logger.error({ err }, 'gem scan failed')), intervalMs));
+    timers.push(
+      setInterval(
+        () => void runGemOutcomeTracker(gemDeps).catch((err) => ctx.logger.error({ err }, 'gem outcome tracker failed')),
+        60 * 60_000,
+      ),
+    );
+
+    void runGemScanCycle(gemDeps).catch((err) => ctx.logger.error({ err }, 'initial gem scan failed'));
+  }
 
   timers.push(setInterval(() => void runOutcomeTracker(ctx).catch((err) => ctx.logger.error({ err }, 'outcome tracker failed')), 5 * 60_000));
   timers.push(setInterval(() => void refreshHistoricalScores(ctx).catch((err) => ctx.logger.error({ err }, 'historical score refresh failed')), 10 * 60_000));

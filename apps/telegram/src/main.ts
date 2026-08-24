@@ -1,7 +1,7 @@
 import { Telegraf } from 'telegraf';
 import { createLogger, loadConfig, type Logger } from '@crypto-signal/shared';
 import { ApiClient } from './apiClient.js';
-import { buildHelpText, formatHeatmap, formatOverview, formatSignalList, formatSymbolDetail } from './formatting.js';
+import { buildHelpText, formatGemList, formatHeatmap, formatOverview, formatSignalList, formatSymbolDetail } from './formatting.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -90,6 +90,16 @@ async function main(): Promise<void> {
     }
   });
 
+  bot.command('gems', async (ctx) => {
+    try {
+      const { gems } = await api.getGems(10);
+      await ctx.reply(formatGemList(gems), { parse_mode: 'HTML', link_preview_options: { is_disabled: true } });
+    } catch (err) {
+      logger.error({ err }, '/gems failed');
+      await ctx.reply('Could not load small-cap candidates right now — try again shortly.');
+    }
+  });
+
   bot.command('alerts', async (ctx) => {
     const chatId = String(ctx.chat.id);
     const arg = ctx.message.text.split(' ')[1]?.toLowerCase();
@@ -117,6 +127,7 @@ async function main(): Promise<void> {
       { command: 'market', description: 'Heatmap across timeframes' },
       ...symbols.map((symbol) => ({ command: commandNameFor(symbol), description: `${symbol} detail` })),
       { command: 'signals', description: 'Recent signals' },
+      { command: 'gems', description: 'Small-cap candidates' },
       { command: 'alerts', description: 'Toggle alerts for this chat' },
       { command: 'help', description: 'Show help' },
     ]);

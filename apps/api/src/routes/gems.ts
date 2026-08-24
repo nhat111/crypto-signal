@@ -1,0 +1,41 @@
+import type { FastifyInstance } from 'fastify';
+import { getGemByAddress, getGemPerformance, getLatestGems, type GemHorizon } from '@crypto-signal/db';
+import type { ApiDeps } from '../deps.js';
+
+interface GemsQuery {
+  chain?: string;
+  minScore?: string;
+  limit?: string;
+}
+
+const VALID_HORIZONS: GemHorizon[] = ['24h', '7d'];
+
+/**
+ * Read-only surfaces for the small-cap discovery scanner. Like every other
+ * route here, it reads what the worker persisted and never calls an
+ * upstream data source itself.
+ */
+export function registerGemRoutes(app: FastifyInstance, deps: ApiDeps): void {
+  app.get<{ Querystring: GemsQuery }>('/api/gems', async (req) => {
+    const gems = await getLatestGems(deps.pool, {
+      chainId: req.query.chain,
+      minScore: req.query.minScore !== undefined ? Number(req.query.minScore) : undefined,
+      limit: Math.min(200, Number(req.query.limit ?? 50)),
+    });
+    return { gems };
+  });
+
+  app.get<{ Params: { chain: string; address: string } }>('/api/gems/:chain/:address', async (req, reply) => {
+    const gem = await getGemByAddress(deps.pool, req.params.chain, req.params.address);
+    if (!gem) return reply.code(404).send({ error: 'Unknown token, or it has not been scanned yet' });
+    return gem;
+  });
+
+  app.get<{ Querystring: { horizon?: string } }>('/api/gems/performance', async (req, reply) => {
+    const horizon = (req.query.horizon ?? '7d') as GemHorizon;
+    if (!VALID_HORIZONS.includes(horizon)) {
+      return reply.code(400).send({ error: `horizon must be one of ${VALID_HORIZONS.join(', ')}` });
+    }
+    return getGemPerformance(deps.pool, horizon);
+  });
+}

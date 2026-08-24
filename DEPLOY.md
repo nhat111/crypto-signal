@@ -103,3 +103,25 @@ Back in Vercel: **Settings → Environment Variables** → set
 `NEXT_PUBLIC_API_BASE_URL` to the API service's public Railway domain from
 step 3.4 → **Redeploy** (env var changes don't apply retroactively to an
 already-built deployment).
+
+## Enabling the small-cap discovery scanner (optional)
+
+A separate, opt-in subsystem — see ASSUMPTIONS.md §16 for what it can and
+cannot tell you before relying on it.
+
+On the **`worker`** service only, add:
+
+- `GEM_SCAN_ENABLED=true`
+- `GEM_CHAINS=solana` (Solana is the only chain with a safety screen wired
+  up; others would be surfaced unverified)
+- optionally `RUGCHECK_API_KEY` — without it, screening is attempted
+  unauthenticated and degrades to "unverified", never to "safe"
+
+Everything else has working defaults (`.env.example` lists them). No change
+is needed on `api`, `web`, or `telegram` — they read what the worker
+persisted, though the bot needs a restart to register its `/gems` command.
+
+Migration `004_gem_scanner.sql` runs automatically on the worker's next
+boot. Give it one scan interval (default 30 min) before expecting anything
+in `/gems`, and note that the performance panel deliberately shows "not
+enough data yet" until 20 surfaced tokens have a recorded outcome.

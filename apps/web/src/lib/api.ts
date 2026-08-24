@@ -1,4 +1,7 @@
 import type {
+  GemHorizon,
+  GemPerformance,
+  GemsResponse,
   Horizon,
   OverviewResponse,
   PerformanceResponse,
@@ -67,6 +70,19 @@ export function getSignals(filter: SignalsFilter = {}): Promise<SignalsResponse>
   if (filter.limit) params.set('limit', String(filter.limit));
   const qs = params.toString();
   return fetchJson<SignalsResponse>(`/api/signals${qs ? `?${qs}` : ''}`);
+}
+
+export function getGems(params: { chain?: string; minScore?: number; limit?: number } = {}): Promise<GemsResponse> {
+  const qs = new URLSearchParams();
+  if (params.chain) qs.set('chain', params.chain);
+  if (params.minScore !== undefined) qs.set('minScore', String(params.minScore));
+  if (params.limit) qs.set('limit', String(params.limit));
+  const query = qs.toString();
+  return fetchJson<GemsResponse>(`/api/gems${query ? `?${query}` : ''}`);
+}
+
+export function getGemPerformance(horizon: GemHorizon): Promise<GemPerformance> {
+  return fetchJson<GemPerformance>(`/api/gems/performance?horizon=${horizon}`);
 }
 
 export function getPerformance(horizon: Horizon): Promise<PerformanceResponse> {

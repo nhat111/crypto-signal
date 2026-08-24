@@ -7,3 +7,4 @@ export * from './outcomes.js';
 export * from './botUsers.js';
 export * from './symbols.js';
 export * from './queries.js';
+export * from './gems.js';

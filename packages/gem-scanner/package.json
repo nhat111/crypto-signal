@@ -1,5 +1,5 @@
 {
-  "name": "@crypto-signal/db",
+  "name": "@crypto-signal/gem-scanner",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,14 +14,9 @@
   },
   "dependencies": {
     "@crypto-signal/shared": "*",
-    "@crypto-signal/indicators": "*",
-    "@crypto-signal/signal-engine": "*",
-    "@crypto-signal/health-engine": "*",
-    "@crypto-signal/gem-scanner": "*",
-    "pg": "^8.13.1"
+    "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@types/pg": "^8.11.10",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }

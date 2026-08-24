@@ -6,6 +6,7 @@ import { registerSymbolRoute } from './symbol.js';
 import { registerSignalsRoute } from './signals.js';
 import { registerPerformanceRoute } from './performance.js';
 import { registerBotRoutes } from './bot.js';
+import { registerGemRoutes } from './gems.js';
 
 export function registerRoutes(app: FastifyInstance, deps: ApiDeps): void {
   registerHealthRoute(app, deps);
@@ -14,4 +15,5 @@ export function registerRoutes(app: FastifyInstance, deps: ApiDeps): void {
   registerSignalsRoute(app, deps);
   registerPerformanceRoute(app, deps);
   registerBotRoutes(app, deps);
+  registerGemRoutes(app, deps);
 }

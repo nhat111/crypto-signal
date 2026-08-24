@@ -59,6 +59,27 @@ export interface BotSettings {
   symbols: string[];
 }
 
+export interface GemRow {
+  scanId: string;
+  chainId: string;
+  tokenAddress: string;
+  symbol: string;
+  name: string;
+  dexId: string;
+  url: string | null;
+  scannedAt: number;
+  gemScore: number;
+  riskScore: number;
+  reasons: string[];
+  priceUsd: number | null;
+  liquidityUsd: number | null;
+  volume24hUsd: number | null;
+  priceChange24hPct: number | null;
+  ageDays: number | null;
+  safetyVerdict: string | null;
+  safetyFlags: string[] | null;
+}
+
 export class ApiClient {
   constructor(private readonly baseUrl: string) {}
 
@@ -88,6 +109,10 @@ export class ApiClient {
 
   getSignals(limit = 10): Promise<{ signals: SignalRow[] }> {
     return this.get(`/api/signals?limit=${limit}`);
+  }
+
+  getGems(limit = 10): Promise<{ gems: GemRow[] }> {
+    return this.get(`/api/gems?limit=${limit}`);
   }
 
   registerUser(chatId: string, username: string | undefined): Promise<{ settings: BotSettings }> {

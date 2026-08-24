@@ -2,6 +2,7 @@ import pg from 'pg';
 import { createLogger, loadConfig } from '@crypto-signal/shared';
 import { BinanceFuturesAdapter, BinanceSpotAdapter } from '@crypto-signal/market-data';
 import { insertLiquidation } from '@crypto-signal/db';
+import { loadGemConfig } from '@crypto-signal/gem-scanner';
 import { buildStates, connectionStatusToState, type WorkerContext } from './context.js';
 import { CandlePairBuffer } from './state.js';
 import { SnapshotCache } from './redisCache.js';
@@ -14,7 +15,17 @@ async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger('worker', config.logLevel);
 
-  logger.info({ symbols: config.symbols, futuresOnlySymbols: config.futuresOnlySymbols, timeframes: config.timeframes }, 'starting worker');
+  const gemConfig = loadGemConfig();
+
+  logger.info(
+    {
+      symbols: config.symbols,
+      futuresOnlySymbols: config.futuresOnlySymbols,
+      timeframes: config.timeframes,
+      gemScan: gemConfig.enabled ? gemConfig.chains : 'disabled',
+    },
+    'starting worker',
+  );
 
   const pool = new pg.Pool({ connectionString: config.databaseUrl, max: 10 });
   const cache = new SnapshotCache(config.redisUrl);
@@ -52,6 +63,7 @@ async function main(): Promise<void> {
     futuresOnlySymbolSet: new Set(config.futuresOnlySymbols),
     connectionStatus: { spot: 'connecting', futures: 'connecting', liquidation: 'connecting' },
     historicalScores: new Map(),
+    gemConfig: gemConfig.enabled ? gemConfig : null,
   };
 
   await backfillHistory(ctx);

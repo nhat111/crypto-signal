@@ -16,6 +16,7 @@
     "@crypto-signal/signal-engine": "*",
     "@crypto-signal/health-engine": "*",
     "@crypto-signal/db": "*",
+    "@crypto-signal/gem-scanner": "*",
     "ioredis": "^5.4.2"
   },
   "devDependencies": {

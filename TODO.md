@@ -113,6 +113,25 @@ Check items as they land; each phase's commit message references the phase.
       listing but no Spot listing (e.g. HYPEUSDT) — reduced feature set,
       never fabricated spot data. See ASSUMPTIONS.md §15.
 
+## Phase 17 — Small-cap discovery scanner (post-MVP, opt-in)
+- [x] `packages/gem-scanner` — DexScreener + GeckoTerminal discovery,
+      DexScreener enrichment, RugCheck safety screening for Solana.
+- [x] Schema-validated adapters (upstream APIs could not be probed from the
+      build environment — see ASSUMPTIONS.md §16).
+- [x] Independent Gem Score + Risk Score, configurable weights/thresholds.
+- [x] Safety as a hard gate: `danger` disqualifies, a failed screen reports
+      `unknown` and never `safe`.
+- [x] `gem_tokens` / `gem_scans` / `gem_outcomes` / `gem_alert_events`.
+- [x] Worker scan cycle + 24h/7d outcome tracking incl. liquidity collapse.
+- [x] `/api/gems`, `/api/gems/:chain/:address`, `/api/gems/performance`.
+- [x] `/gems` web page and `/gems` Telegram command.
+- [x] Unit tests for the scoring gate and the safety interpreter.
+- [ ] EVM safety source (GoPlus-style honeypot simulation) — needed before
+      HyperEVM tokens should be surfaced as anything but unverified.
+- [ ] Holder-growth and social signals.
+- [ ] Tune weights against recorded outcomes — current values are starting
+      points with no track record behind them.
+
 ## Known limitations (carried forward, not silently hidden)
 - [ ] Liquidation history cannot be backfilled on a cold start (exchange
       limitation, see ASSUMPTIONS §1/§6) — 24h rolling average anomaly needs

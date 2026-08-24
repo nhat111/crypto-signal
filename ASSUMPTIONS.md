@@ -196,3 +196,93 @@ reject the whole connection, taking BTC/ETH/SOL spot data down with it) and
 routes their futures candles straight to `processFuturesOnlyCandle`,
 bypassing the spot/futures candle-pairing buffer entirely since there's
 nothing to pair.
+
+## 16. Small-cap discovery scanner ("hidden gems")
+
+A second, opt-in product in the same codebase (`GEM_SCAN_ENABLED`). It
+shares infrastructure with the market-health monitor — worker, database,
+API, bot, web — and its discipline, but none of its data model: these
+tokens trade only on DEXes, so there is no funding, no open interest, and
+no spot-vs-futures divergence to compute.
+
+### Data sources, and what could not be verified
+
+| Need | Source | Status |
+|---|---|---|
+| Pair data (liquidity, volume, txn counts, price change, pool age) | DexScreener REST (`/tokens/v1/{chainId}/{addresses}`, documented cap 30 addresses/call) | **Not verified live.** The build environment's egress proxy blocks `api.dexscreener.com`, so endpoint paths and field names come from public documentation only. |
+| Candidate discovery | DexScreener `/token-profiles/latest/v1`, `/token-boosts/latest/v1`; GeckoTerminal `/networks/{network}/pools` | Same — documented, not probed. |
+| Solana token safety | RugCheck `/v1/tokens/{mint}/report` | Same. Documented to accept a per-developer `X-API-KEY`. |
+
+Because none of it could be probed, **every response is validated against a
+zod schema at the boundary** (`sources/http.ts`). A changed or misremembered
+field name raises `UpstreamShapeError` with the actual payload logged,
+rather than silently scoring `undefined`. A scanner quietly ranking tokens
+on garbage numbers would be far worse than one that refuses to run.
+
+### The sampling limitation (important)
+
+DexScreener's public API has **no endpoint that lists or filters every pair
+on a chain** — the website's screener filters aren't exposed. Discovery is
+therefore candidate-feed + enrichment, and each feed is a biased sample:
+
+- Profile/boost feeds list tokens whose teams **paid for marketing** — a
+  self-selecting slice.
+- GeckoTerminal top-pools is **volume-ranked**, which misses quiet tokens.
+
+So the scanner sees *a sample of the chain, never all of it*. It cannot
+claim to have found "the best" small cap, only the best among what it
+looked at. Scan results record how many candidates each feed produced so
+that coverage stays visible rather than implied.
+
+### Scoring
+
+Two independent 0-100 scores, mirroring Health vs Leverage Risk on the
+market-health side and never blended into one number:
+
+- **Gem Score** — liquidity quality (25), volume conviction (25), buy
+  pressure (20), survival/age (20), momentum structure (10).
+- **Risk Score** — safety (35), concentration (20), liquidity fragility
+  (20), age risk (10), pump exhaustion (15).
+
+Weights and every threshold live in `packages/gem-scanner/src/config.ts`
+and are env-overridable, same rule as the rest of the project. **They are
+starting points, not tuned values** — nothing here has been validated
+against recorded outcomes yet.
+
+Buy pressure uses DexScreener's counted buy/sell **transaction counts** —
+real per-side trade data, consistent with the project's rule against
+inferring flow from candle color. It counts transactions, not size, so many
+tiny buys can skew it; it is one component of five, weighted accordingly.
+
+### Safety is a gate, not a weight
+
+- A `danger` verdict **disqualifies outright**, regardless of how good the
+  market data looks.
+- A screen that could not run reports `unknown`, **never `safe`**.
+- Individual checks are `null` when unreported, never `false`: "we couldn't
+  read whether the mint authority is revoked" and "the mint authority is
+  NOT revoked" mean opposite things to a buyer.
+- Chains with no safety source (i.e. anything that isn't Solana today) get
+  no screen at all — surfaced as "no screen", scored as unverified.
+
+### Outcome tracking
+
+`gem_outcomes` records price at +24h and +7d, plus **liquidity at +7d**,
+for the scans the scanner actually *called* (score ≥ alert threshold) — not
+every routine rescan, which would flood the sample with duplicates. The
+liquidity figure exists because "how often did this point at something
+whose liquidity then vanished" is the number that matters most here, and an
+average return would hide exactly that. The performance surface reports
+"not enough data yet" below 20 recorded outcomes rather than quoting a win
+rate off a handful of samples.
+
+### Known limitations
+
+- Solana only for safety screening. HyperEVM pair data is available through
+  DexScreener (chain id `hyperevm`), but no EVM safety source is wired up,
+  so those tokens would be surfaced unverified — which is why only
+  `solana` is enabled by default.
+- No honeypot simulation (would need a GoPlus-style EVM source).
+- No holder-growth or social signals.
+- Token names and symbols come from on-chain metadata that anyone can set;
+  they are HTML-escaped before display but are not otherwise trustworthy.

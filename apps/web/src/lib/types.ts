@@ -113,3 +113,52 @@ export interface PerformanceResponse {
   horizon: Horizon;
   results: PerformanceResult[];
 }
+
+/* ---------- Small-cap discovery (gem scanner) ---------- */
+
+export type SafetyVerdict = 'safe' | 'caution' | 'danger' | 'unknown';
+
+export interface Gem {
+  scanId: string;
+  chainId: string;
+  tokenAddress: string;
+  symbol: string;
+  name: string;
+  dexId: string;
+  url: string | null;
+  scannedAt: number;
+  gemScore: number;
+  gemComponents: Record<string, number>;
+  riskScore: number;
+  riskComponents: Record<string, number>;
+  reasons: string[];
+  priceUsd: number | null;
+  liquidityUsd: number | null;
+  volume24hUsd: number | null;
+  fdvUsd: number | null;
+  priceChange24hPct: number | null;
+  buys24h: number | null;
+  sells24h: number | null;
+  ageDays: number | null;
+  /** Null means no screen ran for this chain; 'unknown' means one ran but confirmed nothing. */
+  safetyVerdict: SafetyVerdict | null;
+  safetyFlags: string[] | null;
+  topHolderPct: number | null;
+  lpLocked: boolean | null;
+}
+
+export interface GemsResponse {
+  gems: Gem[];
+}
+
+export type GemHorizon = '24h' | '7d';
+
+export interface GemPerformance {
+  horizon: GemHorizon;
+  sampleCount: number;
+  positiveMovePct: number | null;
+  negativeMovePct: number | null;
+  medianMovePct: number | null;
+  liquidityCollapsePct: number | null;
+  sufficientData: boolean;
+}
