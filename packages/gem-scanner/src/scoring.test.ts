@@ -13,6 +13,7 @@ const thresholds: GemThresholds = {
   maxHealthyVolumeToLiquidity: 10,
   idealAgeDays: 60,
   verticalPump24hPct: 100,
+  extremePump24hPct: 300,
 };
 
 const NOW = 1_800_000_000_000;
@@ -83,6 +84,22 @@ describe('eligibility gate', () => {
 
   it('does not disqualify on an unreported FDV — it is a bound, not a safety property', () => {
     expect(checkEligibility(pair({ fdvUsd: null }), thresholds, NOW)).toEqual([]);
+  });
+
+  it('hard-rejects a token already up past the extreme-pump cutoff, no matter how good everything else looks', () => {
+    // Dinger-shaped case: +3268% in 24h on thin liquidity — already a
+    // crowded trade, not an undiscovered one, so no score should rescue it.
+    const alreadyPumped = pair({ priceChangePct: { m5: null, h1: null, h6: null, h24: 3268 } });
+    expect(checkEligibility(alreadyPumped, thresholds, NOW)).toContain('extreme_pump');
+
+    const result = evaluate(alreadyPumped, safety());
+    expect(result.eligible).toBe(false);
+    expect(result.score).toBeNull();
+  });
+
+  it('does not reject a mild pump below the extreme cutoff — only the soft momentum penalty applies there', () => {
+    const mildPump = pair({ priceChangePct: { m5: null, h1: null, h6: null, h24: 102 } });
+    expect(checkEligibility(mildPump, thresholds, NOW)).toEqual([]);
   });
 });
 

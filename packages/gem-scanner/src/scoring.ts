@@ -37,6 +37,7 @@ export type EligibilityFailure =
   | 'volume_too_low'
   | 'too_young'
   | 'fdv_too_high'
+  | 'extreme_pump'
   | 'missing_liquidity_data'
   | 'missing_volume_data'
   | 'missing_age_data';
@@ -89,6 +90,14 @@ export function checkEligibility(pair: GemPair, thresholds: GemThresholds, now: 
   // An unknown FDV doesn't disqualify — it's a "nice to have" bound, not a
   // safety property, and plenty of legitimate pairs omit it.
   if (pair.fdvUsd !== null && pair.fdvUsd > thresholds.maxFdvUsd) failures.push('fdv_too_high');
+
+  // Hard cutoff, separate from momentumStructureScore's soft penalty below
+  // it: past this point the token is already a discovered, already-crowded
+  // trade, and no amount of liquidity/volume/buy-pressure score should be
+  // able to outweigh that and land it on the list anyway.
+  if (pair.priceChangePct.h24 !== null && pair.priceChangePct.h24 >= thresholds.extremePump24hPct) {
+    failures.push('extreme_pump');
+  }
 
   return failures;
 }
@@ -316,6 +325,8 @@ function describeFailure(failure: EligibilityFailure): string {
       return 'The pool is newer than the minimum age — it has not survived long enough for this scanner.';
     case 'fdv_too_high':
       return 'Fully diluted valuation is above the small-cap ceiling.';
+    case 'extreme_pump':
+      return 'Price already moved too far in the last 24h — this is a trade the market already found, not an undiscovered one.';
     case 'missing_liquidity_data':
       return 'Liquidity was not reported — not scored rather than assumed.';
     case 'missing_volume_data':

@@ -34,6 +34,8 @@ export const gemEnvSchema = z.object({
   GEM_MAX_HEALTHY_VOLUME_TO_LIQUIDITY: numeric(10),
   GEM_IDEAL_AGE_DAYS: numeric(60),
   GEM_VERTICAL_PUMP_24H_PCT: numeric(100),
+  /** Hard eligibility cutoff — separate from the soft momentum penalty above. A token already up this much in 24h isn't an undiscovered gem, it's a trade the whole market already found; no combination of other components should be able to outscore that. */
+  GEM_EXTREME_PUMP_24H_PCT: numeric(300),
 
   /** Alerting. */
   GEM_ALERT_MIN_SCORE: numeric(70),
@@ -52,6 +54,7 @@ export interface GemThresholds {
   maxHealthyVolumeToLiquidity: number;
   idealAgeDays: number;
   verticalPump24hPct: number;
+  extremePump24hPct: number;
 }
 
 /** Must sum to 100. */
@@ -124,6 +127,7 @@ export function loadGemConfig(env: NodeJS.ProcessEnv = process.env): GemConfig {
       maxHealthyVolumeToLiquidity: parsed.GEM_MAX_HEALTHY_VOLUME_TO_LIQUIDITY,
       idealAgeDays: parsed.GEM_IDEAL_AGE_DAYS,
       verticalPump24hPct: parsed.GEM_VERTICAL_PUMP_24H_PCT,
+      extremePump24hPct: parsed.GEM_EXTREME_PUMP_24H_PCT,
     },
     scoreWeights: GEM_SCORE_WEIGHTS,
     riskWeights: GEM_RISK_WEIGHTS,
