@@ -97,6 +97,7 @@ function formatWatchAlert(watch: GemWatchRow, currentPrice: number | null, reaso
     '🔔 <b>WATCH ALERT — consider selling</b>',
     '',
     `<b>${escapeHtml(watch.symbol)}</b> · ${watch.chainId}`,
+    `<code>${escapeHtml(watch.tokenAddress)}</code>`,
     `Entry: $${watch.entryPrice}`,
     currentPrice === null
       ? 'Current: pool no longer found on DexScreener'

@@ -109,6 +109,7 @@ export function formatGemList(gems: GemRow[]): string {
 export function formatWatchConfirmation(watch: GemWatchDTO): string {
   return [
     `👀 Watching <b>${escapeHtml(watch.symbol)}</b>`,
+    `<code>${escapeHtml(watch.tokenAddress)}</code> <i>(tap to copy)</i>`,
     '',
     `Entry price: $${watch.entryPrice}`,
     `Sell alert if:`,
@@ -130,11 +131,12 @@ export function formatWatchList(watches: GemWatchDTO[]): string {
   for (const w of watches) {
     lines.push(
       `<b>${escapeHtml(w.symbol)}</b> · ${w.chainId} — entry $${w.entryPrice}`,
+      `<code>${escapeHtml(w.tokenAddress)}</code>`,
       `stop-loss ${w.stopLossPct}% · take-profit ${w.takeProfitPct}% · liq floor ${w.liquidityCollapsePct}%`,
       '',
     );
   }
-  lines.push('<i>Use /unwatch SYMBOL to stop tracking one manually.</i>');
+  lines.push('<i>Tap an address to copy it. Use /unwatch SYMBOL to stop tracking one manually.</i>');
   return lines.join('\n');
 }
 
