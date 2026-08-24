@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { RiskBadge } from '@/components/RiskBadge';
 import { SafetyBadge } from './SafetyBadge';
 import type { Gem } from '@/lib/types';
@@ -29,6 +30,7 @@ export function GemCard({ gem }: GemCardProps) {
           <p className="truncate text-xs text-slate-500">
             {gem.name} · {gem.chainId} · {gem.dexId}
           </p>
+          <ContractAddress address={gem.tokenAddress} />
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -79,6 +81,41 @@ export function GemCard({ gem }: GemCardProps) {
         </a>
       )}
     </article>
+  );
+}
+
+/**
+ * Contract address, truncated for the eye but copyable in full — a symbol
+ * like "DINGER" is not enough to paste into a wallet or DEX search, and
+ * several tokens can share a ticker, so the address is the only thing that
+ * actually identifies which one this card is about.
+ */
+function ContractAddress({ address }: { address: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard API can be unavailable (insecure context, permissions) —
+      // the address is still selectable as plain text, so this is safe to swallow.
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      title={copied ? 'Copied!' : `Copy contract address: ${address}`}
+      className="mt-0.5 flex items-center gap-1.5 rounded text-[11px] text-slate-500 hover:text-slate-300"
+    >
+      <span className="font-mono tabular-nums">
+        {address.slice(0, 4)}…{address.slice(-4)}
+      </span>
+      <span className={cx('font-medium', copied ? 'text-emerald-400' : 'text-slate-600')}>{copied ? 'Copied' : 'Copy'}</span>
+    </button>
   );
 }
 
