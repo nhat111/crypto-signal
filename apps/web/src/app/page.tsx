@@ -11,7 +11,7 @@ import { SignalList } from '@/components/signals/SignalList';
 import { LoadingPanel, StatePanel } from '@/components/StatePanel';
 
 const POLL_MS = 20_000;
-const DEFAULT_TIMEFRAME: Timeframe = '15m';
+const DEFAULT_TIMEFRAME: Timeframe = '5m';
 
 export default function OverviewPage() {
   const overview = usePolling(getOverview, POLL_MS, []);
