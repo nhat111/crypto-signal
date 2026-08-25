@@ -1,4 +1,4 @@
-import type { GemRow, GemWatchDTO, LatestSymbolState, OverviewRow, PriceLevels, SignalRow } from './apiClient.js';
+import type { GemRow, GemWatchDTO, LatestSymbolState, OverviewRow, PriceLevels, SignalRow, TradeDTO, TradeSummaryDTO } from './apiClient.js';
 
 function healthLine(row: OverviewRow): string {
   const score = row.healthScore === null ? 'N/A' : String(row.healthScore);
@@ -148,6 +148,62 @@ export function formatWatchList(watches: GemWatchDTO[]): string {
   return lines.join('\n');
 }
 
+export function formatTradeOpened(trade: TradeDTO): string {
+  const lines = [
+    `📓 Logged <b>${escapeHtml(trade.symbol)}</b> ${trade.side.toUpperCase()}`,
+    `Entry: $${formatPrice(trade.entryPrice)}${trade.size !== null ? ` · size ${trade.size}` : ''}`,
+    '',
+    `<i>/close ${escapeHtml(trade.symbol)} EXIT_PRICE when you're out.</i>`,
+  ];
+  return lines.join('\n');
+}
+
+export function formatTradeClosed(trade: TradeDTO): string {
+  const won = (trade.pnlPct ?? 0) > 0;
+  const pctText = trade.pnlPct === null ? 'N/A' : `${trade.pnlPct >= 0 ? '+' : ''}${trade.pnlPct.toFixed(2)}%`;
+  const usdText = trade.pnlUsd === null ? '' : ` (${trade.pnlUsd >= 0 ? '+' : ''}$${formatPrice(trade.pnlUsd)})`;
+
+  return [
+    `${won ? '✅' : '🔻'} Closed <b>${escapeHtml(trade.symbol)}</b> ${trade.side.toUpperCase()}`,
+    `Entry $${formatPrice(trade.entryPrice)} → Exit $${formatPrice(trade.exitPrice ?? 0)}`,
+    `P&L: <b>${pctText}</b>${usdText}`,
+  ].join('\n');
+}
+
+export function formatJournal(trades: TradeDTO[], summary: TradeSummaryDTO): string {
+  const lines = ['📓 <b>TRADE JOURNAL</b>', ''];
+
+  if (summary.closedCount === 0) {
+    lines.push('No closed trades yet.');
+  } else {
+    lines.push(
+      `Win rate: <b>${summary.winRatePct!.toFixed(0)}%</b> (${summary.wins}W / ${summary.losses}L)`,
+      `Total P&L: <b>${summary.totalPnlUsd >= 0 ? '+' : ''}$${formatPrice(summary.totalPnlUsd)}</b>` +
+        (summary.avgPnlPct === null ? '' : ` · avg ${summary.avgPnlPct >= 0 ? '+' : ''}${summary.avgPnlPct.toFixed(2)}%/trade`),
+    );
+  }
+  if (summary.openCount > 0) lines.push(`Open positions: ${summary.openCount}`);
+  lines.push('');
+
+  if (trades.length === 0) {
+    lines.push('No trades logged yet. Use /trade SYMBOL long|short ENTRY [SIZE] to start.');
+    return lines.join('\n');
+  }
+
+  for (const t of trades) {
+    if (t.status === 'open') {
+      lines.push(`🟡 <b>${escapeHtml(t.symbol)}</b> ${t.side.toUpperCase()} · entry $${formatPrice(t.entryPrice)} · open`);
+    } else {
+      const pct = t.pnlPct ?? 0;
+      lines.push(
+        `${pct > 0 ? '🟢' : '🔴'} <b>${escapeHtml(t.symbol)}</b> ${t.side.toUpperCase()} · $${formatPrice(t.entryPrice)} → $${formatPrice(t.exitPrice ?? 0)} · ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`,
+      );
+    }
+  }
+
+  return lines.join('\n');
+}
+
 /** Token names/symbols come from on-chain metadata that anyone can set, so they're escaped before entering an HTML-parsed message. */
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -184,6 +240,9 @@ export function buildHelpText(symbols: string[]): string {
     '/watch SYMBOL — track a position you bought, get a sell alert here',
     '/watches — list your active watches',
     '/unwatch SYMBOL — stop tracking one',
+    '/trade SYMBOL long|short ENTRY [SIZE] — log a trade you took',
+    '/close SYMBOL EXIT_PRICE — close your most recent open trade on that symbol',
+    '/journal — your trade log + win rate / P&L summary',
     '/alerts on|off — toggle alert push to this chat',
     '/help — this message',
     '',

@@ -126,6 +126,41 @@ export interface PerformanceResponse {
   results: PerformanceResult[];
 }
 
+/* ---------- Trade journal ---------- */
+
+export type TradeSide = 'long' | 'short';
+export type TradeStatus = 'open' | 'closed';
+
+export interface Trade {
+  id: string;
+  chatId: string;
+  symbol: string;
+  side: TradeSide;
+  entryPrice: number;
+  exitPrice: number | null;
+  size: number | null;
+  pnlPct: number | null;
+  pnlUsd: number | null;
+  status: TradeStatus;
+  note: string | null;
+  openedAt: number;
+  closedAt: number | null;
+}
+
+export interface TradesResponse {
+  trades: Trade[];
+}
+
+export interface TradeSummary {
+  openCount: number;
+  closedCount: number;
+  wins: number;
+  losses: number;
+  winRatePct: number | null;
+  totalPnlUsd: number;
+  avgPnlPct: number | null;
+}
+
 /* ---------- Small-cap discovery (gem scanner) ---------- */
 
 export type SafetyVerdict = 'safe' | 'caution' | 'danger' | 'unknown';

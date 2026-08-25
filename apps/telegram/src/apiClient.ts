@@ -114,6 +114,35 @@ export class ApiError extends Error {
   }
 }
 
+export type TradeSide = 'long' | 'short';
+export type TradeStatus = 'open' | 'closed';
+
+export interface TradeDTO {
+  id: string;
+  chatId: string;
+  symbol: string;
+  side: TradeSide;
+  entryPrice: number;
+  exitPrice: number | null;
+  size: number | null;
+  pnlPct: number | null;
+  pnlUsd: number | null;
+  status: TradeStatus;
+  note: string | null;
+  openedAt: number;
+  closedAt: number | null;
+}
+
+export interface TradeSummaryDTO {
+  openCount: number;
+  closedCount: number;
+  wins: number;
+  losses: number;
+  winRatePct: number | null;
+  totalPnlUsd: number;
+  avgPnlPct: number | null;
+}
+
 export class ApiClient {
   constructor(private readonly baseUrl: string) {}
 
@@ -123,21 +152,29 @@ export class ApiClient {
     return (await res.json()) as T;
   }
 
-  private async post<T>(path: string, body: unknown): Promise<T> {
+  private async send<T>(method: 'POST' | 'PATCH', path: string, body: unknown): Promise<T> {
     const res = await fetch(`${this.baseUrl}${path}`, {
-      method: 'POST',
+      method,
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });
     if (!res.ok) {
-      // /api/watches replies with a plain-language {error} on 4xx (already
-      // watching, unknown symbol, etc.) that's worth showing the user
-      // directly rather than a generic "failed: 409".
+      // /api/watches and /api/journal reply with a plain-language {error}
+      // on 4xx (already watching, unknown trade, etc.) that's worth
+      // showing the user directly rather than a generic "failed: 409".
       const parsed = await res.json().catch(() => undefined);
-      const message = parsed && typeof parsed === 'object' && 'error' in parsed ? String((parsed as { error: unknown }).error) : `API POST ${path} failed: ${res.status}`;
+      const message = parsed && typeof parsed === 'object' && 'error' in parsed ? String((parsed as { error: unknown }).error) : `API ${method} ${path} failed: ${res.status}`;
       throw new ApiError(res.status, message);
     }
     return (await res.json()) as T;
+  }
+
+  private post<T>(path: string, body: unknown): Promise<T> {
+    return this.send<T>('POST', path, body);
+  }
+
+  private patch<T>(path: string, body: unknown): Promise<T> {
+    return this.send<T>('PATCH', path, body);
   }
 
   getOverview(): Promise<OverviewResponse> {
@@ -166,6 +203,28 @@ export class ApiClient {
 
   unwatch(chatId: string, id: string): Promise<{ closed: true }> {
     return this.post(`/api/watches/${id}/close`, { chatId });
+  }
+
+  openTrade(chatId: string, symbol: string, side: TradeSide, entryPrice: number, size: number | null): Promise<{ trade: TradeDTO }> {
+    return this.post('/api/journal', { chatId, symbol, side, entryPrice, size });
+  }
+
+  closeTrade(id: string, exitPrice: number): Promise<{ trade: TradeDTO }> {
+    return this.patch(`/api/journal/${id}`, { exitPrice });
+  }
+
+  getTrades(chatId: string, limit = 20): Promise<{ trades: TradeDTO[] }> {
+    return this.get(`/api/journal?chatId=${encodeURIComponent(chatId)}&limit=${limit}`);
+  }
+
+  getOpenTrade(chatId: string, symbol: string): Promise<TradeDTO | undefined> {
+    return this.get<{ trades: TradeDTO[] }>(
+      `/api/journal?chatId=${encodeURIComponent(chatId)}&status=open&limit=200`,
+    ).then((res) => res.trades.find((t) => t.symbol === symbol));
+  }
+
+  getTradeSummary(chatId: string): Promise<{ summary: TradeSummaryDTO }> {
+    return this.get(`/api/journal/summary?chatId=${encodeURIComponent(chatId)}`);
   }
 
   registerUser(chatId: string, username: string | undefined): Promise<{ settings: BotSettings }> {

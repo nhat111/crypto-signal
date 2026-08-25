@@ -10,6 +10,10 @@ import type {
   SignalType,
   SymbolDetailResponse,
   Timeframe,
+  Trade,
+  TradesResponse,
+  TradeSide,
+  TradeSummary,
 } from './types';
 
 /**
@@ -38,6 +42,27 @@ async function fetchJson<T>(path: string): Promise<T> {
   }
   if (!res.ok) {
     throw new ApiError(`${path} responded with ${res.status}`, res.status);
+  }
+  return (await res.json()) as T;
+}
+
+async function sendJson<T>(method: 'POST' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers: body !== undefined ? { 'content-type': 'application/json' } : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new ApiError(`Could not reach the API at ${API_BASE_URL}. Is it running?`);
+  }
+  if (!res.ok) {
+    // Journal/watch routes reply with a plain-language {error} on 4xx —
+    // worth surfacing directly instead of a generic "responded with 409".
+    const parsed = await res.json().catch(() => undefined);
+    const message = parsed && typeof parsed === 'object' && 'error' in parsed ? String((parsed as { error: unknown }).error) : `${path} responded with ${res.status}`;
+    throw new ApiError(message, res.status);
   }
   return (await res.json()) as T;
 }
@@ -94,4 +119,48 @@ export function getPerformanceForType(
   horizon: Horizon,
 ): Promise<PerformanceResult> {
   return fetchJson<PerformanceResult>(`/api/performance/${signalType}?horizon=${horizon}`);
+}
+
+/* ---------- Trade journal ---------- */
+
+// The web dashboard has no login, so there's no per-visitor identity to
+// scope entries by — everyone using the web UI shares this one sentinel,
+// same idea as bot_users being scoped by chat_id for Telegram entries.
+const WEB_CHAT_ID = 'web';
+
+export function getTrades(limit = 200): Promise<TradesResponse> {
+  return fetchJson<TradesResponse>(`/api/journal?limit=${limit}`);
+}
+
+export function getTradeSummary(): Promise<{ summary: TradeSummary }> {
+  return fetchJson<{ summary: TradeSummary }>('/api/journal/summary');
+}
+
+export interface CreateTradeInput {
+  symbol: string;
+  side: TradeSide;
+  entryPrice: number;
+  size: number | null;
+  note: string | null;
+}
+
+export function createTrade(input: CreateTradeInput): Promise<{ trade: Trade }> {
+  return sendJson('POST', '/api/journal', { chatId: WEB_CHAT_ID, ...input });
+}
+
+export interface UpdateTradeInput {
+  symbol?: string;
+  side?: TradeSide;
+  entryPrice?: number;
+  exitPrice?: number | null;
+  size?: number | null;
+  note?: string | null;
+}
+
+export function updateTrade(id: string, patch: UpdateTradeInput): Promise<{ trade: Trade }> {
+  return sendJson('PATCH', `/api/journal/${id}`, patch);
+}
+
+export function deleteTrade(id: string): Promise<{ deleted: true }> {
+  return sendJson('DELETE', `/api/journal/${id}`);
 }

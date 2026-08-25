@@ -1,7 +1,20 @@
 import { Telegraf } from 'telegraf';
 import { createLogger, loadConfig, type Logger } from '@crypto-signal/shared';
 import { ApiClient, ApiError } from './apiClient.js';
-import { buildHelpText, formatGemList, formatHeatmap, formatOverview, formatSignalList, formatSymbolDetail, formatWatchConfirmation, formatWatchList } from './formatting.js';
+import {
+  buildHelpText,
+  formatGemList,
+  formatHeatmap,
+  formatJournal,
+  formatOverview,
+  formatSignalList,
+  formatSymbolDetail,
+  formatTradeClosed,
+  formatTradeOpened,
+  formatWatchConfirmation,
+  formatWatchList,
+} from './formatting.js';
+import type { TradeSide } from './apiClient.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -153,6 +166,65 @@ async function main(): Promise<void> {
     }
   });
 
+  bot.command('trade', async (ctx) => {
+    const chatId = String(ctx.chat.id);
+    const parts = ctx.message.text.split(/\s+/).slice(1);
+    const [symbolRaw, sideRaw, entryRaw, sizeRaw] = parts;
+    const symbol = symbolRaw?.toUpperCase();
+    const side = sideRaw?.toLowerCase() as TradeSide | undefined;
+    const entryPrice = entryRaw !== undefined ? Number(entryRaw) : NaN;
+    const size = sizeRaw !== undefined ? Number(sizeRaw) : null;
+
+    if (!symbol || (side !== 'long' && side !== 'short') || !Number.isFinite(entryPrice) || (size !== null && !Number.isFinite(size))) {
+      await ctx.reply('Usage: /trade SYMBOL long|short ENTRY_PRICE [SIZE]\ne.g. /trade BTCUSDT long 78000 0.1');
+      return;
+    }
+
+    try {
+      const { trade } = await api.openTrade(chatId, symbol, side, entryPrice, size);
+      await ctx.reply(formatTradeOpened(trade), { parse_mode: 'HTML' });
+    } catch (err) {
+      logger.error({ err, symbol }, '/trade failed');
+      await ctx.reply('Could not log that trade right now — try again shortly.');
+    }
+  });
+
+  bot.command('close', async (ctx) => {
+    const chatId = String(ctx.chat.id);
+    const parts = ctx.message.text.split(/\s+/).slice(1);
+    const symbol = parts[0]?.toUpperCase();
+    const exitPrice = parts[1] !== undefined ? Number(parts[1]) : NaN;
+
+    if (!symbol || !Number.isFinite(exitPrice)) {
+      await ctx.reply('Usage: /close SYMBOL EXIT_PRICE\ne.g. /close BTCUSDT 79200');
+      return;
+    }
+
+    try {
+      const open = await api.getOpenTrade(chatId, symbol);
+      if (!open) {
+        await ctx.reply(`No open trade for ${symbol}. Use /journal to see what's logged.`);
+        return;
+      }
+      const { trade } = await api.closeTrade(open.id, exitPrice);
+      await ctx.reply(formatTradeClosed(trade), { parse_mode: 'HTML' });
+    } catch (err) {
+      logger.error({ err, symbol }, '/close failed');
+      await ctx.reply('Could not close that trade right now — try again shortly.');
+    }
+  });
+
+  bot.command('journal', async (ctx) => {
+    const chatId = String(ctx.chat.id);
+    try {
+      const [{ trades }, { summary }] = await Promise.all([api.getTrades(chatId, 20), api.getTradeSummary(chatId)]);
+      await ctx.reply(formatJournal(trades, summary), { parse_mode: 'HTML' });
+    } catch (err) {
+      logger.error({ err }, '/journal failed');
+      await ctx.reply('Could not load your journal right now — try again shortly.');
+    }
+  });
+
   bot.command('alerts', async (ctx) => {
     const chatId = String(ctx.chat.id);
     const arg = ctx.message.text.split(' ')[1]?.toLowerCase();
@@ -184,6 +256,9 @@ async function main(): Promise<void> {
       { command: 'watch', description: 'Track a position, get a sell alert' },
       { command: 'watches', description: 'List your active watches' },
       { command: 'unwatch', description: 'Stop tracking a position' },
+      { command: 'trade', description: 'Log a trade you took' },
+      { command: 'close', description: 'Close a logged trade' },
+      { command: 'journal', description: 'Your trade log + P&L summary' },
       { command: 'alerts', description: 'Toggle alerts for this chat' },
       { command: 'help', description: 'Show help' },
     ]);

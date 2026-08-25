@@ -136,6 +136,48 @@ render that as "no signals of this type yet", not a chart with a zero bar.
 Same shape as one entry of `results` above, for a single signal type. 404
 if `signalType` isn't one of the 9 valid values.
 
+## Trade journal — `POST /api/journal`, `GET /api/journal`, `PATCH /api/journal/:id`, `DELETE /api/journal/:id`, `GET /api/journal/summary`
+A manual log of trades a person actually took — separate from both the
+signal engine and the gem scanner, which never write here. `chatId` scopes
+entries to whoever logged them (a Telegram chat id, or the fixed string
+`"web"` for entries made on the dashboard, which has no login).
+
+`POST /api/journal` body: `{ chatId, symbol, side: "long"|"short", entryPrice, size?, note? }`
+→ `{ trade }`, status `open`.
+
+`GET /api/journal?chatId=&status=open|closed&limit=` — all filters
+optional; omit `chatId` to get every chat's entries (what the web
+dashboard does). Returns `{ trades: [...] }`, most recent first.
+```json
+{
+  "id": "42", "chatId": "web", "symbol": "BTCUSDT", "side": "long",
+  "entryPrice": 78000, "exitPrice": 79200, "size": 0.1,
+  "pnlPct": 1.54, "pnlUsd": 120,
+  "status": "closed", "note": "bullish divergence signal",
+  "openedAt": 1700000000000, "closedAt": 1700003600000
+}
+```
+`pnlPct`/`pnlUsd` are `null` until `exitPrice` is set — `pnlUsd` stays
+`null` forever if `size` was never given. Both are computed server-side and
+stored, not derived on read.
+
+`PATCH /api/journal/:id` body: any subset of `{ symbol, side, entryPrice,
+exitPrice, size, note }`. Setting `exitPrice` to a number is how a trade
+gets closed (recomputes `pnlPct`/`pnlUsd`, sets `status: "closed"`);
+setting it to `null` reopens the trade. 404 if the id doesn't exist.
+
+`DELETE /api/journal/:id` → `{ deleted: true }`, or 404.
+
+`GET /api/journal/summary?chatId=` → aggregate over **closed** trades only:
+```json
+{
+  "openCount": 2, "closedCount": 14, "wins": 9, "losses": 5,
+  "winRatePct": 64.3, "totalPnlUsd": 812.40, "avgPnlPct": 3.1
+}
+```
+`winRatePct`/`avgPnlPct` are `null` when `closedCount` is 0 — render "not
+enough data" rather than a misleading 0%, same rule as `/api/performance`.
+
 ## Notes for the web app
 - This API is the **only** thing apps/web talks to — never Binance, never
   Postgres directly (rule: "Không để Telegram/web gọi trực tiếp Binance",
