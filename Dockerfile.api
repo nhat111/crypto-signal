@@ -13,4 +13,8 @@ RUN npm install
 
 ENV NODE_ENV=production
 EXPOSE 4000
-CMD ["npm", "run", "start", "-w", "@crypto-signal/api"]
+# Migrations run here as well as on the worker, serialized by an advisory
+# lock (see db/migrate.mjs). Without this, deploying api before worker
+# leaves it querying tables that don't exist yet — a 500 that looks like an
+# app bug but is really a deploy-order one.
+CMD ["sh", "-c", "node db/migrate.mjs && npm run start -w @crypto-signal/api"]

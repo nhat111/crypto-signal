@@ -33,18 +33,23 @@ Dockerfiles (`Dockerfile.worker`, `.api`, `.telegram`) were written with a
 repo-root build context specifically so this works without per-service
 subdirectory juggling.
 
-### Redeploy order: worker first, always
+### Redeploying: order doesn't matter
 
-**Database migrations run only on the `worker` service's boot**
-(`Dockerfile.worker`'s CMD is `node db/migrate.mjs && npm run start …`;
-`Dockerfile.api` has no migrate step). So when a change adds a migration
-*and* an API route that reads the new table — which is most features here —
-redeploying `api` first makes it serve 500s until the worker catches up,
-with `relation "…" does not exist` in the API logs.
+**`worker` and `api` both run migrations at boot** (both Dockerfiles' CMD
+is `node db/migrate.mjs && npm run start …`), serialized behind a Postgres
+advisory lock — whichever starts first applies what's pending, the other
+blocks briefly and then finds nothing to do. So a service can never come up
+querying a table that doesn't exist yet, and you can redeploy them in any
+order. Migrations are idempotent; an extra redeploy is always safe.
 
-Redeploy **`worker` → `api` → `telegram`**, and Vercel for `web` whenever
-its own code changed. Migrations are idempotent, so an extra worker
-redeploy is always safe.
+`telegram` runs no migrations (it only calls the API), but **does** need a
+restart to register new bot commands. `web` is on Vercel and only needs a
+redeploy when its own code or `NEXT_PUBLIC_API_BASE_URL` changed.
+
+If a service crash-loops right after a deploy, check its logs for a failed
+migration first — the CMD chain means a migration error stops the service
+from starting at all, deliberately, rather than letting it serve queries
+against a half-applied schema.
 
 ### 1. Create the project and databases
 
