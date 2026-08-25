@@ -19,8 +19,9 @@ export function JournalSummary({ summary }: JournalSummaryProps) {
       />
       <Stat
         label="Total P&L"
-        value={closedCount === 0 ? '—' : formatUsd(totalPnlUsd, false)}
-        tone={closedCount === 0 ? undefined : totalPnlUsd >= 0 ? 'emerald' : 'rose'}
+        value={totalPnlUsd === null ? '—' : formatUsd(totalPnlUsd, false)}
+        detail={totalPnlUsd === null && closedCount > 0 ? 'no sizes logged' : undefined}
+        tone={totalPnlUsd === null ? undefined : totalPnlUsd >= 0 ? 'emerald' : 'rose'}
       />
       <Stat
         label="Avg P&L / trade"

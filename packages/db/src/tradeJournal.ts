@@ -195,7 +195,8 @@ export interface TradeSummary {
   losses: number;
   /** Null when there are no closed trades yet — 0% would misleadingly imply a losing record. */
   winRatePct: number | null;
-  totalPnlUsd: number;
+  /** Null when no closed trade recorded a size — $0.00 would read as "broke even" rather than "not knowable without a size". */
+  totalPnlUsd: number | null;
   avgPnlPct: number | null;
 }
 
@@ -215,7 +216,7 @@ export async function getTradeSummary(pool: Pool, chatId?: string): Promise<Trad
     `SELECT count(*) AS c,
             count(*) FILTER (WHERE pnl_pct > 0) AS wins,
             count(*) FILTER (WHERE pnl_pct <= 0) AS losses,
-            coalesce(sum(pnl_usd), 0) AS total_pnl_usd,
+            sum(pnl_usd) AS total_pnl_usd,
             avg(pnl_pct) AS avg_pnl_pct
      FROM trade_journal WHERE status = 'closed' ${chatFilter}`,
     params,
@@ -230,7 +231,7 @@ export async function getTradeSummary(pool: Pool, chatId?: string): Promise<Trad
     wins: Number(closed.wins),
     losses: Number(closed.losses),
     winRatePct: closedCount > 0 ? (Number(closed.wins) / closedCount) * 100 : null,
-    totalPnlUsd: Number(closed.total_pnl_usd),
+    totalPnlUsd: closed.total_pnl_usd === null ? null : Number(closed.total_pnl_usd),
     avgPnlPct: closed.avg_pnl_pct === null ? null : Number(closed.avg_pnl_pct),
   };
 }

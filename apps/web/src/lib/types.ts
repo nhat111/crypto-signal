@@ -157,7 +157,8 @@ export interface TradeSummary {
   wins: number;
   losses: number;
   winRatePct: number | null;
-  totalPnlUsd: number;
+  /** Null when no closed trade recorded a size — "$0.00" would read as break-even rather than "not knowable". */
+  totalPnlUsd: number | null;
   avgPnlPct: number | null;
 }
 

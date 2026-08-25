@@ -33,6 +33,19 @@ Dockerfiles (`Dockerfile.worker`, `.api`, `.telegram`) were written with a
 repo-root build context specifically so this works without per-service
 subdirectory juggling.
 
+### Redeploy order: worker first, always
+
+**Database migrations run only on the `worker` service's boot**
+(`Dockerfile.worker`'s CMD is `node db/migrate.mjs && npm run start …`;
+`Dockerfile.api` has no migrate step). So when a change adds a migration
+*and* an API route that reads the new table — which is most features here —
+redeploying `api` first makes it serve 500s until the worker catches up,
+with `relation "…" does not exist` in the API logs.
+
+Redeploy **`worker` → `api` → `telegram`**, and Vercel for `web` whenever
+its own code changed. Migrations are idempotent, so an extra worker
+redeploy is always safe.
+
 ### 1. Create the project and databases
 
 1. Railway → **New Project → Deploy from GitHub repo** → `nhat111/crypto-signal`.

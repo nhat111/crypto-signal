@@ -176,9 +176,13 @@ export function formatJournal(trades: TradeDTO[], summary: TradeSummaryDTO): str
   if (summary.closedCount === 0) {
     lines.push('No closed trades yet.');
   } else {
+    const totalPnl =
+      summary.totalPnlUsd === null
+        ? '<b>N/A</b> <i>(no sizes logged)</i>'
+        : `<b>${summary.totalPnlUsd >= 0 ? '+' : ''}$${formatPrice(summary.totalPnlUsd)}</b>`;
     lines.push(
       `Win rate: <b>${summary.winRatePct!.toFixed(0)}%</b> (${summary.wins}W / ${summary.losses}L)`,
-      `Total P&L: <b>${summary.totalPnlUsd >= 0 ? '+' : ''}$${formatPrice(summary.totalPnlUsd)}</b>` +
+      `Total P&L: ${totalPnl}` +
         (summary.avgPnlPct === null ? '' : ` · avg ${summary.avgPnlPct >= 0 ? '+' : ''}${summary.avgPnlPct.toFixed(2)}%/trade`),
     );
   }

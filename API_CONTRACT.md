@@ -175,8 +175,10 @@ setting it to `null` reopens the trade. 404 if the id doesn't exist.
   "winRatePct": 64.3, "totalPnlUsd": 812.40, "avgPnlPct": 3.1
 }
 ```
-`winRatePct`/`avgPnlPct` are `null` when `closedCount` is 0 — render "not
-enough data" rather than a misleading 0%, same rule as `/api/performance`.
+`winRatePct`/`avgPnlPct` are `null` when `closedCount` is 0, and
+`totalPnlUsd` is `null` when no closed trade recorded a `size` — render
+those as "—"/"not enough data" rather than a misleading `0%`/`$0.00`, same
+rule as `/api/performance`.
 
 ## Notes for the web app
 - This API is the **only** thing apps/web talks to — never Binance, never
