@@ -10,6 +10,7 @@ import { ALL_SIGNAL_TYPES } from '@crypto-signal/signal-engine';
 import { processMatchedCandles } from './pipeline.js';
 import { runGemOutcomeTracker, runGemScanCycle, type GemScanDeps } from './gemScan.js';
 import { runGemWatchCycle, type GemWatchDeps } from './gemWatch.js';
+import { runStablecoinFlowCycle } from './stablecoinFlow.js';
 import type { WorkerContext } from './context.js';
 
 const HORIZONS: OutcomeHorizon[] = ['15m', '1h', '4h', '24h'];
@@ -102,6 +103,18 @@ export function startSchedulers(ctx: WorkerContext): () => void {
     const watchIntervalMs = ctx.gemConfig.watch.checkIntervalMinutes * 60_000;
     timers.push(setInterval(() => void runGemWatchCycle(watchDeps).catch((err) => ctx.logger.error({ err }, 'gem watch cycle failed')), watchIntervalMs));
   }
+
+  // Macro context, not part of the Binance pipeline — its own timer and
+  // try/catch so DefiLlama being unreachable can't disturb candle
+  // collection. Daily data, so six-hourly is already more often than it changes.
+  const stablecoinDeps = { pool: ctx.pool, logger: ctx.logger };
+  timers.push(
+    setInterval(
+      () => void runStablecoinFlowCycle(stablecoinDeps).catch((err) => ctx.logger.error({ err }, 'stablecoin flow refresh failed')),
+      6 * 60 * 60_000,
+    ),
+  );
+  void runStablecoinFlowCycle(stablecoinDeps).catch((err) => ctx.logger.error({ err }, 'initial stablecoin flow refresh failed'));
 
   timers.push(setInterval(() => void runOutcomeTracker(ctx).catch((err) => ctx.logger.error({ err }, 'outcome tracker failed')), 5 * 60_000));
   timers.push(setInterval(() => void refreshHistoricalScores(ctx).catch((err) => ctx.logger.error({ err }, 'historical score refresh failed')), 10 * 60_000));

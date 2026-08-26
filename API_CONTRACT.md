@@ -180,6 +180,32 @@ setting it to `null` reopens the trade. 404 if the id doesn't exist.
 those as "—"/"not enough data" rather than a misleading `0%`/`$0.00`, same
 rule as `/api/performance`.
 
+## `GET /api/flow`
+Macro context: total stablecoin circulating supply and how fast it's
+growing, as a proxy for money entering or leaving crypto as a whole.
+```json
+{
+  "stablecoin": {
+    "latestUsd": 243100000000,
+    "asOfDay": "2026-03-10",
+    "change7d": { "changeUsd": 1800000000, "changePct": 0.75, "fromDay": "2026-03-03" },
+    "change30d": { "changeUsd": -4200000000, "changePct": -1.70, "fromDay": "2026-02-08" }
+  }
+}
+```
+`stablecoin` is `null` until the worker's first refresh lands; each window
+is `null` when history doesn't reach back far enough — render "no data yet"
+rather than a zeroed reading, same rule as `/api/performance`.
+
+`fromDay` is the day actually compared against, which is rarely exactly N
+days back (the upstream series has gaps), so the UI can state what the
+number really covers. `asOfDay` is the most recent data point — this is
+**daily data and lags the market**.
+
+Source is DefiLlama, refreshed a few times a day by the worker. It says
+nothing about *which* asset the money buys, so it is context only — never
+render it as trend confirmation or as a signal.
+
 ## Notes for the web app
 - This API is the **only** thing apps/web talks to — never Binance, never
   Postgres directly (rule: "Không để Telegram/web gọi trực tiếp Binance",

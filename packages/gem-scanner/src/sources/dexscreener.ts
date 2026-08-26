@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import type { Logger } from '@crypto-signal/shared';
+import { fetchJsonValidated, type Logger } from '@crypto-signal/shared';
 import type { CandidateSource, ChainId, GemCandidate, GemPair, MarketDataSource } from '../types.js';
-import { fetchJsonValidated } from './http.js';
+
 
 /**
  * DexScreener adapter.

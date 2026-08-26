@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import type { Logger } from '@crypto-signal/shared';
+import { fetchJsonValidated, type Logger } from '@crypto-signal/shared';
 import type { ChainId, SafetyReport, SafetySource, SafetyVerdict } from '../types.js';
-import { fetchJsonValidated } from './http.js';
+
 
 /**
  * RugCheck adapter — Solana token safety screening.

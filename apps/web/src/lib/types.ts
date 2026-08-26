@@ -126,6 +126,29 @@ export interface PerformanceResponse {
   results: PerformanceResult[];
 }
 
+/* ---------- Macro flow ---------- */
+
+export interface StablecoinFlowWindow {
+  changeUsd: number;
+  changePct: number;
+  /** The day actually compared against — rarely exactly N days back, so it's reported rather than assumed. */
+  fromDay: string;
+}
+
+export interface StablecoinFlow {
+  latestUsd: number;
+  /** Day of the most recent data point. Daily data lags — this is not "today". */
+  asOfDay: string;
+  /** Null when history doesn't reach back far enough. */
+  change7d: StablecoinFlowWindow | null;
+  change30d: StablecoinFlowWindow | null;
+}
+
+export interface FlowResponse {
+  /** Null until the worker's first refresh lands. */
+  stablecoin: StablecoinFlow | null;
+}
+
 /* ---------- Trade journal ---------- */
 
 export type TradeSide = 'long' | 'short';

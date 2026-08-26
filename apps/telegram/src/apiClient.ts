@@ -144,6 +144,19 @@ export interface TradeSummaryDTO {
   avgPnlPct: number | null;
 }
 
+export interface StablecoinFlowWindowDTO {
+  changeUsd: number;
+  changePct: number;
+  fromDay: string;
+}
+
+export interface StablecoinFlowDTO {
+  latestUsd: number;
+  asOfDay: string;
+  change7d: StablecoinFlowWindowDTO | null;
+  change30d: StablecoinFlowWindowDTO | null;
+}
+
 export class ApiClient {
   constructor(private readonly baseUrl: string) {}
 
@@ -226,6 +239,10 @@ export class ApiClient {
 
   getTradeSummary(chatId: string): Promise<{ summary: TradeSummaryDTO }> {
     return this.get(`/api/journal/summary?chatId=${encodeURIComponent(chatId)}`);
+  }
+
+  getFlow(): Promise<{ stablecoin: StablecoinFlowDTO | null }> {
+    return this.get('/api/flow');
   }
 
   registerUser(chatId: string, username: string | undefined): Promise<{ settings: BotSettings }> {

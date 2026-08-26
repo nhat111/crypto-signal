@@ -1,4 +1,4 @@
-import type { GemRow, GemWatchDTO, LatestSymbolState, OverviewRow, PriceLevels, SignalRow, TradeDTO, TradeSummaryDTO } from './apiClient.js';
+import type { GemRow, GemWatchDTO, LatestSymbolState, OverviewRow, PriceLevels, SignalRow, StablecoinFlowDTO, StablecoinFlowWindowDTO, TradeDTO, TradeSummaryDTO } from './apiClient.js';
 
 function healthLine(row: OverviewRow): string {
   const score = row.healthScore === null ? 'N/A' : String(row.healthScore);
@@ -208,6 +208,34 @@ export function formatJournal(trades: TradeDTO[], summary: TradeSummaryDTO): str
   return lines.join('\n');
 }
 
+/**
+ * Macro flow context. Leads with what the number is, ends with what it
+ * isn't — the daily lag and the "not trend confirmation" caveat are the
+ * whole point, since this is the reading most likely to be mistaken for a
+ * green light.
+ */
+export function formatFlow(flow: StablecoinFlowDTO | null): string {
+  if (!flow) {
+    return 'No stablecoin supply data yet.\n\n<i>The collector refreshes this a few times a day — check back shortly after the worker starts.</i>';
+  }
+
+  return [
+    '\uD83D\uDCB5 <b>STABLECOIN SUPPLY</b>',
+    '',
+    `Total: <b>$${formatLargeNumber(flow.latestUsd)}</b>`,
+    `7d:  ${windowLine(flow.change7d)}`,
+    `30d: ${windowLine(flow.change30d)}`,
+    '',
+    `<i>As of ${flow.asOfDay}. Rising supply means fiat was converted into on-chain dollars; it does not say which asset that money buys. Daily data, lags the market \u2014 context only, not trend confirmation.</i>`,
+  ].join('\n');
+}
+
+function windowLine(w: StablecoinFlowWindowDTO | null): string {
+  if (!w) return 'N/A <i>(not enough history)</i>';
+  const sign = w.changeUsd >= 0 ? '+' : '-';
+  return `<b>${sign}$${formatLargeNumber(Math.abs(w.changeUsd))}</b> (${w.changePct >= 0 ? '+' : ''}${w.changePct.toFixed(2)}%)`;
+}
+
 /** Token names/symbols come from on-chain metadata that anyone can set, so they're escaped before entering an HTML-parsed message. */
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -247,6 +275,7 @@ export function buildHelpText(symbols: string[]): string {
     '/trade SYMBOL long|short ENTRY [SIZE] — log a trade you took',
     '/close SYMBOL EXIT_PRICE — close your most recent open trade on that symbol',
     '/journal — your trade log + win rate / P&L summary',
+    '/flow — stablecoin supply: money entering or leaving crypto',
     '/alerts on|off — toggle alert push to this chat',
     '/help — this message',
     '',

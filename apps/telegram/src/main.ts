@@ -4,6 +4,7 @@ import { ApiClient, ApiError } from './apiClient.js';
 import {
   buildHelpText,
   formatGemList,
+  formatFlow,
   formatHeatmap,
   formatJournal,
   formatOverview,
@@ -225,6 +226,16 @@ async function main(): Promise<void> {
     }
   });
 
+  bot.command('flow', async (ctx) => {
+    try {
+      const { stablecoin } = await api.getFlow();
+      await ctx.reply(formatFlow(stablecoin), { parse_mode: 'HTML' });
+    } catch (err) {
+      logger.error({ err }, '/flow failed');
+      await ctx.reply('Could not load flow data right now — try again shortly.');
+    }
+  });
+
   bot.command('alerts', async (ctx) => {
     const chatId = String(ctx.chat.id);
     const arg = ctx.message.text.split(' ')[1]?.toLowerCase();
@@ -259,6 +270,7 @@ async function main(): Promise<void> {
       { command: 'trade', description: 'Log a trade you took' },
       { command: 'close', description: 'Close a logged trade' },
       { command: 'journal', description: 'Your trade log + P&L summary' },
+      { command: 'flow', description: 'Stablecoin supply / macro flow' },
       { command: 'alerts', description: 'Toggle alerts for this chat' },
       { command: 'help', description: 'Show help' },
     ]);

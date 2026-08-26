@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import type { Logger } from '@crypto-signal/shared';
+import { fetchJsonValidated, type Logger } from '@crypto-signal/shared';
 import type { CandidateDiscoverySource, ChainId, GemCandidate } from '../types.js';
-import { fetchJsonValidated } from './http.js';
+
 
 /**
  * GeckoTerminal adapter — **discovery only**.

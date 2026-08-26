@@ -6,6 +6,7 @@ import type {
   OverviewResponse,
   PerformanceResponse,
   PerformanceResult,
+  FlowResponse,
   SignalsResponse,
   SignalType,
   SymbolDetailResponse,
@@ -112,6 +113,10 @@ export function getGemPerformance(horizon: GemHorizon): Promise<GemPerformance> 
 
 export function getPerformance(horizon: Horizon): Promise<PerformanceResponse> {
   return fetchJson<PerformanceResponse>(`/api/performance?horizon=${horizon}`);
+}
+
+export function getFlow(): Promise<FlowResponse> {
+  return fetchJson<FlowResponse>('/api/flow');
 }
 
 export function getPerformanceForType(

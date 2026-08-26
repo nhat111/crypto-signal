@@ -1,21 +1,25 @@
 'use client';
 
 import { useMemo } from 'react';
-import { getOverview, getSignals } from '@/lib/api';
+import { getFlow, getOverview, getSignals } from '@/lib/api';
 import { usePolling } from '@/lib/usePolling';
 import { useSymbolSnapshots } from '@/lib/useSymbolSnapshots';
 import type { Signal, Timeframe } from '@/lib/types';
 import { SymbolCard } from '@/components/overview/SymbolCard';
 import { Heatmap } from '@/components/overview/Heatmap';
+import { MacroFlowBar } from '@/components/overview/MacroFlowBar';
 import { SignalList } from '@/components/signals/SignalList';
 import { LoadingPanel, StatePanel } from '@/components/StatePanel';
 
 const POLL_MS = 20_000;
+const FLOW_POLL_MS = 10 * 60_000;
 const DEFAULT_TIMEFRAME: Timeframe = '5m';
 
 export default function OverviewPage() {
   const overview = usePolling(getOverview, POLL_MS, []);
   const signals = usePolling(() => getSignals({ limit: 20 }), POLL_MS, []);
+  // Daily data — polled far less often than the market panels above it.
+  const flow = usePolling(getFlow, FLOW_POLL_MS, []);
 
   const symbols = overview.data?.symbols ?? [];
   const snapshots = useSymbolSnapshots(symbols, DEFAULT_TIMEFRAME, POLL_MS);
@@ -39,6 +43,8 @@ export default function OverviewPage() {
           <h1 className="text-lg font-bold text-slate-100">Market Overview</h1>
           <PollStatus loading={overview.loading} error={overview.error} />
         </div>
+
+        {!isBootstrapping && <div className="mb-4"><MacroFlowBar flow={flow.data?.stablecoin ?? null} /></div>}
 
         {isBootstrapping ? (
           <LoadingPanel label="Loading market overview…" />

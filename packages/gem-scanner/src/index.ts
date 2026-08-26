@@ -6,4 +6,4 @@ export * from './watchEvaluator.js';
 export { DexScreenerSource, toGemPair } from './sources/dexscreener.js';
 export { GeckoTerminalSource, toGeckoNetwork, stripNetworkPrefix } from './sources/geckoterminal.js';
 export { RugCheckSource, interpretRugCheckReport, SAFETY_THRESHOLDS } from './sources/rugcheck.js';
-export { UpstreamShapeError } from './sources/http.js';
+export { UpstreamShapeError } from '@crypto-signal/shared';

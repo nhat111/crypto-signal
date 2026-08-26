@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { Logger } from '@crypto-signal/shared';
+import type { Logger } from './logger.js';
 
 export class UpstreamShapeError extends Error {
   constructor(
