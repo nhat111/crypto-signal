@@ -44,6 +44,51 @@ export interface CandleRow {
   volume: number;
 }
 
+/**
+ * The first candle opening at or after `atOrAfterMs` — the price *at a past
+ * moment*, which is what outcome tracking needs and `getRecentCandles`
+ * cannot give (it only ever returns the newest candles).
+ *
+ * `maxLookaheadMs` bounds how far past the target a candle may be before it
+ * stops being an answer to the question asked. Without it, a collector
+ * outage would let a price from days later be recorded as "the price 15
+ * minutes after the signal". Returning undefined leaves the outcome
+ * unresolved, which is honest; a wrong number is not.
+ */
+export async function getCandleAtOrAfter(
+  pool: Pool,
+  symbol: string,
+  market: 'spot' | 'futures',
+  timeframe: string,
+  atOrAfterMs: number,
+  maxLookaheadMs: number,
+): Promise<CandleRow | undefined> {
+  const { rows } = await pool.query(
+    `SELECT extract(epoch from open_time)*1000 AS open_time,
+            extract(epoch from close_time)*1000 AS close_time,
+            open, high, low, close, volume
+     FROM market_candles
+     WHERE symbol = $1 AND market = $2 AND timeframe = $3
+       AND open_time >= to_timestamp($4/1000.0)
+       AND open_time <= to_timestamp($5/1000.0)
+     ORDER BY open_time ASC
+     LIMIT 1`,
+    [symbol, market, timeframe, atOrAfterMs, atOrAfterMs + maxLookaheadMs],
+  );
+
+  const r = rows[0];
+  if (!r) return undefined;
+  return {
+    openTime: Number(r.open_time),
+    closeTime: Number(r.close_time),
+    open: Number(r.open),
+    high: Number(r.high),
+    low: Number(r.low),
+    close: Number(r.close),
+    volume: Number(r.volume),
+  };
+}
+
 export async function getRecentCandles(
   pool: Pool,
   symbol: string,

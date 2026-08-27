@@ -1,6 +1,6 @@
 import {
   getHistoricalScoreForSignalType,
-  getRecentCandles,
+  getCandleAtOrAfter,
   getSignalsPendingOutcome,
   pruneOldLiquidations,
   recordOutcomePrice,
@@ -15,19 +15,54 @@ import type { WorkerContext } from './context.js';
 
 const HORIZONS: OutcomeHorizon[] = ['15m', '1h', '4h', '24h'];
 
-/** Phase 9 historical validation: fills price_after_* columns once each horizon has actually elapsed. Never fabricates a price — skips a signal if there's no futures candle yet at/after the due time. */
+const HORIZON_MS: Record<OutcomeHorizon, number> = {
+  '15m': 15 * 60_000,
+  '1h': 60 * 60_000,
+  '4h': 4 * 60 * 60_000,
+  '24h': 24 * 60 * 60_000,
+};
+
+/**
+ * How far past a signal's due time a candle may be and still answer "what
+ * was the price at signal + horizon". Six 5m candles: enough slack for an
+ * ordinary gap in collection, far too little to let a price from a later
+ * outage be passed off as the answer.
+ */
+const OUTCOME_LOOKAHEAD_MS = 30 * 60_000;
+
+/**
+ * Phase 9 historical validation: fills price_after_* columns once each
+ * horizon has actually elapsed.
+ *
+ * The price is looked up at the candle covering **signal time + horizon**,
+ * not at whatever candle is newest when this happens to run. Those are the
+ * same thing only while the job keeps up; when the worker is down or stuck
+ * (as it has been), the backlog would otherwise be priced at the moment of
+ * recovery — quietly filling /performance, the one surface whose whole
+ * purpose is honest evidence, with numbers measured over the wrong window.
+ *
+ * Never fabricates a price: a signal with no futures candle near its due
+ * time is left unresolved rather than resolved wrongly.
+ */
 export async function runOutcomeTracker(ctx: WorkerContext): Promise<void> {
   const now = Date.now();
   for (const horizon of HORIZONS) {
     const pending = await getSignalsPendingOutcome(ctx.pool, horizon, now);
+    let recorded = 0;
+
     for (const row of pending) {
-      const candles = await getRecentCandles(ctx.pool, row.symbol, 'futures', '5m', 1);
-      const latest = candles[0];
-      if (!latest) continue;
-      await recordOutcomePrice(ctx.pool, row.signalId, horizon, latest.close, row.priceAtSignal);
+      const dueAtMs = row.signalTimestamp + HORIZON_MS[horizon];
+      const candle = await getCandleAtOrAfter(ctx.pool, row.symbol, 'futures', '5m', dueAtMs, OUTCOME_LOOKAHEAD_MS);
+      if (!candle) continue;
+      await recordOutcomePrice(ctx.pool, row.signalId, horizon, candle.close, row.priceAtSignal);
+      recorded += 1;
     }
+
     if (pending.length > 0) {
-      ctx.logger.info({ horizon, count: pending.length }, 'outcome tracker updated signals');
+      // `pending` and `recorded` differ when candles near the due time are
+      // missing — worth seeing, since a persistent gap means outcomes are
+      // silently not accumulating.
+      ctx.logger.info({ horizon, pending: pending.length, recorded }, 'outcome tracker updated signals');
     }
   }
 }
