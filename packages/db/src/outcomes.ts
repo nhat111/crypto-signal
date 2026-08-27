@@ -117,6 +117,91 @@ export async function getSignalPerformance(pool: Pool, signalType: string, horiz
   };
 }
 
+export interface BaselinePerformance {
+  horizon: OutcomeHorizon;
+  sampleCount: number;
+  positiveMovePct: number | null;
+  medianMovePct: number | null;
+  /** The window measured, so the UI can say whether it really matches the signals' period. Null when there are no outcomes to bound it by. */
+  fromMs: number | null;
+  toMs: number | null;
+}
+
+/**
+ * What price did over the same horizon from an *arbitrary* moment — the
+ * control a signal has to beat.
+ *
+ * Without it "55% positive" is unreadable: if price rises 55% of the time
+ * anyway, the signal selected for nothing. Deliberately measured the same
+ * way as signal outcomes — first futures 5m candle at or after T + horizon,
+ * same 30-minute tolerance, same symbols — because a control measured
+ * differently from the thing it controls for is worse than none.
+ *
+ * The window is bounded to the period the recorded outcomes span, so the
+ * two are compared across the same market regime rather than the signal's
+ * week against the collector's whole history.
+ */
+export async function getBaselinePerformance(pool: Pool, horizon: OutcomeHorizon): Promise<BaselinePerformance> {
+  const moveCol = HORIZON_MOVE_COLUMN[horizon];
+  const horizonMs = HORIZON_MS[horizon];
+  const LOOKAHEAD_MS = 30 * 60_000;
+
+  const { rows: bounds } = await pool.query(
+    `SELECT extract(epoch from min(s.timestamp))*1000 AS from_ms,
+            extract(epoch from max(s.timestamp))*1000 AS to_ms
+     FROM signal_outcomes o
+     JOIN market_signals s ON s.signal_id = o.signal_id
+     WHERE o.${moveCol} IS NOT NULL`,
+  );
+  const fromMs = bounds[0]?.from_ms === null || bounds[0]?.from_ms === undefined ? null : Number(bounds[0].from_ms);
+  const toMs = bounds[0]?.to_ms === null || bounds[0]?.to_ms === undefined ? null : Number(bounds[0].to_ms);
+
+  if (fromMs === null || toMs === null) {
+    return { horizon, sampleCount: 0, positiveMovePct: null, medianMovePct: null, fromMs: null, toMs: null };
+  }
+
+  // Aggregated in SQL rather than pulled row by row: this scans every 5m
+  // candle in the window across all symbols, which is far more rows than
+  // any single signal type produces. percentile_cont(0.5) is the same
+  // midpoint-of-two-middle-values the JS path computes for even counts.
+  const { rows } = await pool.query(
+    `SELECT count(*)::int AS n,
+            count(*) FILTER (WHERE later.close > base.close)::int AS positive,
+            percentile_cont(0.5) WITHIN GROUP (
+              ORDER BY (later.close - base.close) / base.close * 100
+            ) AS median_move
+     FROM market_candles base
+     JOIN LATERAL (
+       SELECT mc.close
+       FROM market_candles mc
+       WHERE mc.symbol = base.symbol AND mc.market = 'futures' AND mc.timeframe = '5m'
+         AND mc.open_time >= base.open_time + ($1 || ' milliseconds')::interval
+         AND mc.open_time <= base.open_time + ($2 || ' milliseconds')::interval
+       ORDER BY mc.open_time ASC
+       LIMIT 1
+     ) later ON TRUE
+     WHERE base.market = 'futures' AND base.timeframe = '5m'
+       AND base.open_time >= to_timestamp($3/1000.0)
+       AND base.open_time <= to_timestamp($4/1000.0)
+       AND base.close > 0`,
+    [horizonMs, horizonMs + LOOKAHEAD_MS, fromMs, toMs],
+  );
+
+  const n = Number(rows[0]?.n ?? 0);
+  if (n === 0) {
+    return { horizon, sampleCount: 0, positiveMovePct: null, medianMovePct: null, fromMs, toMs };
+  }
+
+  return {
+    horizon,
+    sampleCount: n,
+    positiveMovePct: Math.round((Number(rows[0].positive) / n) * 1000) / 10,
+    medianMovePct: Math.round(Number(rows[0].median_move) * 100) / 100,
+    fromMs,
+    toMs,
+  };
+}
+
 /** Historical score feed for the signal engine's confidence formula (spec §30 term, ASSUMPTIONS.md §8) — defaults to undefined (-> neutral 50) below MIN_SAMPLES. */
 export async function getHistoricalScoreForSignalType(pool: Pool, signalType: string): Promise<number | undefined> {
   const perf = await getSignalPerformance(pool, signalType, '1h');

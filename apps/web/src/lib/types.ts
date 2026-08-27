@@ -121,9 +121,24 @@ export interface PerformanceResult {
   sufficientData: boolean;
 }
 
+/**
+ * What price did over the same horizon from an arbitrary moment — the
+ * control every signal result must be read against. Measured the same way
+ * as signal outcomes, over the period the outcomes span.
+ */
+export interface PerformanceBaseline {
+  horizon: Horizon;
+  sampleCount: number;
+  positiveMovePct: number | null;
+  medianMovePct: number | null;
+  fromMs: number | null;
+  toMs: number | null;
+}
+
 export interface PerformanceResponse {
   horizon: Horizon;
   results: PerformanceResult[];
+  baseline: PerformanceBaseline;
 }
 
 /* ---------- Macro flow ---------- */

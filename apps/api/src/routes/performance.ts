@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { getSignalPerformance } from '@crypto-signal/db';
+import { getBaselinePerformance, getSignalPerformance } from '@crypto-signal/db';
 import { ALL_SIGNAL_TYPES, type SignalType } from '@crypto-signal/signal-engine';
 import type { ApiDeps } from '../deps.js';
 
@@ -21,10 +21,14 @@ export function registerPerformanceRoute(app: FastifyInstance, deps: ApiDeps): v
     if (!VALID_HORIZONS.includes(horizon as Horizon)) {
       return reply.code(400).send({ error: `horizon must be one of ${VALID_HORIZONS.join(', ')}` });
     }
-    const results = await Promise.all(
-      ALL_SIGNAL_TYPES.map((signalType: SignalType) => getSignalPerformance(deps.pool, signalType, horizon as Horizon)),
-    );
-    return { horizon, results };
+    // The baseline is what every result on this page has to be read
+    // against — a signal type's hit rate means nothing without knowing how
+    // often price rose anyway over the same window.
+    const [results, baseline] = await Promise.all([
+      Promise.all(ALL_SIGNAL_TYPES.map((signalType: SignalType) => getSignalPerformance(deps.pool, signalType, horizon as Horizon))),
+      getBaselinePerformance(deps.pool, horizon as Horizon),
+    ]);
+    return { horizon, results, baseline };
   });
 
   app.get<{ Params: { signalType: string }; Querystring: PerformanceQuery }>('/api/performance/:signalType', async (req, reply) => {

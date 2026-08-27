@@ -6,6 +6,7 @@ import { usePolling } from '@/lib/usePolling';
 import type { Horizon } from '@/lib/types';
 import { HorizonSwitcher } from '@/components/performance/HorizonSwitcher';
 import { PerformanceCard } from '@/components/performance/PerformanceCard';
+import { BaselinePanel } from '@/components/performance/BaselinePanel';
 import { LoadingPanel, StatePanel } from '@/components/StatePanel';
 
 const POLL_MS = 60_000;
@@ -24,7 +25,8 @@ export default function PerformancePage() {
           <p className="mt-1 max-w-2xl text-xs text-slate-500">
             What happened to price after each signal type fired, at the selected horizon. Figures only render
             once a signal type has at least 30 recorded outcomes — otherwise this refuses to claim edge that
-            isn&apos;t backed by evidence yet.
+            isn&apos;t backed by evidence yet. Read every card against the baseline below it: a hit rate only
+            means something if it beats what price did anyway over the same window.
           </p>
         </div>
         <HorizonSwitcher value={horizon} onChange={setHorizon} />
@@ -35,11 +37,14 @@ export default function PerformancePage() {
       ) : performance.error && !performance.data ? (
         <StatePanel tone="error" title="Could not reach the API" detail={performance.error} />
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {(performance.data?.results ?? []).map((result) => (
-            <PerformanceCard key={result.signalType} result={result} />
-          ))}
-        </div>
+        <>
+          {performance.data && <BaselinePanel baseline={performance.data.baseline} />}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {performance.data?.results.map((result) => (
+              <PerformanceCard key={result.signalType} result={result} baseline={performance.data!.baseline} />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

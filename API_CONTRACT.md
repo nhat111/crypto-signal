@@ -124,6 +124,27 @@ Valid `severity` values: `INFO | LOW | MEDIUM | HIGH | EXTREME`.
   ]
 }
 ```
+The response also carries a `baseline` — the control every result must be
+read against:
+```json
+{
+  "baseline": {
+    "horizon": "1h",
+    "sampleCount": 34210,
+    "positiveMovePct": 51.4,
+    "medianMovePct": 0.02,
+    "fromMs": 1700000000000,
+    "toMs": 1700600000000
+  }
+}
+```
+It is what price did over the same horizon starting from an *arbitrary*
+moment: every futures 5m candle in the window the recorded outcomes span,
+measured the same way signal outcomes are (first candle at or after
+T + horizon, 30-minute tolerance). Without it a hit rate is unreadable — a
+signal at 55% has no edge if price rose 55% of the time anyway. All fields
+are `null`/0 until outcomes exist to bound the window.
+
 `positiveMovePct`/`negativeMovePct` are percentages of samples that moved
 up/down (spec §24 "Positive move: 61%"), NOT the average magnitude.
 `medianMovePct` is the median price move in %. **When `sufficientData` is
