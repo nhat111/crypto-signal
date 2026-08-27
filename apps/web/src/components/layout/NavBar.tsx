@@ -11,7 +11,7 @@ const LINKS = [
   { href: '/gems', label: 'Gems' },
   { href: '/journal', label: 'Journal' },
   { href: '/performance', label: 'Performance' },
-  { href: '/huong-dan', label: 'Hướng dẫn' },
+  { href: '/huong-dan', label: 'Guide' },
 ];
 
 /** Top nav: section links + quick jumps to each symbol's detail page. */
