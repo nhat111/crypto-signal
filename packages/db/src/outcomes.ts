@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import type { DataSource } from './provenance.js';
 
 export type OutcomeHorizon = '15m' | '1h' | '4h' | '24h';
 
@@ -36,7 +37,7 @@ export interface PendingOutcomeRow {
  * for that horizon is still null — exactly what the outcome-tracker job
  * (Phase 9) needs to fill in.
  */
-export async function getSignalsPendingOutcome(pool: Pool, horizon: OutcomeHorizon, nowMs: number, limit = 200): Promise<PendingOutcomeRow[]> {
+export async function getSignalsPendingOutcome(pool: Pool, horizon: OutcomeHorizon, nowMs: number, limit = 200, source?: DataSource): Promise<PendingOutcomeRow[]> {
   const dueBeforeMs = nowMs - HORIZON_MS[horizon];
   const priceCol = HORIZON_PRICE_COLUMN[horizon];
 
@@ -45,9 +46,10 @@ export async function getSignalsPendingOutcome(pool: Pool, horizon: OutcomeHoriz
      FROM signal_outcomes o
      JOIN market_signals s ON s.signal_id = o.signal_id
      WHERE o.${priceCol} IS NULL AND s.timestamp <= to_timestamp($1/1000.0)
+       ${source ? 'AND s.source = $3' : ''}
      ORDER BY s.timestamp ASC
      LIMIT $2`,
-    [dueBeforeMs, limit],
+    source ? [dueBeforeMs, limit, source] : [dueBeforeMs, limit],
   );
 
   return rows.map((r) => ({
@@ -74,6 +76,8 @@ export interface SignalPerformance {
   signalType: string;
   sampleCount: number;
   horizon: OutcomeHorizon;
+  /** Which provenance these samples came from; undefined means both were counted together. */
+  source?: DataSource;
   positiveMovePct: number | null;
   negativeMovePct: number | null;
   medianMovePct: number | null;
@@ -83,22 +87,23 @@ export interface SignalPerformance {
 
 const MIN_SAMPLES = 30;
 
-export async function getSignalPerformance(pool: Pool, signalType: string, horizon: OutcomeHorizon): Promise<SignalPerformance> {
+export async function getSignalPerformance(pool: Pool, signalType: string, horizon: OutcomeHorizon, source?: DataSource): Promise<SignalPerformance> {
   const moveCol = HORIZON_MOVE_COLUMN[horizon];
 
   const { rows } = await pool.query(
     `SELECT o.${moveCol} AS move
      FROM signal_outcomes o
      JOIN market_signals s ON s.signal_id = o.signal_id
-     WHERE s.signal_type = $1 AND o.${moveCol} IS NOT NULL`,
-    [signalType],
+     WHERE s.signal_type = $1 AND o.${moveCol} IS NOT NULL
+       ${source ? 'AND s.source = $2' : ''}`,
+    source ? [signalType, source] : [signalType],
   );
 
   const moves = rows.map((r) => Number(r.move)).sort((a, b) => a - b);
   const sampleCount = moves.length;
 
   if (sampleCount === 0) {
-    return { signalType, sampleCount, horizon, positiveMovePct: null, negativeMovePct: null, medianMovePct: null, sufficientData: false };
+    return { signalType, sampleCount, horizon, source, positiveMovePct: null, negativeMovePct: null, medianMovePct: null, sufficientData: false };
   }
 
   const positive = moves.filter((m) => m > 0).length;
@@ -110,6 +115,7 @@ export async function getSignalPerformance(pool: Pool, signalType: string, horiz
     signalType,
     sampleCount,
     horizon,
+    source,
     positiveMovePct: Math.round((positive / sampleCount) * 1000) / 10,
     negativeMovePct: Math.round((negative / sampleCount) * 1000) / 10,
     medianMovePct: Math.round(median * 100) / 100,
@@ -141,7 +147,7 @@ export interface BaselinePerformance {
  * two are compared across the same market regime rather than the signal's
  * week against the collector's whole history.
  */
-export async function getBaselinePerformance(pool: Pool, horizon: OutcomeHorizon): Promise<BaselinePerformance> {
+export async function getBaselinePerformance(pool: Pool, horizon: OutcomeHorizon, source?: DataSource): Promise<BaselinePerformance> {
   const moveCol = HORIZON_MOVE_COLUMN[horizon];
   const horizonMs = HORIZON_MS[horizon];
   const LOOKAHEAD_MS = 30 * 60_000;
@@ -151,7 +157,9 @@ export async function getBaselinePerformance(pool: Pool, horizon: OutcomeHorizon
             extract(epoch from max(s.timestamp))*1000 AS to_ms
      FROM signal_outcomes o
      JOIN market_signals s ON s.signal_id = o.signal_id
-     WHERE o.${moveCol} IS NOT NULL`,
+     WHERE o.${moveCol} IS NOT NULL
+       ${source ? 'AND s.source = $1' : ''}`,
+    source ? [source] : [],
   );
   const fromMs = bounds[0]?.from_ms === null || bounds[0]?.from_ms === undefined ? null : Number(bounds[0].from_ms);
   const toMs = bounds[0]?.to_ms === null || bounds[0]?.to_ms === undefined ? null : Number(bounds[0].to_ms);
@@ -203,8 +211,8 @@ export async function getBaselinePerformance(pool: Pool, horizon: OutcomeHorizon
 }
 
 /** Historical score feed for the signal engine's confidence formula (spec §30 term, ASSUMPTIONS.md §8) — defaults to undefined (-> neutral 50) below MIN_SAMPLES. */
-export async function getHistoricalScoreForSignalType(pool: Pool, signalType: string): Promise<number | undefined> {
-  const perf = await getSignalPerformance(pool, signalType, '1h');
+export async function getHistoricalScoreForSignalType(pool: Pool, signalType: string, source: DataSource = 'live'): Promise<number | undefined> {
+  const perf = await getSignalPerformance(pool, signalType, '1h', source);
   if (!perf.sufficientData || perf.positiveMovePct === null) return undefined;
   return Math.round(perf.positiveMovePct);
 }

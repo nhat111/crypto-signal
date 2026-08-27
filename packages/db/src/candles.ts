@@ -1,19 +1,22 @@
 import type { Pool } from 'pg';
 import type { Candle } from '@crypto-signal/shared';
+import { keepLiveOverBackfill, type DataSource } from './provenance.js';
 
-export async function upsertCandle(pool: Pool, candle: Candle): Promise<void> {
+export async function upsertCandle(pool: Pool, candle: Candle, source: DataSource = 'live'): Promise<void> {
   await pool.query(
     `INSERT INTO market_candles
       (symbol, market, timeframe, open_time, close_time, open, high, low, close,
-       volume, quote_volume, trades, taker_buy_base_volume, taker_buy_quote_volume, taker_sell_base_volume)
-     VALUES ($1,$2,$3,to_timestamp($4/1000.0),to_timestamp($5/1000.0),$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+       volume, quote_volume, trades, taker_buy_base_volume, taker_buy_quote_volume, taker_sell_base_volume, source)
+     VALUES ($1,$2,$3,to_timestamp($4/1000.0),to_timestamp($5/1000.0),$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
      ON CONFLICT (symbol, market, timeframe, open_time) DO UPDATE SET
        close_time = EXCLUDED.close_time,
        open = EXCLUDED.open, high = EXCLUDED.high, low = EXCLUDED.low, close = EXCLUDED.close,
        volume = EXCLUDED.volume, quote_volume = EXCLUDED.quote_volume, trades = EXCLUDED.trades,
        taker_buy_base_volume = EXCLUDED.taker_buy_base_volume,
        taker_buy_quote_volume = EXCLUDED.taker_buy_quote_volume,
-       taker_sell_base_volume = EXCLUDED.taker_sell_base_volume`,
+       taker_sell_base_volume = EXCLUDED.taker_sell_base_volume,
+       source = EXCLUDED.source
+     ${keepLiveOverBackfill('market_candles')}`,
     [
       candle.symbol,
       candle.market,
@@ -30,6 +33,7 @@ export async function upsertCandle(pool: Pool, candle: Candle): Promise<void> {
       candle.takerBuyBaseVolume,
       candle.takerBuyQuoteVolume,
       candle.takerSellBaseVolume,
+      source,
     ],
   );
 }

@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 import type { Signal } from '@crypto-signal/signal-engine';
+import type { DataSource } from './provenance.js';
 
 export interface SignalExtras {
   price: number;
@@ -18,12 +19,12 @@ export interface StoredSignal extends Signal, SignalExtras {
   signalId: string;
 }
 
-export async function insertSignal(pool: Pool, signal: Signal, extras: SignalExtras): Promise<string> {
+export async function insertSignal(pool: Pool, signal: Signal, extras: SignalExtras, source: DataSource = 'live'): Promise<string> {
   const { rows } = await pool.query(
     `INSERT INTO market_signals
       (symbol, timeframe, signal_type, severity, confidence, timestamp, reasons, metrics,
-       price, health_score, risk_score, spot_cvd, futures_cvd, open_interest, funding_rate, volume)
-     VALUES ($1,$2,$3,$4,$5,to_timestamp($6/1000.0),$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+       price, health_score, risk_score, spot_cvd, futures_cvd, open_interest, funding_rate, volume, source)
+     VALUES ($1,$2,$3,$4,$5,to_timestamp($6/1000.0),$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
      RETURNING signal_id`,
     [
       signal.symbol,
@@ -42,6 +43,7 @@ export async function insertSignal(pool: Pool, signal: Signal, extras: SignalExt
       extras.openInterest,
       extras.fundingRate,
       extras.volume,
+      source,
     ],
   );
   const signalId = rows[0]?.signal_id as string;

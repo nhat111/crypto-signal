@@ -1,4 +1,5 @@
 export * from './pool.js';
+export * from './provenance.js';
 export * from './candles.js';
 export * from './metrics.js';
 export * from './liquidations.js';

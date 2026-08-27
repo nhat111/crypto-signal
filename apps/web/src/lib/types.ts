@@ -135,8 +135,23 @@ export interface PerformanceBaseline {
   toMs: number | null;
 }
 
+/**
+ * Where the samples came from. 'live' is what the collector observed;
+ * 'backfill' is the signal engine replayed over historical market data —
+ * real, but weaker evidence (no liquidation history exists upstream, so two
+ * of the nine rules cannot fire in it at all). Never averaged together
+ * unless the reader explicitly asks for 'all'.
+ */
+export type PerformanceSource = 'live' | 'backfill' | 'all';
+
+export const PERFORMANCE_SOURCES: readonly PerformanceSource[] = ['live', 'backfill', 'all'];
+
+/** Rules that structurally cannot appear in replayed history — a zero here means "unmeasurable", not "never happens". */
+export const UNREPLAYABLE_SIGNAL_TYPES: readonly SignalType[] = ['LONG_LIQUIDATION', 'SHORT_LIQUIDATION'];
+
 export interface PerformanceResponse {
   horizon: Horizon;
+  source: PerformanceSource;
   results: PerformanceResult[];
   baseline: PerformanceBaseline;
 }

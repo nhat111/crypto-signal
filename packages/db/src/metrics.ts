@@ -2,17 +2,20 @@ import type { Pool } from 'pg';
 import type { MarketSnapshot } from '@crypto-signal/indicators';
 import type { HealthResult, RiskResult } from '@crypto-signal/health-engine';
 import type { FundingRatePoint, OpenInterestPoint } from '@crypto-signal/shared';
+import { keepLiveOverBackfill, type DataSource } from './provenance.js';
 
 /** No-op for futures-only symbols — nothing to persist without a Spot leg. Callers only invoke this from the spot+futures pipeline path, where `snapshot.spot` is always present; this guard just makes that contract explicit at the type level. */
-export async function saveSpotMetrics(pool: Pool, snapshot: MarketSnapshot): Promise<void> {
+export async function saveSpotMetrics(pool: Pool, snapshot: MarketSnapshot, source: DataSource = 'live'): Promise<void> {
   if (!snapshot.spot) return;
   await pool.query(
-    `INSERT INTO spot_metrics (symbol, timeframe, timestamp, cvd_delta, cvd_skew_ratio, cvd_cumulative, volume, volume_ratio, volume_anomaly)
-     VALUES ($1,$2,to_timestamp($3/1000.0),$4,$5,$6,$7,$8,$9)
+    `INSERT INTO spot_metrics (symbol, timeframe, timestamp, cvd_delta, cvd_skew_ratio, cvd_cumulative, volume, volume_ratio, volume_anomaly, source)
+     VALUES ($1,$2,to_timestamp($3/1000.0),$4,$5,$6,$7,$8,$9,$10)
      ON CONFLICT (symbol, timeframe, timestamp) DO UPDATE SET
        cvd_delta = EXCLUDED.cvd_delta, cvd_skew_ratio = EXCLUDED.cvd_skew_ratio,
        cvd_cumulative = EXCLUDED.cvd_cumulative, volume = EXCLUDED.volume,
-       volume_ratio = EXCLUDED.volume_ratio, volume_anomaly = EXCLUDED.volume_anomaly`,
+       volume_ratio = EXCLUDED.volume_ratio, volume_anomaly = EXCLUDED.volume_anomaly,
+       source = EXCLUDED.source
+     ${keepLiveOverBackfill('spot_metrics')}`,
     [
       snapshot.symbol,
       snapshot.timeframe,
@@ -23,18 +26,25 @@ export async function saveSpotMetrics(pool: Pool, snapshot: MarketSnapshot): Pro
       snapshot.spot.volume,
       snapshot.spot.volumeRatio,
       snapshot.spot.volumeAnomaly,
+      source,
     ],
   );
 }
 
-export async function saveFuturesMetrics(pool: Pool, snapshot: MarketSnapshot): Promise<void> {
+export async function saveFuturesMetrics(pool: Pool, snapshot: MarketSnapshot, source: DataSource = 'live'): Promise<void> {
   const f = snapshot.futures;
+  // Liquidations have no REST history — a replayed candle simply does not
+  // know them, which is not the same as knowing they were zero. Writing
+  // NULL keeps the difference readable downstream; the ON CONFLICT guard
+  // below additionally stops a replay from overwriting a live row that
+  // does carry real figures.
+  const liquidationsKnown = source === 'live';
   await pool.query(
     `INSERT INTO futures_metrics
       (symbol, timeframe, timestamp, cvd_delta, cvd_skew_ratio, cvd_cumulative, volume, volume_ratio, volume_anomaly,
        open_interest, oi_change_pct, oi_velocity_pct_per_hour, funding_rate, funding_rate_pct,
-       basis_absolute, basis_pct, liquidation_long_usd, liquidation_short_usd, liquidation_anomaly_ratio)
-     VALUES ($1,$2,to_timestamp($3/1000.0),$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+       basis_absolute, basis_pct, liquidation_long_usd, liquidation_short_usd, liquidation_anomaly_ratio, source)
+     VALUES ($1,$2,to_timestamp($3/1000.0),$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
      ON CONFLICT (symbol, timeframe, timestamp) DO UPDATE SET
        cvd_delta = EXCLUDED.cvd_delta, cvd_skew_ratio = EXCLUDED.cvd_skew_ratio,
        cvd_cumulative = EXCLUDED.cvd_cumulative, volume = EXCLUDED.volume,
@@ -45,7 +55,9 @@ export async function saveFuturesMetrics(pool: Pool, snapshot: MarketSnapshot): 
        basis_absolute = EXCLUDED.basis_absolute, basis_pct = EXCLUDED.basis_pct,
        liquidation_long_usd = EXCLUDED.liquidation_long_usd,
        liquidation_short_usd = EXCLUDED.liquidation_short_usd,
-       liquidation_anomaly_ratio = EXCLUDED.liquidation_anomaly_ratio`,
+       liquidation_anomaly_ratio = EXCLUDED.liquidation_anomaly_ratio,
+       source = EXCLUDED.source
+     ${keepLiveOverBackfill('futures_metrics')}`,
     [
       snapshot.symbol,
       snapshot.timeframe,
@@ -63,9 +75,10 @@ export async function saveFuturesMetrics(pool: Pool, snapshot: MarketSnapshot): 
       f.fundingRatePct,
       f.basisAbsolute,
       f.basisPct,
-      f.liquidation.longLiquidationUsd,
-      f.liquidation.shortLiquidationUsd,
-      f.liquidationAnomalyRatio,
+      liquidationsKnown ? f.liquidation.longLiquidationUsd : null,
+      liquidationsKnown ? f.liquidation.shortLiquidationUsd : null,
+      liquidationsKnown ? f.liquidationAnomalyRatio : null,
+      source,
     ],
   );
 }
@@ -76,17 +89,20 @@ export async function saveHealthSnapshot(
   snapshot: MarketSnapshot,
   health: HealthResult | null,
   risk: RiskResult,
+  source: DataSource = 'live',
 ): Promise<void> {
   await pool.query(
     `INSERT INTO market_health_snapshots
       (symbol, timeframe, timestamp, price_close, price_change_pct, health_score, health_status,
-       health_components, risk_score, risk_components, data_quality_score)
-     VALUES ($1,$2,to_timestamp($3/1000.0),$4,$5,$6,$7,$8,$9,$10,$11)
+       health_components, risk_score, risk_components, data_quality_score, source)
+     VALUES ($1,$2,to_timestamp($3/1000.0),$4,$5,$6,$7,$8,$9,$10,$11,$12)
      ON CONFLICT (symbol, timeframe, timestamp) DO UPDATE SET
        price_close = EXCLUDED.price_close, price_change_pct = EXCLUDED.price_change_pct,
        health_score = EXCLUDED.health_score, health_status = EXCLUDED.health_status,
        health_components = EXCLUDED.health_components, risk_score = EXCLUDED.risk_score,
-       risk_components = EXCLUDED.risk_components, data_quality_score = EXCLUDED.data_quality_score`,
+       risk_components = EXCLUDED.risk_components, data_quality_score = EXCLUDED.data_quality_score,
+       source = EXCLUDED.source
+     ${keepLiveOverBackfill('market_health_snapshots')}`,
     [
       snapshot.symbol,
       snapshot.timeframe,
@@ -99,6 +115,7 @@ export async function saveHealthSnapshot(
       risk.score,
       JSON.stringify(risk.components),
       snapshot.dataQuality.score,
+      source,
     ],
   );
 }

@@ -106,8 +106,9 @@ Valid `signalType` values (spec §7/§15, exactly 9):
 
 Valid `severity` values: `INFO | LOW | MEDIUM | HIGH | EXTREME`.
 
-## `GET /api/performance?horizon=1h`
+## `GET /api/performance?horizon=1h&source=live`
 `horizon` one of `15m|1h|4h|24h`, default `1h`.
+`source` one of `live|backfill|all`, default `live` — see **Provenance** below.
 ```json
 {
   "horizon": "1h",
@@ -144,6 +145,27 @@ measured the same way signal outcomes are (first candle at or after
 T + horizon, 30-minute tolerance). Without it a hit rate is unreadable — a
 signal at 55% has no edge if price rose 55% of the time anyway. All fields
 are `null`/0 until outcomes exist to bound the window.
+
+### Provenance (`source`)
+Every stored row records whether the collector **observed** it (`live`) or
+whether it was **replayed** — the signal engine re-run over historical
+market data (`backfill`). The two are reported separately by default
+because they are not equal evidence:
+
+- Binance publishes **no history for liquidations at all**; they exist only
+  from the moment a websocket connected. `LONG_LIQUIDATION` and
+  `SHORT_LIQUIDATION` therefore **cannot fire in replayed history**, and a
+  count of 0 there means unmeasurable, not "never happened". Replayed
+  `futures_metrics` rows store `NULL` liquidation figures, never `0`.
+- Open interest history reaches back **30 days**, which bounds how far a
+  replay can go for the five rules that read it.
+- Replayed signals score a lower `dataQuality`, so their confidence is
+  lower than a live signal in the same market state. That is intended.
+
+A replay never overwrites a live row; a live observation does upgrade a
+replayed one. Run it with `npm run backfill -w @crypto-signal/worker`
+(`BACKFILL_DAYS`, `BACKFILL_SYMBOLS`, `BACKFILL_TIMEFRAMES` override the
+defaults). It is a one-shot job, not a scheduled one, and is safe to re-run.
 
 `positiveMovePct`/`negativeMovePct` are percentages of samples that moved
 up/down (spec §24 "Positive move: 61%"), NOT the average magnitude.
