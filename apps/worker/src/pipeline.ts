@@ -80,7 +80,7 @@ async function gatherFuturesInputs(ctx: WorkerContext, symbol: SymbolId, timefra
 
 /**
  * The shared tail once a MarketSnapshot exists, regardless of which
- * pipeline built it: signals, health/risk, persistence, cache, alerts.
+ * pipeline built it: signals, health/risk, persistence, alerts.
  * `health`/`risk` are null for futures-only symbols (no Spot data to score
  * Health against — see health-engine's computeHealth doc comment); Risk is
  * still fully computed since it never depended on Spot.
@@ -96,12 +96,6 @@ async function finishSnapshot(ctx: WorkerContext, snapshot: MarketSnapshot): Pro
   const risk = computeRisk(snapshot, signals, ctx.config.thresholds, ctx.config.riskWeights);
 
   await saveHealthSnapshot(ctx.pool, snapshot, health, risk);
-
-  try {
-    await ctx.cache.set({ snapshot, health, risk, signals, updatedAt: Date.now() });
-  } catch (err) {
-    ctx.logger.warn({ err }, 'redis cache set failed (non-fatal)');
-  }
 
   for (const signal of signals) {
     const signalId = await insertSignal(ctx.pool, signal, {

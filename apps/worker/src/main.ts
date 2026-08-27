@@ -5,7 +5,6 @@ import { insertLiquidation } from '@crypto-signal/db';
 import { loadGemConfig } from '@crypto-signal/gem-scanner';
 import { buildStates, connectionStatusToState, type WorkerContext } from './context.js';
 import { CandlePairBuffer } from './state.js';
-import { SnapshotCache } from './redisCache.js';
 import { TelegramNotifier } from './telegramNotifier.js';
 import { processFuturesOnlyCandle, processMatchedCandles } from './pipeline.js';
 import { backfillHistory, registerSymbols } from './backfill.js';
@@ -28,13 +27,6 @@ async function main(): Promise<void> {
   );
 
   const pool = new pg.Pool({ connectionString: config.databaseUrl, max: 10 });
-  const cache = new SnapshotCache(config.redisUrl);
-  try {
-    await cache.connect();
-  } catch (err) {
-    logger.warn({ err }, 'redis connect failed at startup — snapshot cache will stay best-effort/disabled');
-  }
-
   const notifier = new TelegramNotifier(config.telegramBotToken, logger);
 
   const spotAdapter = new BinanceSpotAdapter({
@@ -52,7 +44,6 @@ async function main(): Promise<void> {
 
   const ctx: WorkerContext = {
     pool,
-    cache,
     notifier,
     logger,
     config,
@@ -122,7 +113,6 @@ async function main(): Promise<void> {
     unsubscribeSpot();
     unsubscribeFutures();
     unsubscribeLiquidations();
-    await cache.close();
     await pool.end();
     process.exit(0);
   };

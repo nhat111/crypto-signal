@@ -45,7 +45,7 @@ export async function runGemWatchCycle(deps: GemWatchDeps): Promise<void> {
 
         // No pair at all usually means the pool is gone — itself the
         // clearest possible sell signal, same read as the outcome tracker
-        // uses for gem_scans (redisCache.ts has no equivalent; see gemScan.ts).
+        // uses for gem_scans (see gemScan.ts).
         if (!pair || pair.priceUsd === null) {
           await closeGemWatch(pool, watch.id, 'triggered', ['pool_gone']);
           await notifier.send(watch.chatId, formatWatchAlert(watch, null, ['pool_gone']));

@@ -17,7 +17,6 @@ const numeric = (defaultValue: number) =>
 
 const envSchema = z.object({
   DATABASE_URL: z.string().default('postgres://crypto:crypto@localhost:5432/crypto_market_health'),
-  REDIS_URL: z.string().default('redis://localhost:6379'),
 
   API_PORT: numeric(4000),
   API_HOST: z.string().default('0.0.0.0'),
@@ -105,7 +104,6 @@ export interface ConfidenceWeights {
 
 export interface AppConfig {
   databaseUrl: string;
-  redisUrl: string;
   apiPort: number;
   apiHost: string;
   apiBaseUrl: string;
@@ -179,7 +177,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 
   const config: AppConfig = {
     databaseUrl: parsed.DATABASE_URL,
-    redisUrl: parsed.REDIS_URL,
     apiPort: parsed.API_PORT,
     apiHost: parsed.API_HOST,
     apiBaseUrl: parsed.NEXT_PUBLIC_API_BASE_URL,

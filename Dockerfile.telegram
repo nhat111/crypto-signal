@@ -1,6 +1,22 @@
-# Interactive Telegram bot — calls apps/api only, never Postgres or Binance
-# directly (rule 8, "Không để Telegram/web gọi trực tiếp Binance").
-FROM node:22-slim
+# Telegram bot. Reads through the API like the web app does — never Postgres or Binance directly.
+#
+# Two stages on purpose, both aimed at Railway's per-minute memory billing.
+#
+# 1. The runtime runs a single pre-bundled .cjs on plain node instead of
+#    transpiling TypeScript at boot with tsx. Measured on this app: ~88MB
+#    RSS under tsx vs ~71MB running the bundle. Across the three Node
+#    services that is real money on a $5 budget, and it was buying nothing.
+#
+# 2. The runtime carries no monorepo and no build tooling. esbuild inlines
+#    every workspace package and npm dependency into the bundle, so the only
+#    thing left to install is `pg` — needed because db/migrate.mjs stays an
+#    ordinary ESM script (it resolves its own directory through
+#    import.meta.url, which a CJS bundle cannot represent).
+#
+#    Note that `npm prune --omit=dev` is deliberately NOT used here: at a
+#    workspace root it does not remove the workspaces' own devDependencies,
+#    so tsx, typescript and vitest would ride along into production anyway.
+FROM node:22-slim AS build
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
@@ -9,6 +25,22 @@ COPY apps ./apps
 COPY tsconfig.base.json ./
 
 RUN npm install
+RUN npx esbuild apps/telegram/src/main.ts --bundle --platform=node --format=cjs --target=node22 --external:pg-native --external:bufferutil --external:utf-8-validate --outfile=/out/app.cjs
 
+# Pinned to whatever version the build above actually resolved, so the
+# migration runner can never drift onto a different driver than the one the
+# bundle was built and tested against.
+RUN mkdir -p /runtime-deps && cd /runtime-deps \
+ && echo '{"name":"runtime-deps","private":true}' > package.json \
+ && npm install --omit=dev --no-audit --no-fund \
+      pg@$(node -p "require('/app/node_modules/pg/package.json').version")
+
+FROM node:22-slim
+WORKDIR /app
 ENV NODE_ENV=production
-CMD ["npm", "run", "start", "-w", "@crypto-signal/telegram"]
+
+COPY --from=build /runtime-deps/node_modules ./node_modules
+COPY --from=build /out/ ./
+COPY db ./db
+
+CMD ["node", "app.cjs"]

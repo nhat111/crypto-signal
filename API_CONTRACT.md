@@ -163,9 +163,10 @@ because they are not equal evidence:
   lower than a live signal in the same market state. That is intended.
 
 A replay never overwrites a live row; a live observation does upgrade a
-replayed one. Run it with `npm run backfill -w @crypto-signal/worker`
-(`BACKFILL_DAYS`, `BACKFILL_SYMBOLS`, `BACKFILL_TIMEFRAMES` override the
-defaults). It is a one-shot job, not a scheduled one, and is safe to re-run.
+replayed one. Run it with `npm run backfill -w @crypto-signal/worker` locally, or
+`node backfill.cjs` inside the deployed worker container (the image ships
+bundles, not a workspace). `BACKFILL_DAYS`, `BACKFILL_SYMBOLS` and
+`BACKFILL_TIMEFRAMES` override the defaults. It is a one-shot job, not a scheduled one, and is safe to re-run.
 
 `positiveMovePct`/`negativeMovePct` are percentages of samples that moved
 up/down (spec §24 "Positive move: 61%"), NOT the average magnitude.

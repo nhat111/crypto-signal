@@ -7,7 +7,7 @@ something Vercel's serverless functions don't provide.
 
 ```
 Vercel            → apps/web (Next.js dashboard)
-Railway           → apps/worker + apps/api + Postgres + Redis (+ apps/telegram, optional)
+Railway           → apps/worker + apps/api + Postgres (+ apps/telegram, optional)
 ```
 
 ## Web dashboard — Vercel
@@ -58,8 +58,11 @@ against a half-applied schema.
    that guess, you'll configure each service manually below.
 2. **New → Database → PostgreSQL** (adds a `Postgres` service with
    `DATABASE_URL` auto-generated).
-3. **New → Database → Redis** (adds a `Redis` service with `REDIS_URL`
-   auto-generated — Railway may label this "Key Value").
+
+   There is deliberately **no Redis service**. An earlier design cached the
+   latest snapshot there, but nothing ever read it back — the API queries
+   Postgres directly. It was removed rather than kept "in case", because on
+   Railway an idle service still bills for its memory every minute.
 
 ### 2. Worker service (required — this is the only process that talks to Binance)
 
@@ -69,7 +72,6 @@ against a half-applied schema.
    `Dockerfile.worker`.
 3. **Variables** tab, add:
    - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}`
-   - `REDIS_URL` = `${{Redis.REDIS_URL}}`
    - (optional) `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_IDS` if you want
      proactive alert pushes from the worker itself.
    - Everything else (`SYMBOLS`, `TIMEFRAMES`, all `THRESH_*`) has working
@@ -92,7 +94,7 @@ against a half-applied schema.
 
 1. **New → GitHub Repo** → same repo again, as a second service.
 2. **Settings → Build** — Dockerfile Path: `Dockerfile.api`.
-3. **Variables**: same `DATABASE_URL` / `REDIS_URL` references as the
+3. **Variables**: same `DATABASE_URL` reference as the
    worker, plus `API_HOST=0.0.0.0`, `API_PORT=4000` (already the defaults,
    fine to leave unset).
 4. **Settings → Networking → Generate Domain** — exposes it publicly on
@@ -121,6 +123,47 @@ Back in Vercel: **Settings → Environment Variables** → set
 `NEXT_PUBLIC_API_BASE_URL` to the API service's public Railway domain from
 step 3.4 → **Redeploy** (env var changes don't apply retroactively to an
 already-built deployment).
+
+## Keeping it inside Railway's $5 credit
+
+Railway bills memory and CPU **per minute, per service**, so the thing that
+costs money here is how many processes sit running all month — not disk, and
+not how much data the backfill wrote.
+
+Roughly what each part costs (Railway's published rate is about $10 per
+GB-month of memory; check your own usage page for the real figure, these are
+measured RSS numbers from this app, not guesses):
+
+| Service     | Memory | Notes                                        |
+| ----------- | ------ | -------------------------------------------- |
+| Postgres    | ~200MB | The floor. Nothing to tune without losing history. |
+| worker      | ~71MB  | The only process that must run 24/7.         |
+| api         | ~71MB  | Needed by the web dashboard and the bot.     |
+| telegram    | ~71MB  | Optional — the dashboard works without it.   |
+
+Two things were removed for exactly this reason:
+
+- **Redis is gone.** The worker used to write a latest-snapshot cache there
+  that nothing ever read — the API queries Postgres directly. A whole
+  service billed every minute for nothing.
+- **The services no longer run `tsx` in production.** They ran TypeScript
+  through a transpiler at boot; each one now runs a pre-bundled `.cjs` on
+  plain node. Measured: ~88MB → ~71MB per service.
+
+If you are still over budget, in order of how much they save versus how much
+they cost you:
+
+1. **Drop the Telegram service** (~71MB). Alerts stop; everything else works.
+2. **Trim `TIMEFRAMES`.** Four timeframes means four times the candles,
+   metrics and health rows. `5m,1h` keeps the default view and the daily
+   picture while cutting write volume by more than half.
+3. **Do not add symbols.** Each one adds websocket streams, REST polls and
+   rows on every timeframe, forever. Three is what the $5 tier comfortably
+   holds.
+
+Storage is genuinely not the concern: the whole schema grows on the order of
+50MB a month at three symbols, and Railway charges cents per GB-month for it.
+The 30-day historical replay adds roughly 60MB once.
 
 ## Enabling the small-cap discovery scanner (optional)
 

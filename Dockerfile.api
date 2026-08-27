@@ -1,20 +1,49 @@
-# Read-only HTTP API over Postgres — shared domain layer for web + telegram
-# (rule 8). Never talks to Binance directly.
-FROM node:22-slim
+# Read-only HTTP API over Postgres — shared domain layer for web + telegram. Never talks to Binance directly.
+#
+# Two stages on purpose, both aimed at Railway's per-minute memory billing.
+#
+# 1. The runtime runs a single pre-bundled .cjs on plain node instead of
+#    transpiling TypeScript at boot with tsx. Measured on this app: ~88MB
+#    RSS under tsx vs ~71MB running the bundle. Across the three Node
+#    services that is real money on a $5 budget, and it was buying nothing.
+#
+# 2. The runtime carries no monorepo and no build tooling. esbuild inlines
+#    every workspace package and npm dependency into the bundle, so the only
+#    thing left to install is `pg` — needed because db/migrate.mjs stays an
+#    ordinary ESM script (it resolves its own directory through
+#    import.meta.url, which a CJS bundle cannot represent).
+#
+#    Note that `npm prune --omit=dev` is deliberately NOT used here: at a
+#    workspace root it does not remove the workspaces' own devDependencies,
+#    so tsx, typescript and vitest would ride along into production anyway.
+FROM node:22-slim AS build
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
 COPY packages ./packages
 COPY apps ./apps
-COPY db ./db
 COPY tsconfig.base.json ./
 
 RUN npm install
+RUN npx esbuild apps/api/src/server.ts --bundle --platform=node --format=cjs --target=node22 --external:pg-native --external:bufferutil --external:utf-8-validate --outfile=/out/app.cjs
 
+# Pinned to whatever version the build above actually resolved, so the
+# migration runner can never drift onto a different driver than the one the
+# bundle was built and tested against.
+RUN mkdir -p /runtime-deps && cd /runtime-deps \
+ && echo '{"name":"runtime-deps","private":true}' > package.json \
+ && npm install --omit=dev --no-audit --no-fund \
+      pg@$(node -p "require('/app/node_modules/pg/package.json').version")
+
+FROM node:22-slim
+WORKDIR /app
 ENV NODE_ENV=production
 EXPOSE 4000
+COPY --from=build /runtime-deps/node_modules ./node_modules
+COPY --from=build /out/ ./
+COPY db ./db
+
 # Migrations run here as well as on the worker, serialized by an advisory
 # lock (see db/migrate.mjs). Without this, deploying api before worker
-# leaves it querying tables that don't exist yet — a 500 that looks like an
-# app bug but is really a deploy-order one.
-CMD ["sh", "-c", "node db/migrate.mjs && npm run start -w @crypto-signal/api"]
+# leaves it querying tables that do not exist yet.
+CMD ["sh", "-c", "node db/migrate.mjs && node app.cjs"]

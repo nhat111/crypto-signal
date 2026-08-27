@@ -3,7 +3,6 @@ import type { AppConfig, Logger, SymbolId } from '@crypto-signal/shared';
 import type { BinanceFuturesAdapter, BinanceSpotAdapter, ConnectionStatus } from '@crypto-signal/market-data';
 import type { SignalType } from '@crypto-signal/signal-engine';
 import type { GemConfig } from '@crypto-signal/gem-scanner';
-import { SnapshotCache } from './redisCache.js';
 import { TelegramNotifier } from './telegramNotifier.js';
 import { CandlePairBuffer, SymbolTimeframeState, stateKey } from './state.js';
 
@@ -11,7 +10,6 @@ export type MarketConnectionState = 'connecting' | 'open' | 'reconnecting' | 'cl
 
 export interface WorkerContext {
   pool: Pool;
-  cache: SnapshotCache;
   notifier: TelegramNotifier;
   logger: Logger;
   config: AppConfig;
