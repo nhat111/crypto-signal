@@ -1,7 +1,7 @@
 import {
   getHistoricalScoreForSignalType,
-  getCandleAtOrAfter,
-  getSignalsPendingOutcome,
+  countPendingOutcomes,
+  getResolvableOutcomes,
   pruneOldLiquidations,
   recordOutcomePrice,
   type OutcomeHorizon,
@@ -23,14 +23,6 @@ const HORIZON_MS: Record<OutcomeHorizon, number> = {
 };
 
 /**
- * How far past a signal's due time a candle may be and still answer "what
- * was the price at signal + horizon". Six 5m candles: enough slack for an
- * ordinary gap in collection, far too little to let a price from a later
- * outage be passed off as the answer.
- */
-const OUTCOME_LOOKAHEAD_MS = 30 * 60_000;
-
-/**
  * Phase 9 historical validation: fills price_after_* columns once each
  * horizon has actually elapsed.
  *
@@ -47,22 +39,21 @@ const OUTCOME_LOOKAHEAD_MS = 30 * 60_000;
 export async function runOutcomeTracker(ctx: WorkerContext): Promise<void> {
   const now = Date.now();
   for (const horizon of HORIZONS) {
-    const pending = await getSignalsPendingOutcome(ctx.pool, horizon, now);
-    let recorded = 0;
+    // Only rows that can actually be priced are handed back, so a signal
+    // whose candle is missing cannot sit at the head of the queue and
+    // starve everything behind it (see getResolvableOutcomes).
+    const resolvable = await getResolvableOutcomes(ctx.pool, horizon, now);
 
-    for (const row of pending) {
-      const dueAtMs = row.signalTimestamp + HORIZON_MS[horizon];
-      const candle = await getCandleAtOrAfter(ctx.pool, row.symbol, 'futures', '5m', dueAtMs, OUTCOME_LOOKAHEAD_MS);
-      if (!candle) continue;
-      await recordOutcomePrice(ctx.pool, row.signalId, horizon, candle.close, row.priceAtSignal);
-      recorded += 1;
+    for (const row of resolvable) {
+      await recordOutcomePrice(ctx.pool, row.signalId, horizon, row.closeAtHorizon, row.priceAtSignal);
     }
 
-    if (pending.length > 0) {
-      // `pending` and `recorded` differ when candles near the due time are
-      // missing — worth seeing, since a persistent gap means outcomes are
-      // silently not accumulating.
-      ctx.logger.info({ horizon, pending: pending.length, recorded }, 'outcome tracker updated signals');
+    const stillPending = await countPendingOutcomes(ctx.pool, horizon, now);
+    if (resolvable.length > 0 || stillPending > 0) {
+      // `stillPending` counts rows that are due but unpriceable as well as
+      // ones simply not reached yet — a number that keeps growing means
+      // candle coverage has a hole, which is worth seeing.
+      ctx.logger.info({ horizon, recorded: resolvable.length, stillPending }, 'outcome tracker updated signals');
     }
   }
 }

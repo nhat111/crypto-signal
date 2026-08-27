@@ -24,41 +24,109 @@ const HORIZON_MOVE_COLUMN: Record<OutcomeHorizon, string> = {
   '24h': 'move_after_24h_pct',
 };
 
-export interface PendingOutcomeRow {
+/**
+ * How far past a signal's due time a candle may be and still answer "what
+ * was the price at signal + horizon". Must stay in step with the caller —
+ * it lives here because the resolvability check below is what decides
+ * whether a row is even offered for resolution.
+ */
+const OUTCOME_LOOKAHEAD_MS = 30 * 60_000;
+
+export interface ResolvableOutcomeRow {
   signalId: string;
-  symbol: string;
-  timeframe: string;
   priceAtSignal: number;
-  signalTimestamp: number;
+  /** Close of the first futures 5m candle at or after signal time + horizon. */
+  closeAtHorizon: number;
 }
 
 /**
- * Signals whose (timestamp + horizon) has passed but whose outcome column
- * for that horizon is still null — exactly what the outcome-tracker job
- * (Phase 9) needs to fill in.
+ * Signals whose outcome can be recorded *right now*: the horizon has
+ * elapsed AND a futures 5m candle exists to price it against.
+ *
+ * The resolvability check is deliberately inside the query rather than in
+ * the caller's loop. When it lived in the loop, a row that could never
+ * resolve — no candle near its due time — stayed NULL forever, and since
+ * the page is ordered oldest-first and capped, the same dead rows were
+ * re-fetched every pass and newer signals were never reached at all. That
+ * is a permanent head-of-line block, and it is silent: the job logs a
+ * healthy "200 pending" every time while recording nothing.
+ *
+ * Replayed history made it acute — it writes signals dated up to 30 days
+ * back, which sort ahead of everything live — but the bug was always
+ * there for any live signal whose candle went missing.
+ *
+ * Doing the lookup in SQL also collapses what was one query per row (200
+ * per horizon per pass, 800 every five minutes) into one.
+ *
+ * Rows stay eligible rather than being marked dead: if the candles they
+ * need are written later by a backfill, they simply start resolving.
  */
-export async function getSignalsPendingOutcome(pool: Pool, horizon: OutcomeHorizon, nowMs: number, limit = 200, source?: DataSource): Promise<PendingOutcomeRow[]> {
+export async function getResolvableOutcomes(
+  pool: Pool,
+  horizon: OutcomeHorizon,
+  nowMs: number,
+  limit = 200,
+  source?: DataSource,
+): Promise<ResolvableOutcomeRow[]> {
   const dueBeforeMs = nowMs - HORIZON_MS[horizon];
   const priceCol = HORIZON_PRICE_COLUMN[horizon];
+  const horizonMs = HORIZON_MS[horizon];
+
+  const params: unknown[] = [dueBeforeMs, horizonMs, horizonMs + OUTCOME_LOOKAHEAD_MS, limit];
+  if (source) params.push(source);
 
   const { rows } = await pool.query(
-    `SELECT o.signal_id, s.symbol, s.timeframe, o.price_at_signal, extract(epoch from s.timestamp)*1000 AS ts
+    `SELECT o.signal_id, o.price_at_signal, later.close
      FROM signal_outcomes o
      JOIN market_signals s ON s.signal_id = o.signal_id
+     JOIN LATERAL (
+       SELECT mc.close
+       FROM market_candles mc
+       WHERE mc.symbol = s.symbol AND mc.market = 'futures' AND mc.timeframe = '5m'
+         AND mc.open_time >= s.timestamp + ($2 || ' milliseconds')::interval
+         AND mc.open_time <= s.timestamp + ($3 || ' milliseconds')::interval
+       ORDER BY mc.open_time ASC
+       LIMIT 1
+     ) later ON TRUE
      WHERE o.${priceCol} IS NULL AND s.timestamp <= to_timestamp($1/1000.0)
-       ${source ? 'AND s.source = $3' : ''}
+       ${source ? 'AND s.source = $5' : ''}
      ORDER BY s.timestamp ASC
-     LIMIT $2`,
-    source ? [dueBeforeMs, limit, source] : [dueBeforeMs, limit],
+     LIMIT $4`,
+    params,
   );
 
   return rows.map((r) => ({
     signalId: r.signal_id,
-    symbol: r.symbol,
-    timeframe: r.timeframe,
     priceAtSignal: Number(r.price_at_signal),
-    signalTimestamp: Number(r.ts),
+    closeAtHorizon: Number(r.close),
   }));
+}
+
+/**
+ * How many signals are still waiting on this horizon, resolvable or not.
+ *
+ * Reported alongside the resolved count so a backlog that cannot be priced
+ * stays visible — otherwise filtering the unresolvable rows out of the work
+ * queue would also hide the fact that they exist.
+ */
+export async function countPendingOutcomes(
+  pool: Pool,
+  horizon: OutcomeHorizon,
+  nowMs: number,
+  source?: DataSource,
+): Promise<number> {
+  const dueBeforeMs = nowMs - HORIZON_MS[horizon];
+  const priceCol = HORIZON_PRICE_COLUMN[horizon];
+
+  const { rows } = await pool.query(
+    `SELECT count(*)::int AS n
+     FROM signal_outcomes o
+     JOIN market_signals s ON s.signal_id = o.signal_id
+     WHERE o.${priceCol} IS NULL AND s.timestamp <= to_timestamp($1/1000.0)
+       ${source ? 'AND s.source = $2' : ''}`,
+    source ? [dueBeforeMs, source] : [dueBeforeMs],
+  );
+  return Number(rows[0]?.n ?? 0);
 }
 
 export async function recordOutcomePrice(pool: Pool, signalId: string, horizon: OutcomeHorizon, price: number, priceAtSignal: number): Promise<void> {

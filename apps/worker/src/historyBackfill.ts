@@ -14,8 +14,8 @@ import { computeFuturesOnlySnapshot, computeMarketSnapshot, computeTrueRange, ty
 import { evaluateSignals, type Signal } from '@crypto-signal/signal-engine';
 import { computeHealth, computeRisk } from '@crypto-signal/health-engine';
 import {
-  getCandleAtOrAfter,
-  getSignalsPendingOutcome,
+  countPendingOutcomes,
+  getResolvableOutcomes,
   insertFundingRate,
   insertOpenInterest,
   insertSignal,
@@ -474,41 +474,41 @@ export async function resolveBackfilledOutcomes(
   nowMs: number = Date.now(),
 ): Promise<{ resolved: number; unresolved: number }> {
   const horizons: OutcomeHorizon[] = ['15m', '1h', '4h', '24h'];
-  const horizonMs: Record<OutcomeHorizon, number> = {
-    '15m': 15 * 60_000,
-    '1h': 60 * 60_000,
-    '4h': 4 * 60 * 60_000,
-    '24h': 24 * 60 * 60_000,
-  };
-  const lookaheadMs = 30 * 60_000;
 
   let resolved = 0;
-  let unresolved = 0;
 
   for (const horizon of horizons) {
-    // Drains rather than taking one page: a replay's backlog is the whole
-    // point of running this. `seen` guards against a row that can never
-    // resolve keeping the loop alive forever.
-    const seen = new Set<string>();
+    // Drains rather than taking one page: a replay writes its whole
+    // backlog at once, and that is the point of running this. The query
+    // only returns rows it can actually price, so this terminates — rows
+    // with no candle to price against are simply never returned, and are
+    // counted separately below rather than looped over forever.
     for (;;) {
-      const pending = await getSignalsPendingOutcome(deps.pool, horizon, nowMs, 500, 'backfill');
-      const fresh = pending.filter((row) => !seen.has(row.signalId));
-      if (fresh.length === 0) break;
-
-      for (const row of fresh) {
-        seen.add(row.signalId);
-        const dueAtMs = row.signalTimestamp + horizonMs[horizon];
-        const candle = await getCandleAtOrAfter(deps.pool, row.symbol, 'futures', '5m', dueAtMs, lookaheadMs);
-        if (!candle) {
-          unresolved += 1;
-          continue;
-        }
-        await recordOutcomePrice(deps.pool, row.signalId, horizon, candle.close, row.priceAtSignal);
+      const batch = await getResolvableOutcomes(deps.pool, horizon, nowMs, 500, 'backfill');
+      if (batch.length === 0) break;
+      for (const row of batch) {
+        await recordOutcomePrice(deps.pool, row.signalId, horizon, row.closeAtHorizon, row.priceAtSignal);
         resolved += 1;
       }
     }
   }
 
-  deps.logger.info({ resolved, unresolved }, 'backfilled outcomes resolved');
+  let unresolved = 0;
+  for (const horizon of horizons) {
+    unresolved += await countPendingOutcomes(deps.pool, horizon, nowMs, 'backfill');
+  }
+
+  if (unresolved > 0) {
+    // Almost always means the replay covered a timeframe other than 5m:
+    // outcomes are priced off futures 5m candles, so replaying only 1h
+    // writes no candles the tracker can use.
+    deps.logger.warn(
+      { resolved, unresolved },
+      'some replayed signals have no futures 5m candle to price against — include 5m in BACKFILL_TIMEFRAMES',
+    );
+  } else {
+    deps.logger.info({ resolved, unresolved }, 'backfilled outcomes resolved');
+  }
+
   return { resolved, unresolved };
 }
