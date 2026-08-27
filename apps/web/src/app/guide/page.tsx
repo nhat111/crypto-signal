@@ -18,7 +18,7 @@ const TOC = [
   { id: 'tu-dien', label: 'Từ điển' },
 ];
 
-export default function HuongDanPage() {
+export default function GuidePage() {
   return (
     <div className="mx-auto max-w-3xl pb-24">
       <header className="border-b border-slate-800 pb-6">
