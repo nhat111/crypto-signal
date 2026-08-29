@@ -44,7 +44,7 @@ export default function OverviewPage() {
           <PollStatus loading={overview.loading} error={overview.error} />
         </div>
 
-        {!isBootstrapping && <div className="mb-4"><MacroFlowBar flow={flow.data?.stablecoin ?? null} /></div>}
+        {!isBootstrapping && <div className="mb-4"><MacroFlowBar flow={flow.data?.stablecoin ?? null} fetch={flow.data?.fetch ?? null} /></div>}
 
         {isBootstrapping ? (
           <LoadingPanel label="Loading market overview…" />

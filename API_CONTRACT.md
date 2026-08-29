@@ -237,6 +237,31 @@ growing, as a proxy for money entering or leaving crypto as a whole.
   }
 }
 ```
+The response also carries `fetch` — whether the refresh behind those
+numbers is actually working:
+```json
+{
+  "fetch": {
+    "lastAttemptAt": 1788017553473,
+    "lastSuccessAt": null,
+    "consecutiveFailures": 14,
+    "lastError": "totalCirculatingUSD: Required"
+  }
+}
+```
+`stablecoin: null` on its own cannot say **why** it is empty, and the two
+reasons are not remotely the same problem:
+
+- `fetch: null` — the job has never run. Genuinely a fresh start.
+- `lastSuccessAt: null` with `consecutiveFailures > 0` — it has run and
+  **never once succeeded**. This is broken, not early, and the UI says so
+  in those words rather than showing the reassuring "no data yet".
+- `consecutiveFailures > 0` while `stablecoin` is present — the reading is
+  real but going stale, which otherwise looks identical to a live one.
+
+One or two failures after a good run is an upstream hiccup; the dashboard
+only raises it from three in a row. `lastError` is truncated to 500 chars.
+
 `stablecoin` is `null` until the worker's first refresh lands; each window
 is `null` when history doesn't reach back far enough — render "no data yet"
 rather than a zeroed reading, same rule as `/api/performance`.

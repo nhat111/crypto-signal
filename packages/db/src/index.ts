@@ -12,3 +12,4 @@ export * from './gems.js';
 export * from './gemWatches.js';
 export * from './tradeJournal.js';
 export * from './stablecoinSupply.js';
+export * from './jobHealth.js';

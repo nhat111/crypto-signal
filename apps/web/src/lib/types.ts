@@ -174,9 +174,25 @@ export interface StablecoinFlow {
   change30d: StablecoinFlowWindow | null;
 }
 
+/**
+ * Whether the refresh behind `stablecoin` is actually working.
+ *
+ * Without this, a null reading means both "not refreshed yet" and "failing
+ * on every attempt for a month", and the UI shows the same reassuring
+ * placeholder for each. Null here means the job has never run at all.
+ */
+export interface FlowFetchState {
+  lastAttemptAt: number | null;
+  /** Null means it has never once succeeded. */
+  lastSuccessAt: number | null;
+  consecutiveFailures: number;
+  lastError: string | null;
+}
+
 export interface FlowResponse {
-  /** Null until the worker's first refresh lands. */
+  /** Null until the worker's first refresh lands — read `fetch` to know whether that is still true. */
   stablecoin: StablecoinFlow | null;
+  fetch: FlowFetchState | null;
 }
 
 /* ---------- Trade journal ---------- */

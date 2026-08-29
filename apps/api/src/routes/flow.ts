@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { getRecentStablecoinSupply } from '@crypto-signal/db';
+import { getJobHealth, getRecentStablecoinSupply, JOB_STABLECOIN_FLOW } from '@crypto-signal/db';
 import { computeStablecoinFlow } from '@crypto-signal/indicators';
 import type { ApiDeps } from '../deps.js';
 
@@ -15,9 +15,25 @@ const HISTORY_DAYS = 45;
 
 export function registerFlowRoute(app: FastifyInstance, deps: ApiDeps): void {
   app.get('/api/flow', async () => {
-    const points = await getRecentStablecoinSupply(deps.pool, HISTORY_DAYS);
-    // Null until the worker's first refresh lands — the UI must say "no data
-    // yet" rather than render a zeroed reading.
-    return { stablecoin: computeStablecoinFlow(points) };
+    const [points, health] = await Promise.all([
+      getRecentStablecoinSupply(deps.pool, HISTORY_DAYS),
+      getJobHealth(deps.pool, JOB_STABLECOIN_FLOW),
+    ]);
+
+    // `stablecoin` alone cannot say why it is null — not refreshed yet, or
+    // refreshing and failing every time. `fetch` is what separates those,
+    // and it is also how a stale-but-present reading becomes visible: data
+    // can exist while every refresh since has been throwing.
+    return {
+      stablecoin: computeStablecoinFlow(points),
+      fetch: health
+        ? {
+            lastAttemptAt: health.lastAttemptAt,
+            lastSuccessAt: health.lastSuccessAt,
+            consecutiveFailures: health.consecutiveFailures,
+            lastError: health.lastError,
+          }
+        : null,
+    };
   });
 }
