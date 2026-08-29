@@ -15,6 +15,40 @@ red. This is how you confirm a deploy landed; see DEPLOY.md.
 
 `checks` carries `database`, `symbols`, `symbolFreshness` and `collector`.
 
+## `GET /api/status`
+Everything needed to answer "is this thing working?" — read by the
+dashboard's `/status` page, on demand rather than on a poll, because its
+aggregates have no business running on an uptime probe.
+
+```json
+{
+  "version": { "commit": "ff17908", "commitSource": "RAILWAY_GIT_COMMIT_SHA",
+               "startedAt": 0, "uptimeMs": 0,
+               "schema": { "latest": "010_job_health.sql", "appliedAt": 0 } },
+  "collector": [{ "symbol": "BTCUSDT", "lastSnapshotAt": 0, "ageMs": 0 }],
+  "outcomes": [{ "horizon": "1h", "resolved": 120, "pending": 8,
+                 "resolvableNow": 8, "oldestPendingAt": 0 }],
+  "jobs": [{ "jobName": "stablecoin_flow", "lastAttemptAt": 0,
+             "lastSuccessAt": null, "consecutiveFailures": 14,
+             "lastError": "totalCirculatingUSD: Required" }],
+  "serverTime": 0
+}
+```
+
+Two fields carry most of the diagnostic weight:
+
+- **`outcomes[].resolvableNow`** against `pending`. A backlog being worked
+  through and one that can never be priced both look like "lots pending";
+  only this separates them. Zero resolvable against a large pending count
+  means those signals have no futures 5m candle to price against — usually
+  a backfill run without `5m` in `BACKFILL_TIMEFRAMES` — and waiting will
+  not fix it.
+- **`jobs[].lastSuccessAt: null`** with `consecutiveFailures > 0`. The job
+  has never once worked. That is broken, not slow to start.
+
+`collector[].lastSnapshotAt` is `null` when a symbol has never produced a
+snapshot, which is a different state from a very old one.
+
 ## `GET /api/overview`
 ```json
 {

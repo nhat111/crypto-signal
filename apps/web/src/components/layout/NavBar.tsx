@@ -12,6 +12,7 @@ const LINKS = [
   { href: '/journal', label: 'Journal' },
   { href: '/performance', label: 'Performance' },
   { href: '/guide', label: 'Guide' },
+  { href: '/status', label: 'Status' },
 ];
 
 /** Top nav: section links + quick jumps to each symbol's detail page. */

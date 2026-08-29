@@ -6,7 +6,7 @@ const alias = (pkg: string) => fileURLToPath(new URL(`./packages/${pkg}/src/inde
 export default defineConfig({
   test: {
     include: ['packages/**/src/**/*.test.ts', 'apps/**/src/**/*.test.ts'],
-    exclude: ['**/node_modules/**', '**/dist/**', 'apps/web/**'],
+    exclude: ['**/node_modules/**', '**/dist/**'],
   },
   resolve: {
     alias: {
@@ -17,6 +17,7 @@ export default defineConfig({
       '@crypto-signal/health-engine': alias('health-engine'),
       '@crypto-signal/gem-scanner': alias('gem-scanner'),
       '@crypto-signal/db': alias('db'),
+      '@': fileURLToPath(new URL('./apps/web/src', import.meta.url)),
     },
   },
 });

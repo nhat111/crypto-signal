@@ -279,3 +279,47 @@ export interface GemPerformance {
   liquidityCollapsePct: number | null;
   sufficientData: boolean;
 }
+
+/* ---------- Operator status ---------- */
+
+export interface StatusVersion {
+  /** Null when no platform variable is set — not an error. */
+  commit: string | null;
+  commitSource: string | null;
+  startedAt: number;
+  uptimeMs: number;
+  schema: { latest: string | null; appliedAt: number | null };
+}
+
+export interface StatusCollectorSymbol {
+  symbol: string;
+  /** Null when the collector has never produced a snapshot for this symbol — different from a very old one. */
+  lastSnapshotAt: number | null;
+  ageMs: number | null;
+}
+
+export interface StatusOutcomeHorizon {
+  horizon: Horizon;
+  resolved: number;
+  pending: number;
+  /** Zero against a large `pending` means the candles those signals need do not exist — waiting will not fix it. */
+  resolvableNow: number;
+  oldestPendingAt: number | null;
+}
+
+export interface StatusJob {
+  jobName: string;
+  lastAttemptAt: number | null;
+  /** Null means it has never once succeeded. */
+  lastSuccessAt: number | null;
+  consecutiveFailures: number;
+  lastError: string | null;
+}
+
+export interface StatusResponse {
+  version: StatusVersion;
+  collector: StatusCollectorSymbol[];
+  outcomes: StatusOutcomeHorizon[];
+  jobs: StatusJob[];
+  serverTime: number;
+}

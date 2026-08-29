@@ -126,7 +126,14 @@ already-built deployment).
 
 ## Did the deploy actually land?
 
-One request answers it:
+**Open `/status` in the dashboard.** It answers this and the checks below
+without a terminal, which matters because the times you most need it — a
+deploy from a phone, a job that has been failing all week — are exactly
+when psql and curl are not available. Four cards, each with its own
+verdict: the build serving, collector freshness per symbol, whether the
+outcome tracker is keeping up, and whether any background job is failing.
+
+The same thing over HTTP, if you have a shell:
 
 ```bash
 curl -s <api-url>/health | jq '{status, version}'

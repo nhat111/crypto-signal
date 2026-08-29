@@ -71,3 +71,21 @@ export async function getJobHealth(pool: Pool, jobName: string): Promise<JobHeal
 
 /** Job names are referenced from both the writer and the reader, so they live in one place. */
 export const JOB_STABLECOIN_FLOW = 'stablecoin_flow';
+
+/** Every recorded job, for the operator status page. Ordered by name so the page does not reshuffle between polls. */
+export async function getAllJobHealth(pool: Pool): Promise<JobHealth[]> {
+  const { rows } = await pool.query(
+    `SELECT job_name,
+            extract(epoch from last_attempt_at)*1000 AS attempt_ms,
+            extract(epoch from last_success_at)*1000 AS success_ms,
+            consecutive_failures, last_error
+     FROM job_health ORDER BY job_name`,
+  );
+  return rows.map((r) => ({
+    jobName: r.job_name,
+    lastAttemptAt: r.attempt_ms === null ? null : Math.round(Number(r.attempt_ms)),
+    lastSuccessAt: r.success_ms === null ? null : Math.round(Number(r.success_ms)),
+    consecutiveFailures: Number(r.consecutive_failures),
+    lastError: r.last_error,
+  }));
+}

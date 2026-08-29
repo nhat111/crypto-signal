@@ -10,6 +10,7 @@ import { registerGemRoutes } from './gems.js';
 import { registerWatchRoutes } from './watches.js';
 import { registerJournalRoutes } from './journal.js';
 import { registerFlowRoute } from './flow.js';
+import { registerStatusRoute } from './status.js';
 
 export function registerRoutes(app: FastifyInstance, deps: ApiDeps): void {
   registerHealthRoute(app, deps);
@@ -22,4 +23,5 @@ export function registerRoutes(app: FastifyInstance, deps: ApiDeps): void {
   registerWatchRoutes(app, deps);
   registerJournalRoutes(app, deps);
   registerFlowRoute(app, deps);
+  registerStatusRoute(app, deps);
 }

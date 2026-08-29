@@ -284,3 +284,61 @@ export async function getHistoricalScoreForSignalType(pool: Pool, signalType: st
   if (!perf.sufficientData || perf.positiveMovePct === null) return undefined;
   return Math.round(perf.positiveMovePct);
 }
+
+export interface OutcomeTrackerHorizonStatus {
+  horizon: OutcomeHorizon;
+  resolved: number;
+  /** Due but still unpriced — resolvable or not. */
+  pending: number;
+  /** Of those, how many could be priced on the next pass. */
+  resolvableNow: number;
+  /** Oldest signal still waiting. A number that never moves means its candles are missing, not that the job is behind. */
+  oldestPendingAt: number | null;
+}
+
+/**
+ * What the outcome tracker is actually keeping up with.
+ *
+ * `pending` alone cannot say whether the job is behind or stuck: a backlog
+ * being worked through and a backlog that can never be priced look the
+ * same. `resolvableNow` separates them — zero resolvable against a large
+ * pending count means the candles those signals need do not exist, and no
+ * amount of waiting will change it.
+ */
+export async function getOutcomeTrackerStatus(pool: Pool, nowMs: number = Date.now()): Promise<OutcomeTrackerHorizonStatus[]> {
+  const horizons: OutcomeHorizon[] = ['15m', '1h', '4h', '24h'];
+  const out: OutcomeTrackerHorizonStatus[] = [];
+
+  for (const horizon of horizons) {
+    const moveCol = HORIZON_MOVE_COLUMN[horizon];
+    const priceCol = HORIZON_PRICE_COLUMN[horizon];
+    const dueBeforeMs = nowMs - HORIZON_MS[horizon];
+
+    const { rows } = await pool.query(
+      `SELECT
+         count(*) FILTER (WHERE o.${moveCol} IS NOT NULL)::int AS resolved,
+         count(*) FILTER (WHERE o.${priceCol} IS NULL AND s.timestamp <= to_timestamp($1/1000.0))::int AS pending,
+         extract(epoch from min(s.timestamp) FILTER (
+           WHERE o.${priceCol} IS NULL AND s.timestamp <= to_timestamp($1/1000.0)
+         ))*1000 AS oldest_ms
+       FROM signal_outcomes o
+       JOIN market_signals s ON s.signal_id = o.signal_id`,
+      [dueBeforeMs],
+    );
+
+    // Counted through the same query the tracker works from, so this can
+    // never disagree with what the next pass will actually manage.
+    const resolvableNow = (await getResolvableOutcomes(pool, horizon, nowMs, 1000)).length;
+
+    const r = rows[0];
+    out.push({
+      horizon,
+      resolved: Number(r?.resolved ?? 0),
+      pending: Number(r?.pending ?? 0),
+      resolvableNow,
+      oldestPendingAt: r?.oldest_ms == null ? null : Math.round(Number(r.oldest_ms)),
+    });
+  }
+
+  return out;
+}
