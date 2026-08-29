@@ -4,7 +4,16 @@ Base URL: `NEXT_PUBLIC_API_BASE_URL` (default `http://localhost:4000` in dev).
 All responses are JSON. No auth for MVP (read-only market data).
 
 ## `GET /health`
-Returns `{ status: 'ok'|'degraded', checks: { database, collector } }`. HTTP 200 or 503.
+Returns `{ status: 'ok'|'degraded', version, checks }`. HTTP 200 or 503.
+
+`version` carries `commit` (the build serving, short sha, `null` when no
+platform variable is set), `commitSource` (which variable it came from),
+`startedAt`, `uptimeMs`, and `schema` (`latest` migration filename,
+`appliedAt`, `count`). It is deliberately outside `checks` — a missing
+commit variable says nothing about health and must never turn the endpoint
+red. This is how you confirm a deploy landed; see DEPLOY.md.
+
+`checks` carries `database`, `symbols`, `symbolFreshness` and `collector`.
 
 ## `GET /api/overview`
 ```json

@@ -1,5 +1,5 @@
 import pg from 'pg';
-import { createLogger, loadConfig } from '@crypto-signal/shared';
+import { createLogger, loadConfig, resolveBuildInfo } from '@crypto-signal/shared';
 import { BinanceFuturesAdapter, BinanceSpotAdapter } from '@crypto-signal/market-data';
 import { insertLiquidation } from '@crypto-signal/db';
 import { loadGemConfig } from '@crypto-signal/gem-scanner';
@@ -16,8 +16,16 @@ async function main(): Promise<void> {
 
   const gemConfig = loadGemConfig();
 
+  // The worker has no HTTP surface, so its build is only knowable from
+  // this line. Without it, "is the worker running the new code?" can only
+  // be answered by watching for a behaviour change, which is exactly the
+  // guesswork /health's version block exists to remove on the api side.
+  const build = resolveBuildInfo();
+
   logger.info(
     {
+      commit: build.commit,
+      commitSource: build.commitSource,
       symbols: config.symbols,
       futuresOnlySymbols: config.futuresOnlySymbols,
       timeframes: config.timeframes,

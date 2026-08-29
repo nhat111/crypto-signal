@@ -124,6 +124,47 @@ Back in Vercel: **Settings → Environment Variables** → set
 step 3.4 → **Redeploy** (env var changes don't apply retroactively to an
 already-built deployment).
 
+## Did the deploy actually land?
+
+One request answers it:
+
+```bash
+curl -s <api-url>/health | jq '{status, version}'
+```
+
+```json
+{
+  "status": "ok",
+  "version": {
+    "commit": "66a894f",
+    "commitSource": "RAILWAY_GIT_COMMIT_SHA",
+    "startedAt": 1788019673995,
+    "uptimeMs": 918,
+    "schema": { "latest": "010_job_health.sql", "appliedAt": 1788019671224, "count": 10 }
+  }
+}
+```
+
+- **`commit`** — the build serving right now. Compare it to the commit you
+  pushed. If it still shows the old one, the deploy did not roll over.
+- **`uptimeMs`** — small means it just restarted. Large after you clicked
+  redeploy means nothing was redeployed.
+- **`schema.latest`** — the newest migration applied. Both api and worker
+  migrate at boot, so this is how you confirm a schema change went through.
+- **`commit: null`** — no platform variable was found. Not an error, and it
+  never turns `/health` red; set `GIT_COMMIT` by hand if your platform is
+  not among the ones read (`packages/shared/src/version.ts` lists them).
+
+The worker has no HTTP surface, so it logs the same thing once at startup —
+look for the `starting worker` line and its `commit` field. If that line is
+absent from a recent restart, the worker is not running this build.
+
+Redeploying only some services is normal, but the two must not drift apart
+across a migration: api and worker both run migrations, so whichever
+deploys first pulls the schema forward, and an old build then queries a
+newer schema. That is fine for additive migrations (every one here so far)
+and is why the order in the previous section is api first.
+
 ## Keeping it inside Railway's $5 credit
 
 Railway bills memory and CPU **per minute, per service**, so the thing that
