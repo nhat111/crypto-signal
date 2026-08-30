@@ -80,6 +80,27 @@ export async function maybeBackfillOnBoot(
       timeframes: input.timeframes,
       days,
     });
+    // A replay that scored nothing is a failure, whatever the individual
+    // windows reported. runHistoryBackfill catches per-window errors so one
+    // bad symbol cannot discard the rest — which means every window can
+    // fail and it still returns normally. Recording that as success is the
+    // same lie the stablecoin job used to tell: green on the status page
+    // while nothing happened.
+    if (summary.totalEvaluated === 0) {
+      await recordJobFailure(
+        pool,
+        JOB_HISTORY_BACKFILL,
+        new Error(
+          `replay scored no candles (${summary.failedWindows} of ${input.symbols.length * input.timeframes.length} windows failed) — check upstream errors above`,
+        ),
+      );
+      logger.error(
+        { failedWindows: summary.failedWindows, effectiveDays: summary.effectiveDays },
+        'history replay produced nothing — recorded as a failure, not a run',
+      );
+      return;
+    }
+
     const outcomes = await resolveBackfilledOutcomes(input.deps);
     await recordJobSuccess(pool, JOB_HISTORY_BACKFILL);
 
@@ -91,6 +112,9 @@ export async function maybeBackfillOnBoot(
         outcomesUnresolved: outcomes.unresolved,
         effectiveDays: summary.effectiveDays,
         cannotBeReplayed: summary.unreplayableSignalTypes,
+        // Surfaced even on a good run: some windows failing while others
+        // worked is a partial replay, and it should not read as a clean one.
+        failedWindows: summary.failedWindows,
       },
       'history replay complete — remove BACKFILL_DAYS to stop it re-running',
     );

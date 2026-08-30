@@ -415,6 +415,8 @@ export interface BackfillSummary {
   totalEvaluated: number;
   /** Rules that cannot fire in a replay at all, listed so a zero count is never read as "this never happens". */
   unreplayableSignalTypes: string[];
+  /** Windows that threw. Counted rather than only logged, so a caller can tell a partial run from a total one. */
+  failedWindows: number;
   requestedDays: number;
   effectiveDays: number;
 }
@@ -435,6 +437,7 @@ export async function runHistoryBackfill(deps: BackfillDeps, options: BackfillOp
 
   const startMs = endMs - effectiveDays * DAY_MS;
   const windows: BackfillWindowReport[] = [];
+  let failedWindows = 0;
 
   for (const symbol of options.symbols) {
     for (const timeframe of options.timeframes) {
@@ -445,6 +448,7 @@ export async function runHistoryBackfill(deps: BackfillDeps, options: BackfillOp
       } catch (err) {
         // One symbol/timeframe failing upstream must not discard the
         // windows that already succeeded — each is independently useful.
+        failedWindows += 1;
         deps.logger.error({ err, symbol, timeframe }, 'backfill window failed');
       }
     }
@@ -455,6 +459,7 @@ export async function runHistoryBackfill(deps: BackfillDeps, options: BackfillOp
     totalSignals: windows.reduce((sum, w) => sum + w.signalsWritten, 0),
     totalEvaluated: windows.reduce((sum, w) => sum + w.evaluatedCandles, 0),
     unreplayableSignalTypes: [...UNREPLAYABLE_SIGNAL_TYPES],
+    failedWindows,
     requestedDays: options.days,
     effectiveDays,
   };
