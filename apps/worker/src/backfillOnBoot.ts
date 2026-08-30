@@ -11,8 +11,11 @@ import { runHistoryBackfill, resolveBackfilledOutcomes, type BackfillDeps } from
  * only the last 30 days of open interest, so every day it goes unrun is a
  * day of history lost for good.
  *
- * Set BACKFILL_ON_BOOT to the number of days and redeploy. The worker
- * replays once, then carries on as normal.
+ * Set BACKFILL_DAYS to the number of days and redeploy. The worker replays
+ * once, then carries on as normal. It is the same variable the standalone
+ * `backfill.cjs` entry point reads, deliberately: two names for one value
+ * meant the operator reached for whichever they had seen last, and only
+ * one of them did anything on a platform without a shell.
  */
 export const JOB_HISTORY_BACKFILL = 'history_backfill';
 
@@ -34,7 +37,7 @@ export interface BackfillOnBootDeps {
   timeframes: Timeframe[];
 }
 
-export function parseBackfillOnBootDays(raw: string | undefined): number | null {
+export function parseBackfillDays(raw: string | undefined): number | null {
   if (!raw) return null;
   const days = Number(raw);
   if (!Number.isFinite(days) || days <= 0) return null;
@@ -54,9 +57,9 @@ export async function maybeBackfillOnBoot(
 ): Promise<void> {
   const { pool, logger } = input;
 
-  const days = parseBackfillOnBootDays(rawDays);
+  const days = parseBackfillDays(rawDays);
   if (days === null) {
-    if (rawDays) logger.warn({ BACKFILL_ON_BOOT: rawDays }, 'BACKFILL_ON_BOOT is not a positive number — ignoring');
+    if (rawDays) logger.warn({ BACKFILL_DAYS: rawDays }, 'BACKFILL_DAYS is not a positive number — ignoring');
     return;
   }
 
@@ -64,7 +67,7 @@ export async function maybeBackfillOnBoot(
   if (!shouldRunBackfill(health?.lastSuccessAt, nowMs)) {
     logger.info(
       { lastSuccessAt: health?.lastSuccessAt, minHoursBetweenRuns: MIN_HOURS_BETWEEN_RUNS },
-      'history replay already ran recently — skipping. Remove BACKFILL_ON_BOOT once you are done.',
+      'history replay already ran recently — skipping. Remove BACKFILL_DAYS once you are done.',
     );
     return;
   }
@@ -89,7 +92,7 @@ export async function maybeBackfillOnBoot(
         effectiveDays: summary.effectiveDays,
         cannotBeReplayed: summary.unreplayableSignalTypes,
       },
-      'history replay complete — remove BACKFILL_ON_BOOT to stop it re-running',
+      'history replay complete — remove BACKFILL_DAYS to stop it re-running',
     );
   } catch (err) {
     // Recorded rather than only logged: the status page is where someone

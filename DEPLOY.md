@@ -177,7 +177,7 @@ and is why the order in the previous section is api first.
 Railway gives no shell inside a running container, so the replay is
 triggered by an environment variable instead:
 
-1. Worker service → **Variables** → add `BACKFILL_ON_BOOT` = `30`
+1. Worker service → **Variables** → add `BACKFILL_DAYS` = `30`
 2. Redeploy the worker
 3. Watch the logs for `history replay complete`, then check `/status` →
    **Tác vụ nền** for `history_backfill`

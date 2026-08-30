@@ -1,24 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { parseBackfillOnBootDays, shouldRunBackfill } from './backfillOnBoot.js';
+import { parseBackfillDays, shouldRunBackfill } from './backfillOnBoot.js';
 
 const HOUR = 60 * 60_000;
 
-describe('parseBackfillOnBootDays', () => {
+describe('parseBackfillDays', () => {
   it('is off when the variable is absent', () => {
-    expect(parseBackfillOnBootDays(undefined)).toBeNull();
-    expect(parseBackfillOnBootDays('')).toBeNull();
+    expect(parseBackfillDays(undefined)).toBeNull();
+    expect(parseBackfillDays('')).toBeNull();
   });
 
   it('reads a day count', () => {
-    expect(parseBackfillOnBootDays('30')).toBe(30);
-    expect(parseBackfillOnBootDays('7')).toBe(7);
+    expect(parseBackfillDays('30')).toBe(30);
+    expect(parseBackfillDays('7')).toBe(7);
   });
 
   it('refuses junk rather than guessing a window', () => {
     // A typo must not silently become "replay some arbitrary period".
-    expect(parseBackfillOnBootDays('abc')).toBeNull();
-    expect(parseBackfillOnBootDays('0')).toBeNull();
-    expect(parseBackfillOnBootDays('-5')).toBeNull();
+    expect(parseBackfillDays('abc')).toBeNull();
+    expect(parseBackfillDays('0')).toBeNull();
+    expect(parseBackfillDays('-5')).toBeNull();
   });
 });
 

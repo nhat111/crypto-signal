@@ -138,7 +138,7 @@ async function main(): Promise<void> {
         logger,
       },
     },
-    process.env.BACKFILL_ON_BOOT,
+    process.env.BACKFILL_DAYS,
   );
 
   const shutdown = async (signal: string): Promise<void> => {

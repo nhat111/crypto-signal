@@ -8,6 +8,7 @@ import {
   UNREPLAYABLE_SIGNAL_TYPES,
   type BackfillDeps,
 } from './historyBackfill.js';
+import { parseBackfillDays } from './backfillOnBoot.js';
 
 /**
  * One-shot historical replay. Run it, let it finish, done — it is not a
@@ -24,10 +25,8 @@ import {
 function parseDays(): number {
   const raw = process.env.BACKFILL_DAYS;
   if (!raw) return OPEN_INTEREST_HISTORY_DAYS;
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`BACKFILL_DAYS must be a positive number, got "${raw}"`);
-  }
+  const parsed = parseBackfillDays(raw);
+  if (parsed === null) throw new Error(`BACKFILL_DAYS must be a positive number, got "${raw}"`);
   return parsed;
 }
 
