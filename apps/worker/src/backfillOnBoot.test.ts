@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseBackfillDays, shouldRunBackfill } from './backfillOnBoot.js';
+import { parseBackfillDays, parseBackfillForce, shouldRunBackfill } from './backfillOnBoot.js';
 
 const HOUR = 60 * 60_000;
 
@@ -45,5 +45,39 @@ describe('shouldRunBackfill', () => {
     // So the variable can be left set: it becomes "at most once a day"
     // rather than something that must be removed to be safe.
     expect(shouldRunBackfill(now - 21 * HOUR, now)).toBe(true);
+  });
+});
+
+describe('parseBackfillForce', () => {
+  it('is off unless explicitly asked for', () => {
+    expect(parseBackfillForce(undefined)).toBe(false);
+    expect(parseBackfillForce('')).toBe(false);
+    expect(parseBackfillForce('0')).toBe(false);
+    expect(parseBackfillForce('false')).toBe(false);
+    // Not a truthy-string check: leaving junk in the variable must not
+    // turn every restart into a fresh 30-day replay.
+    expect(parseBackfillForce('maybe')).toBe(false);
+  });
+
+  it('accepts the forms someone actually types into Railway', () => {
+    expect(parseBackfillForce('1')).toBe(true);
+    expect(parseBackfillForce('true')).toBe(true);
+    expect(parseBackfillForce('TRUE')).toBe(true);
+    expect(parseBackfillForce(' yes ')).toBe(true);
+  });
+});
+
+describe('shouldRunBackfill — force', () => {
+  const now = 1_800_000_000_000;
+
+  it('overrides a cooldown the operator cannot otherwise clear', () => {
+    // The cooldown reads a success an older build could record for a run
+    // that scored nothing, and there is no shell on this platform to
+    // reset it from.
+    expect(shouldRunBackfill(now - 60_000, now, true)).toBe(true);
+  });
+
+  it('still refuses without the flag', () => {
+    expect(shouldRunBackfill(now - 60_000, now, false)).toBe(false);
   });
 });

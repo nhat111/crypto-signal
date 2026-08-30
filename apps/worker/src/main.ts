@@ -146,6 +146,7 @@ async function main(): Promise<void> {
       },
     },
     process.env.BACKFILL_DAYS,
+    process.env.BACKFILL_FORCE,
   );
 
   const shutdown = async (signal: string): Promise<void> => {

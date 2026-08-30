@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Candle, FundingRatePoint, OpenInterestPoint, SymbolId, Timeframe } from '@crypto-signal/shared';
 import { loadConfig, resetConfigCache, timeframeToMs } from '@crypto-signal/shared';
-import { backfillWindow, type BackfillDeps } from './historyBackfill.js';
+import { backfillWindow, runHistoryBackfill, type BackfillDeps } from './historyBackfill.js';
 
 /**
  * These tests exist for one reason: a backtest that peeks at the future
@@ -202,5 +202,109 @@ describe('backfillWindow', () => {
 
     expect(second.signals).toEqual(first.signals);
     expect(second.futuresMetrics).toEqual(first.futuresMetrics);
+  });
+});
+
+/**
+ * The failure these cover was live for weeks and looked like a slow
+ * tracker: 244 signals pending on every horizon, 0 resolvable, forever.
+ * TIMEFRAMES was set to 15m,1h,4h — sensible for analysis, fatal for
+ * scoring, because outcomes are priced off futures 5m candles and nothing
+ * was storing any.
+ */
+describe('runHistoryBackfill — pricing candles', () => {
+  const base = 1_700_000_000_000;
+
+  function pricingDeps(
+    recorded: Recorded,
+    opts: { fiveMinuteCandles?: Candle[]; throwOn5m?: boolean } = {},
+  ): { deps: BackfillDeps; requested: Timeframe[] } {
+    const requested: Timeframe[] = [];
+    const deps = buildDeps([], [], [], [], recorded);
+    const fiveMin = opts.fiveMinuteCandles ?? [];
+
+    deps.futuresAdapter = {
+      ...deps.futuresAdapter,
+      fetchKlines: async (_s, tf, o) => {
+        requested.push(tf);
+        if (tf !== '5m') return [];
+        if (opts.throwOn5m) throw new Error('binance said no');
+        const from = o.startTime ?? -Infinity;
+        const page = fiveMin.filter((c) => c.openTime >= from).slice(0, o.limit ?? 1000);
+        return page;
+      },
+    };
+    return { deps, requested };
+  }
+
+  it('stores futures 5m candles when 5m is not a scored timeframe', async () => {
+    const recorded = emptyRecorded();
+    const fiveMin = Array.from({ length: 3 }, (_, i) => candle(base + i * STEP, 100 + i));
+    const { deps, requested } = pricingDeps(recorded, { fiveMinuteCandles: fiveMin });
+
+    const summary = await runHistoryBackfill(deps, {
+      symbols: [SYMBOL],
+      timeframes: ['1h'],
+      days: 1,
+      endMs: base + 10 * STEP,
+    });
+
+    expect(requested).toContain('5m');
+    expect(summary.pricingCandles).toBe(3);
+    // The fetch is not the point — the rows landing in market_candles is.
+    // Without these, getResolvableOutcomes returns nothing, forever.
+    expect(recorded.candles.map((c) => c.openTime)).toEqual(fiveMin.map((c) => c.openTime));
+    expect(recorded.candles.every((c) => c.source === 'backfill')).toBe(true);
+  });
+
+  it('writes no signals for the pricing timeframe', async () => {
+    // An operator who left 5m out of TIMEFRAMES does not want 5m signals.
+    // Fixing the pricing gap by scoring 5m too would fill /performance with
+    // a timeframe they never trade.
+    const recorded = emptyRecorded();
+    const fiveMin = Array.from({ length: 200 }, (_, i) => candle(base + i * STEP, 100 + i * 0.01));
+    const { deps } = pricingDeps(recorded, { fiveMinuteCandles: fiveMin });
+
+    await runHistoryBackfill(deps, {
+      symbols: [SYMBOL],
+      timeframes: ['1h'],
+      days: 1,
+      endMs: base + 300 * STEP,
+    });
+
+    expect(recorded.signals).toEqual([]);
+    expect(recorded.futuresMetrics).toEqual([]);
+  });
+
+  it('does not fetch 5m twice when it is already being scored', async () => {
+    const recorded = emptyRecorded();
+    const { deps, requested } = pricingDeps(recorded, { fiveMinuteCandles: [] });
+
+    const summary = await runHistoryBackfill(deps, {
+      symbols: [SYMBOL],
+      timeframes: ['5m'],
+      days: 1,
+      endMs: base + 10 * STEP,
+    });
+
+    expect(summary.pricingCandles).toBe(0);
+    expect(requested.filter((tf) => tf === '5m')).toHaveLength(1);
+  });
+
+  it('survives a pricing fetch that throws', async () => {
+    // One symbol failing upstream must not discard the replay; it must also
+    // not be reported as if the candles were stored.
+    const recorded = emptyRecorded();
+    const { deps } = pricingDeps(recorded, { throwOn5m: true });
+
+    const summary = await runHistoryBackfill(deps, {
+      symbols: [SYMBOL],
+      timeframes: ['1h'],
+      days: 1,
+      endMs: base + 10 * STEP,
+    });
+
+    expect(summary.pricingCandles).toBe(0);
+    expect(deps.logger.error).toHaveBeenCalled();
   });
 });

@@ -185,6 +185,20 @@ triggered by an environment variable instead:
    **Tác vụ nền** for `history_backfill`
 4. Remove the variable when you are done (optional — see below)
 
+If the logs say `history replay already ran recently — skipping`, the
+20-hour cooldown is holding. Add `BACKFILL_FORCE=1` alongside
+`BACKFILL_DAYS` and redeploy to run anyway, then remove it. The cooldown
+exists so a crash-looping container cannot fire a fresh 30-day replay on
+every restart; forcing it is a deliberate, one-off act.
+
+**5m is not optional.** Outcomes are priced off futures 5m candles, so a
+replay stores them for every symbol even when `TIMEFRAMES` leaves 5m out —
+without them every signal stays `pending` and `resolvableNow` is 0 forever,
+on `/status` → **Chấm kết quả tín hiệu**. They are stored for pricing only:
+no 5m signals are written, so excluding 5m from `TIMEFRAMES` still means
+no 5m rows on `/performance`. Live signals need live 5m candles, though —
+if `TIMEFRAMES` omits 5m, only the replayed window can ever be scored.
+
 It runs after the collector is already live and is never awaited, so live
 candle collection does not wait on it, and nothing it does can take the
 worker down.

@@ -67,6 +67,14 @@ const OPEN_INTEREST_PAGE_LIMIT = 500;
 /** Binance serves /futures/data/openInterestHist for the last 30 days only. Beyond this, OI-dependent rules cannot be replayed. */
 export const OPEN_INTEREST_HISTORY_DAYS = 30;
 
+/**
+ * Outcomes are priced off futures 5m candles — see `getResolvableOutcomes`.
+ * That makes 5m the ruler every horizon is measured with, not one more
+ * timeframe to analyse, so the replay needs it stored whether or not 5m is
+ * one of the timeframes being scored.
+ */
+const PRICING_TIMEFRAME: Timeframe = '5m';
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface BackfillDeps {
@@ -183,6 +191,35 @@ class StepHoldCursor<T> {
       previous: this.index >= 1 ? this.points[this.index - 1] : undefined,
     };
   }
+}
+
+/**
+ * Stores futures 5m candles for `symbol` over the window, for pricing only.
+ *
+ * Deliberately not a scored window: it writes no signals, computes no
+ * snapshot, advances no state. An operator who left 5m out of TIMEFRAMES
+ * does not want 5m signals — they want the timeframes they trade. But
+ * without these candles every outcome, replayed and live alike, stays
+ * pending forever: `getResolvableOutcomes` prices at the first futures 5m
+ * candle at or after signal time + horizon, and a row with no such candle
+ * is never returned. That is a backlog that grows and never drains, and it
+ * looks exactly like "the tracker is behind".
+ */
+async function backfillPricingCandles(
+  deps: BackfillDeps,
+  symbol: SymbolId,
+  startMs: number,
+  endMs: number,
+): Promise<number> {
+  const candles = await fetchKlineRange(
+    (s, tf, o) => deps.futuresAdapter.fetchKlines(s, tf, o),
+    symbol,
+    PRICING_TIMEFRAME,
+    startMs,
+    endMs,
+  );
+  for (const candle of candles) await upsertCandle(deps.pool, candle, 'backfill');
+  return candles.length;
 }
 
 /** Replays one (symbol, timeframe) over `[startMs, endMs)`, writing rows tagged source='backfill'. */
@@ -417,6 +454,8 @@ export interface BackfillSummary {
   unreplayableSignalTypes: string[];
   /** Windows that threw. Counted rather than only logged, so a caller can tell a partial run from a total one. */
   failedWindows: number;
+  /** Futures 5m candles stored purely so outcomes can be priced. Zero when 5m was already a scored timeframe. */
+  pricingCandles: number;
   requestedDays: number;
   effectiveDays: number;
 }
@@ -454,12 +493,31 @@ export async function runHistoryBackfill(deps: BackfillDeps, options: BackfillOp
     }
   }
 
+  // Unconditional on the windows above having produced anything: these
+  // candles also price the *live* signals already sitting pending, which
+  // is the backlog an operator actually notices on the status page.
+  let pricingCandles = 0;
+  if (!options.timeframes.includes(PRICING_TIMEFRAME)) {
+    for (const symbol of options.symbols) {
+      try {
+        pricingCandles += await backfillPricingCandles(deps, symbol, startMs, endMs);
+      } catch (err) {
+        deps.logger.error(
+          { err, symbol },
+          'pricing-candle fetch failed — outcomes for this symbol cannot be scored',
+        );
+      }
+    }
+    deps.logger.info({ pricingCandles, timeframe: PRICING_TIMEFRAME }, 'pricing candles stored');
+  }
+
   return {
     windows,
     totalSignals: windows.reduce((sum, w) => sum + w.signalsWritten, 0),
     totalEvaluated: windows.reduce((sum, w) => sum + w.evaluatedCandles, 0),
     unreplayableSignalTypes: [...UNREPLAYABLE_SIGNAL_TYPES],
     failedWindows,
+    pricingCandles,
     requestedDays: options.days,
     effectiveDays,
   };
@@ -504,12 +562,13 @@ export async function resolveBackfilledOutcomes(
   }
 
   if (unresolved > 0) {
-    // Almost always means the replay covered a timeframe other than 5m:
-    // outcomes are priced off futures 5m candles, so replaying only 1h
-    // writes no candles the tracker can use.
+    // Expected for signals younger than their horizon — 24h outcomes for
+    // the last day of the window genuinely cannot exist yet. Anything
+    // beyond that means futures 5m candles are missing for the period,
+    // which `backfillPricingCandles` above is what stores.
     deps.logger.warn(
-      { resolved, unresolved },
-      'some replayed signals have no futures 5m candle to price against — include 5m in BACKFILL_TIMEFRAMES',
+      { resolved, unresolved, pricedFrom: PRICING_TIMEFRAME },
+      'some replayed signals have no futures 5m candle to price against',
     );
   } else {
     deps.logger.info({ resolved, unresolved }, 'backfilled outcomes resolved');

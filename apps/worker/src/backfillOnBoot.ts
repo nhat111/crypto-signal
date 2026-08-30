@@ -44,8 +44,28 @@ export function parseBackfillDays(raw: string | undefined): number | null {
   return days;
 }
 
+/**
+ * True when the operator asked for it explicitly.
+ *
+ * The cooldown is keyed on a success recorded by an earlier build, and an
+ * earlier build could record success for a run that scored nothing. That
+ * makes the guard able to suppress the very run that would fix things, for
+ * up to 20 hours, with no shell to override it from. A redeploy is the only
+ * lever this platform gives, so the escape hatch has to be a variable too.
+ */
+export function parseBackfillForce(raw: string | undefined): boolean {
+  if (!raw) return false;
+  const v = raw.trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes';
+}
+
 /** True when enough time has passed since the last successful replay. */
-export function shouldRunBackfill(lastSuccessAt: number | null | undefined, nowMs: number): boolean {
+export function shouldRunBackfill(
+  lastSuccessAt: number | null | undefined,
+  nowMs: number,
+  force = false,
+): boolean {
+  if (force) return true;
   if (lastSuccessAt === null || lastSuccessAt === undefined) return true;
   return nowMs - lastSuccessAt >= MIN_HOURS_BETWEEN_RUNS * 60 * 60_000;
 }
@@ -53,6 +73,7 @@ export function shouldRunBackfill(lastSuccessAt: number | null | undefined, nowM
 export async function maybeBackfillOnBoot(
   input: BackfillOnBootDeps,
   rawDays: string | undefined,
+  rawForce: string | undefined = undefined,
   nowMs: number = Date.now(),
 ): Promise<void> {
   const { pool, logger } = input;
@@ -63,14 +84,16 @@ export async function maybeBackfillOnBoot(
     return;
   }
 
+  const force = parseBackfillForce(rawForce);
   const health = await getJobHealth(pool, JOB_HISTORY_BACKFILL);
-  if (!shouldRunBackfill(health?.lastSuccessAt, nowMs)) {
+  if (!shouldRunBackfill(health?.lastSuccessAt, nowMs, force)) {
     logger.info(
       { lastSuccessAt: health?.lastSuccessAt, minHoursBetweenRuns: MIN_HOURS_BETWEEN_RUNS },
-      'history replay already ran recently — skipping. Remove BACKFILL_DAYS once you are done.',
+      'history replay already ran recently — skipping. Set BACKFILL_FORCE=1 to override, or remove BACKFILL_DAYS once you are done.',
     );
     return;
   }
+  if (force) logger.warn('BACKFILL_FORCE is set — ignoring the once-a-day cooldown');
 
   logger.info({ days, symbols: input.symbols, timeframes: input.timeframes }, 'history replay starting');
 
@@ -115,6 +138,9 @@ export async function maybeBackfillOnBoot(
         // Surfaced even on a good run: some windows failing while others
         // worked is a partial replay, and it should not read as a clean one.
         failedWindows: summary.failedWindows,
+        // Zero here with a large `outcomesUnresolved` means 5m was already
+        // a scored timeframe and the candles still are not there.
+        pricingCandles: summary.pricingCandles,
       },
       'history replay complete — remove BACKFILL_DAYS to stop it re-running',
     );
