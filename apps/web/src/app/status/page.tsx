@@ -3,7 +3,7 @@
 import { useCallback } from 'react';
 import { getStatus } from '@/lib/api';
 import { usePolling } from '@/lib/usePolling';
-import type { StatusJob, StatusOutcomeHorizon, StatusResponse } from '@/lib/types';
+import type { StatusJob, StatusOutcomeHorizon, StatusResponse, StatusService } from '@/lib/types';
 import { ago, Row, StatusCard } from '@/components/status/StatusBlocks';
 import {
   collectorVerdict,
@@ -74,10 +74,24 @@ function BuildCard({ data }: { data: StatusResponse }) {
       {version.commitSource && <Row label="Đọc từ biến" value={version.commitSource} />}
       <Row label="Khởi động" value={ago(version.uptimeMs)} />
       <Row label="Migration mới nhất" value={version.schema.latest ?? '—'} />
+
+      {/* Services are deployed one at a time here, so "which build is the
+          api on" is only half the answer. Each one that has no HTTP surface
+          writes its build at boot; a missing row means it has not started
+          since this was added. */}
+      {data.services.map((svc: StatusService) => (
+        <Row
+          key={svc.service}
+          label={`${svc.service} — commit`}
+          value={`${svc.commit ?? '—'} · khởi động ${ago(Date.now() - svc.startedAt)}`}
+        />
+      ))}
+      {data.services.length === 0 && (
+        <Row label="worker — commit" value="chưa báo cáo (worker chưa khởi động lại)" tone="warn" />
+      )}
       <p className="mt-2.5 text-[11px] leading-relaxed text-slate-500">
-        So <span className="font-semibold text-slate-400">Commit</span> với commit vừa push. Còn hiện bản cũ, hoặc{' '}
-        <span className="font-semibold text-slate-400">Khởi động</span> là nhiều giờ trước dù vừa bấm redeploy →
-        deploy chưa lên.
+        Dòng <span className="font-semibold text-slate-400">Commit</span> đầu là của api. Mỗi service khác tự
+        báo bản của nó khi khởi động. Cái nào còn hiện commit cũ → service đó chưa deploy lại.
       </p>
     </StatusCard>
   );

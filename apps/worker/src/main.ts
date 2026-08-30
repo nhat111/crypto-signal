@@ -1,7 +1,7 @@
 import pg from 'pg';
 import { createLogger, loadConfig, resolveBuildInfo } from '@crypto-signal/shared';
 import { BinanceFuturesAdapter, BinanceSpotAdapter } from '@crypto-signal/market-data';
-import { insertLiquidation } from '@crypto-signal/db';
+import { insertLiquidation, recordServiceBuild, SERVICE_WORKER } from '@crypto-signal/db';
 import { loadGemConfig } from '@crypto-signal/gem-scanner';
 import { buildStates, connectionStatusToState, type WorkerContext } from './context.js';
 import { CandlePairBuffer } from './state.js';
@@ -65,6 +65,13 @@ async function main(): Promise<void> {
     historicalScores: new Map(),
     gemConfig: gemConfig.enabled ? gemConfig : null,
   };
+
+  // Written before anything that can fail: after a deploy the first
+  // question is "did the worker roll over?", and it must be answerable even
+  // if Binance is unreachable and the rest of startup falls over.
+  await recordServiceBuild(pool, SERVICE_WORKER, build).catch((err) =>
+    logger.warn({ err }, 'could not record worker build — version will not show on /status'),
+  );
 
   // Registration first: a symbol must be visible to the read side even if
   // its history backfill later fails.

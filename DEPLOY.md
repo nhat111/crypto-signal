@@ -162,9 +162,11 @@ curl -s <api-url>/health | jq '{status, version}'
   never turns `/health` red; set `GIT_COMMIT` by hand if your platform is
   not among the ones read (`packages/shared/src/version.ts` lists them).
 
-The worker has no HTTP surface, so it logs the same thing once at startup —
-look for the `starting worker` line and its `commit` field. If that line is
-absent from a recent restart, the worker is not running this build.
+The worker has no HTTP surface, so it writes its build into the database at
+boot and `/status` lists it under the api's own commit. Two different
+commits there means that service has not been redeployed yet — which is the
+normal way this goes wrong, since the services deploy one at a time. It
+also still logs the same fields on the `starting worker` line.
 
 Redeploying only some services is normal, but the two must not drift apart
 across a migration: api and worker both run migrations, so whichever

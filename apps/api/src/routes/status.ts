@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { getAllJobHealth, getEnabledSymbols, getOutcomeTrackerStatus } from '@crypto-signal/db';
+import { getAllJobHealth, getEnabledSymbols, getOutcomeTrackerStatus, getServiceBuilds } from '@crypto-signal/db';
 import { resolveBuildInfo } from '@crypto-signal/shared';
 import type { ApiDeps } from '../deps.js';
 
@@ -21,10 +21,11 @@ const BUILD = resolveBuildInfo();
  */
 export function registerStatusRoute(app: FastifyInstance, deps: ApiDeps): void {
   app.get('/api/status', async () => {
-    const [symbols, outcomes, jobs] = await Promise.all([
+    const [symbols, outcomes, jobs, serviceBuilds] = await Promise.all([
       getEnabledSymbols(deps.pool),
       getOutcomeTrackerStatus(deps.pool),
       getAllJobHealth(deps.pool),
+      getServiceBuilds(deps.pool),
     ]);
 
     const { rows: migrations } = await deps.pool.query(
@@ -52,6 +53,10 @@ export function registerStatusRoute(app: FastifyInstance, deps: ApiDeps): void {
           appliedAt: migrations[0]?.applied_ms == null ? null : Math.round(Number(migrations[0].applied_ms)),
         },
       },
+      // The api's own build comes from this process; every other service
+      // reports itself into the database at boot, because none of them has
+      // an HTTP surface to ask.
+      services: serviceBuilds,
       collector: symbols.map((symbol) => {
         const row = freshness.find((r) => r.symbol === symbol);
         return {

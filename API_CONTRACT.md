@@ -25,6 +25,8 @@ aggregates have no business running on an uptime probe.
   "version": { "commit": "ff17908", "commitSource": "RAILWAY_GIT_COMMIT_SHA",
                "startedAt": 0, "uptimeMs": 0,
                "schema": { "latest": "010_job_health.sql", "appliedAt": 0 } },
+  "services": [{ "service": "worker", "commit": "aaa1111",
+                 "commitSource": "RAILWAY_GIT_COMMIT_SHA", "startedAt": 0 }],
   "collector": [{ "symbol": "BTCUSDT", "lastSnapshotAt": 0, "ageMs": 0 }],
   "outcomes": [{ "horizon": "1h", "resolved": 120, "pending": 8,
                  "resolvableNow": 8, "oldestPendingAt": 0 }],
@@ -34,6 +36,13 @@ aggregates have no business running on an uptime probe.
   "serverTime": 0
 }
 ```
+
+`version` is the build of the process answering the request — the api.
+`services` is every other service, each writing its own build into the
+database at boot, because none of them has an HTTP surface to ask. They are
+deployed separately, so a commit here that differs from `version.commit`
+means that service has not rolled over yet. An empty array means nothing
+has started since this was added.
 
 Two fields carry most of the diagnostic weight:
 

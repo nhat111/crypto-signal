@@ -316,8 +316,17 @@ export interface StatusJob {
   lastError: string | null;
 }
 
+/** A service that has no HTTP surface of its own and reports its build into the database at boot. */
+export interface StatusService {
+  service: string;
+  commit: string | null;
+  commitSource: string | null;
+  startedAt: number;
+}
+
 export interface StatusResponse {
   version: StatusVersion;
+  services: StatusService[];
   collector: StatusCollectorSymbol[];
   outcomes: StatusOutcomeHorizon[];
   jobs: StatusJob[];
