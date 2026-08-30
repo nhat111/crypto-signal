@@ -172,6 +172,40 @@ deploys first pulls the schema forward, and an old build then queries a
 newer schema. That is fine for additive migrations (every one here so far)
 and is why the order in the previous section is api first.
 
+## Running the historical replay
+
+Railway gives no shell inside a running container, so the replay is
+triggered by an environment variable instead:
+
+1. Worker service → **Variables** → add `BACKFILL_ON_BOOT` = `30`
+2. Redeploy the worker
+3. Watch the logs for `history replay complete`, then check `/status` →
+   **Tác vụ nền** for `history_backfill`
+4. Remove the variable when you are done (optional — see below)
+
+It runs after the collector is already live and is never awaited, so live
+candle collection does not wait on it, and nothing it does can take the
+worker down.
+
+**It will not re-run on a restart.** Containers restart on their own — a
+crash loop, a platform migration, an out-of-memory kill — and a variable
+left set would otherwise fire a fresh 30-day replay, and hundreds of
+upstream requests, every single time. A successful run inside the last 20
+hours suppresses the next one, which also means the variable is safe to
+leave in place: it degrades to "replay at most once a day" rather than
+being something you must remember to remove.
+
+A value that is not a positive number is ignored with a warning rather than
+being guessed at, so a typo cannot quietly become some arbitrary window.
+
+**This is time-sensitive.** Binance serves open-interest history for the
+last 30 days only, so every day the replay goes unrun is a day of history
+that can never be recovered.
+
+If you do have a shell (Railway CLI, or running locally against the
+production database), the same job is `node backfill.cjs` inside the worker
+image, or `npm run backfill -w @crypto-signal/worker` from a clone.
+
 ## Keeping it inside Railway's $5 credit
 
 Railway bills memory and CPU **per minute, per service**, so the thing that

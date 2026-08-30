@@ -8,6 +8,7 @@ import { CandlePairBuffer } from './state.js';
 import { TelegramNotifier } from './telegramNotifier.js';
 import { processFuturesOnlyCandle, processMatchedCandles } from './pipeline.js';
 import { backfillHistory, registerSymbols } from './backfill.js';
+import { maybeBackfillOnBoot } from './backfillOnBoot.js';
 import { startSchedulers } from './scheduler.js';
 
 async function main(): Promise<void> {
@@ -114,6 +115,31 @@ async function main(): Promise<void> {
   const stopSchedulers = startSchedulers(ctx);
 
   logger.info('worker is running');
+
+  // Deliberately after the collector is live and not awaited: the replay
+  // makes hundreds of upstream requests and can run for minutes, and live
+  // candle collection must not wait on it. Its own error handling is
+  // inside — nothing it does can take the worker down.
+  void maybeBackfillOnBoot(
+    {
+      pool,
+      logger,
+      symbols: allSymbols,
+      timeframes: config.timeframes,
+      deps: {
+        pool,
+        spotAdapter,
+        futuresAdapter,
+        thresholds: config.thresholds,
+        healthWeights: config.healthWeights,
+        riskWeights: config.riskWeights,
+        confidenceWeights: config.confidenceWeights,
+        futuresOnlySymbolSet: ctx.futuresOnlySymbolSet,
+        logger,
+      },
+    },
+    process.env.BACKFILL_ON_BOOT,
+  );
 
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, 'shutting down worker');
