@@ -28,7 +28,11 @@ export function NavBar() {
           Market Health Monitor
         </Link>
 
-        <nav className="flex items-center gap-1">
+        {/* Wraps. Without this the row overflowed the viewport on a phone
+            once the link count grew, and the links past the fold were not
+            merely cramped — they were unreachable, with the whole page
+            scrolling sideways to reach them. */}
+        <nav className="flex flex-wrap items-center gap-1">
           {LINKS.map((link) => {
             const active = link.href === '/' ? pathname === '/' : pathname.startsWith(link.href);
             return (
@@ -48,7 +52,10 @@ export function NavBar() {
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-1">
+        {/* ml-auto only once there is room for it: on a narrow screen it
+            shoved the symbol chips against the right edge of an already
+            overflowing row. */}
+        <div className="flex flex-wrap items-center gap-1 sm:ml-auto">
           {symbols.map((symbol) => {
             const active = pathname === `/symbol/${symbol}`;
             return (

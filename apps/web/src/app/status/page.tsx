@@ -138,14 +138,14 @@ function OutcomesCard({ outcomes }: { outcomes: StatusOutcomeHorizon[] }) {
   return (
     <StatusCard title="Chấm kết quả tín hiệu" verdict={verdict} headline={headline}>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[26rem] border-collapse text-xs">
+        <table className="w-full border-collapse text-xs">
           <thead>
             <tr className="text-[10px] uppercase tracking-wide text-slate-500">
               <th className="border-b border-slate-800 py-1.5 text-left font-semibold">Khung</th>
-              <th className="border-b border-slate-800 py-1.5 text-right font-semibold">Đã chấm</th>
+              <th className="hidden border-b border-slate-800 py-1.5 text-right font-semibold sm:table-cell">Đã chấm</th>
               <th className="border-b border-slate-800 py-1.5 text-right font-semibold">Đang chờ</th>
               <th className="border-b border-slate-800 py-1.5 text-right font-semibold">Chấm được ngay</th>
-              <th className="border-b border-slate-800 py-1.5 text-right font-semibold">Cũ nhất</th>
+              <th className="hidden border-b border-slate-800 py-1.5 text-right font-semibold sm:table-cell">Cũ nhất</th>
             </tr>
           </thead>
           <tbody>
@@ -154,7 +154,7 @@ function OutcomesCard({ outcomes }: { outcomes: StatusOutcomeHorizon[] }) {
               return (
                 <tr key={o.horizon} className="tabular-nums">
                   <td className="border-b border-slate-800/60 py-1.5 font-medium text-slate-300">{o.horizon}</td>
-                  <td className="border-b border-slate-800/60 py-1.5 text-right text-slate-200">{o.resolved}</td>
+                  <td className="hidden border-b border-slate-800/60 py-1.5 text-right text-slate-200 sm:table-cell">{o.resolved}</td>
                   <td className="border-b border-slate-800/60 py-1.5 text-right text-slate-400">{o.pending}</td>
                   <td
                     className={`border-b border-slate-800/60 py-1.5 text-right font-semibold ${
@@ -163,7 +163,7 @@ function OutcomesCard({ outcomes }: { outcomes: StatusOutcomeHorizon[] }) {
                   >
                     {o.resolvableNow}
                   </td>
-                  <td className="border-b border-slate-800/60 py-1.5 text-right text-slate-500">
+                  <td className="hidden border-b border-slate-800/60 py-1.5 text-right text-slate-500 sm:table-cell">
                     {o.oldestPendingAt === null ? '—' : ago(Date.now() - o.oldestPendingAt)}
                   </td>
                 </tr>
