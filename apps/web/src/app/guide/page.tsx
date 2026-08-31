@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Section, Story, Table, Takeaway, Term, Warning, Steps } from '@/components/guide/GuideBlocks';
+import { GuideTabs } from '@/components/guide/GuideTabs';
 
 export const metadata: Metadata = {
   title: 'Guide · Market Health Monitor',
@@ -26,6 +27,7 @@ export default function GuidePage() {
         <p className="mt-2.5 text-[15px] leading-relaxed text-slate-400">
           Giải thích mọi con số trên trang này bằng ví dụ đời thường. Không cần biết gì về trading từ trước.
         </p>
+        <GuideTabs />
       </header>
 
       <nav className="mt-6 rounded-lg border border-slate-800 bg-slate-900/40 p-4">
