@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Section, Story, Table, Takeaway, Term, Warning, Steps } from '@/components/guide/GuideBlocks';
 import { GuideTabs } from '@/components/guide/GuideTabs';
+import { CandleChart, CandleLegend } from '@/components/guide/CandleChart';
+import { BREAKOUT, FLIP, NO_TRADE, PULLBACK, STOP_INSIDE, STRUCTURE } from '@/components/guide/taFigures';
 
 export const metadata: Metadata = {
   title: 'Học phân tích kỹ thuật · Market Health Monitor',
@@ -143,6 +145,16 @@ export default function TaGuidePage() {
               </>,
             ]}
           />
+          <CandleLegend />
+          <p>
+            Bước 1 trông như thế này. Không cần chỉ báo nào — chỉ cần nhìn xem đỉnh và đáy có đang cao dần lên không:
+          </p>
+          <CandleChart
+            caption="Xu hướng tăng: đỉnh 2 cao hơn đỉnh 1, và quan trọng hơn — đáy 2 cũng cao hơn đáy 1. Chỉ cần một đáy thủng đáy cũ là cấu trúc này hỏng."
+            candles={STRUCTURE.candles}
+            domain={STRUCTURE.domain}
+            markers={STRUCTURE.markers}
+          />
           <Takeaway>
             Không viết được điểm sai thì không phải là kế hoạch, mà là hy vọng.
           </Takeaway>
@@ -167,6 +179,13 @@ export default function TaGuidePage() {
               Đó chính là lý do vùng kháng cự bị phá thường thành hỗ trợ khi giá quay lại test, và ngược lại.
             </p>
           </Story>
+          <CandleChart
+            caption="Vùng 60–62 chặn giá hai lần. Đến lần thứ ba giá đóng hẳn lên trên, rồi quay lại test — và chính vùng đó đỡ giá. Cái trần cũ thành cái sàn mới."
+            candles={FLIP.candles}
+            domain={FLIP.domain}
+            zones={FLIP.zones}
+            markers={FLIP.markers}
+          />
           <p>
             Về cây nến: đừng học thuộc hàng chục mẫu nến. Chỉ cần hai ý. <Term>Thân nến dài</Term> = một bên thắng
             dứt khoát. <Term>Râu nến dài</Term> = giá đã bị đẩy tới đó rồi bị từ chối. Râu dài xuất hiện{' '}
@@ -288,6 +307,14 @@ export default function TaGuidePage() {
             Bối cảnh 1D: đỉnh sau cao hơn đỉnh trước, giá nằm trên EMA200. Hỗ trợ <Term>98–100</Term>, kháng cự{' '}
             <Term>118–120</Term>. Trên 4H, giá từ 115 hồi về 100–102, EMA50 4H quanh 101, RSI về 45 rồi bật.
           </p>
+          <CandleChart
+            caption="Giá lên tới 115 rồi hồi về vùng 98–100. Cây nến cuối có râu dưới dài đâm vào vùng rồi đóng cao — đó là chỗ ra quyết định. Hình dừng ở đây vì lúc thật bro cũng chỉ nhìn được tới đây."
+            candles={PULLBACK.candles}
+            domain={PULLBACK.domain}
+            zones={PULLBACK.zones}
+            levels={PULLBACK.levels}
+            markers={PULLBACK.markers}
+          />
           <Table
             head={['Mục', 'Giá', 'Vì sao']}
             rows={[
@@ -316,6 +343,14 @@ export default function TaGuidePage() {
               giá tới đó thì luận điểm đã hỏng thật — tức là dưới 98.
             </p>
           </Warning>
+          <CandleChart
+            caption="Cùng một kịch bản, hai chỗ đặt cắt lỗ. Giá thủng xuống 98,1 rồi bật lên 107: đường 99 bị quét sạch và bro mất tiền dù đọc đúng hướng, còn đường 97,5 thì không hề bị chạm."
+            candles={STOP_INSIDE.candles}
+            domain={STOP_INSIDE.domain}
+            zones={STOP_INSIDE.zones}
+            levels={STOP_INSIDE.levels}
+            markers={STOP_INSIDE.markers}
+          />
           <Warning>
             <p>
               Bản gốc còn viết &ldquo;Stop: 99 (đóng 4H dưới support)&rdquo;. Đó là <Term>hai kiểu cắt lỗ khác nhau</Term>{' '}
@@ -351,6 +386,16 @@ export default function TaGuidePage() {
               <>Xuất hiện nến 4H râu dưới tại vùng test. Đây mới là lúc vào.</>,
             ]}
           />
+          <CandleChart
+            caption="Cây nến phá vùng có khối lượng gấp hơn hai lần trung bình — cột xanh dưới cùng. Đó là bằng chứng có người thật sự mua, không phải giá trôi lên vì vắng người bán."
+            candles={BREAKOUT.candles}
+            domain={BREAKOUT.domain}
+            zones={BREAKOUT.zones}
+            levels={BREAKOUT.levels}
+            markers={BREAKOUT.markers}
+            volumes={BREAKOUT.volumes}
+            volumeHighlight={BREAKOUT.volumeHighlight}
+          />
           <Table
             head={['Mục', 'Giá', 'Ghi chú']}
             rows={[
@@ -381,6 +426,13 @@ export default function TaGuidePage() {
             1D đi ngang chặt trong 100–110. Trên 4H giá đang ở 105–106, tức là <Term>chính giữa</Term>. Nến 4H râu
             dài cả hai phía liên tục.
           </p>
+          <CandleChart
+            caption="Mười hai cây nến, râu dài cả hai phía, không cây nào tới gần vùng nào — giá quanh quẩn giữa 100 và 110. Nhìn thì có vẻ nhiều chuyện đang xảy ra, thực ra không có gì cả."
+            candles={NO_TRADE.candles}
+            domain={NO_TRADE.domain}
+            zones={NO_TRADE.zones}
+            markers={NO_TRADE.markers}
+          />
           <p>Thử tính thì thấy ngay vì sao nên bỏ:</p>
           <Table
             head={['', 'Khoảng cách', 'Kết quả']}
