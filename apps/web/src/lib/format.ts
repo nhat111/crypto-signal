@@ -78,3 +78,19 @@ export function formatRelativeTime(timestampMs: number, nowMs = Date.now()): str
 export function cx(...classes: Array<string | false | null | undefined>): string {
   return classes.filter(Boolean).join(' ');
 }
+
+/**
+ * A symbol's data is only as good as its last snapshot.
+ *
+ * The threshold matches the collector card on /status, deliberately: a
+ * symbol that page calls stale must not read as current on Overview. It
+ * did — HYPE's stream stopped and its card kept showing a price, a change
+ * percentage and an open interest figure with nothing to say they were
+ * fifteen hours old. A number with no age on it is read as "now".
+ */
+export const STALE_DATA_MS = 15 * 60_000;
+
+export function isStale(timestampMs: number | null | undefined, nowMs = Date.now()): boolean {
+  if (timestampMs === null || timestampMs === undefined) return false;
+  return nowMs - timestampMs > STALE_DATA_MS;
+}

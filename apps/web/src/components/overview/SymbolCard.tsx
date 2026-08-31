@@ -3,7 +3,7 @@ import { HealthBadge } from '@/components/HealthBadge';
 import { RiskBadge } from '@/components/RiskBadge';
 import { StatePanel } from '@/components/StatePanel';
 import type { OverviewRow, Signal, SymbolLatest } from '@/lib/types';
-import { cx, formatPct, formatSignedUsd, formatUsd } from '@/lib/format';
+import { cx, formatPct, formatRelativeTime, formatSignedUsd, formatUsd, isStale } from '@/lib/format';
 
 interface SymbolCardProps {
   symbol: string;
@@ -31,6 +31,7 @@ export function SymbolCard({ symbol, overviewRow, snapshot, activeSignalCount, l
   }
 
   const priceUp = overviewRow.priceChangePct >= 0;
+  const stale = isStale(overviewRow.timestamp);
 
   return (
     <Link
@@ -60,6 +61,17 @@ export function SymbolCard({ symbol, overviewRow, snapshot, activeSignalCount, l
         <HealthBadge score={overviewRow.healthScore} status={overviewRow.healthStatus} />
         <RiskBadge score={overviewRow.riskScore} />
       </div>
+
+      {/* A stopped stream is invisible on a card that only shows values:
+          every figure below stays exactly as legible as a live one. The
+          threshold matches /status so the two pages cannot disagree about
+          which symbols are keeping up. */}
+      {stale && (
+        <p className="mb-3 rounded border border-amber-500/30 bg-amber-500/[0.08] px-2 py-1.5 text-[11px] font-semibold leading-relaxed text-amber-300">
+          Dữ liệu cũ — cập nhật lần cuối {formatRelativeTime(overviewRow.timestamp)}. Mọi số bên dưới là của lúc đó,
+          không phải bây giờ.
+        </p>
+      )}
 
       {/* A null health score has exactly one cause — computeHealthComponents
           returns null when a snapshot has no spot leg — so the reason can be
