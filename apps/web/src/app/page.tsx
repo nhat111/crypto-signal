@@ -85,7 +85,8 @@ export default function OverviewPage() {
         <section>
           <h2 className="mb-3 text-lg font-bold text-slate-100">Health Heatmap</h2>
           <p className="mb-3 text-xs text-slate-500">
-            Health score by symbol × timeframe. Color reflects the band only — the number is the source of truth.
+            Health score by symbol × timeframe. Color reflects the band only — the number is the source of truth. N/A
+            means the symbol has no Binance spot listing, not that data is missing.
           </p>
           <Heatmap symbols={overview.data.symbols} timeframes={overview.data.timeframes} rows={overview.data.rows} />
         </section>

@@ -61,6 +61,17 @@ export function SymbolCard({ symbol, overviewRow, snapshot, activeSignalCount, l
         <RiskBadge score={overviewRow.riskScore} />
       </div>
 
+      {/* A null health score has exactly one cause — computeHealthComponents
+          returns null when a snapshot has no spot leg — so the reason can be
+          stated rather than left as a bare "N/A". Without this the badge
+          reads as a fault in the collector, which is what it was taken for. */}
+      {overviewRow.healthScore === null && (
+        <p className="mb-3 rounded border border-slate-800 bg-slate-950/60 px-2 py-1.5 text-[11px] leading-relaxed text-slate-500">
+          No Binance spot listing, so Health Score cannot exist — it measures spot against futures. Risk Score is
+          unaffected.
+        </p>
+      )}
+
       <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
         <Metric label="Spot CVD" value={snapshot?.spotCvd != null ? formatSignedUsd(snapshot.spotCvd) : '—'} />
         <Metric label="Futures CVD" value={snapshot ? formatSignedUsd(snapshot.futuresCvd) : '—'} />

@@ -164,6 +164,20 @@ export default function GuidePage() {
             ]}
           />
           <Takeaway>Đọc hai điểm như một cặp. Gộp thành một số là mất đúng cái ô nguy hiểm nhất.</Takeaway>
+                  <Warning>
+            <p>
+              Có coin hiện <Term>N/A</Term> ở ô Health Score — HYPE chẳng hạn. Đó <Term>không phải lỗi</Term> và cũng
+              không phải &ldquo;chưa có dữ liệu&rdquo;.
+            </p>
+            <p>
+              Health Score trả lời đúng một câu: <Term>người mua bằng tiền thật có xác nhận cú tăng này không</Term> —
+              tức là so sàn thường với sàn đòn bẩy. HYPE chỉ có trên sàn đòn bẩy của Binance, không có sàn thường. Không
+              có vế để so thì câu hỏi đó không có câu trả lời, và bịa ra một con số còn tệ hơn là nói không biết.
+            </p>
+            <p>
+              Risk Score của mấy coin đó vẫn tính bình thường và vẫn dùng được — nó không cần vế sàn thường.
+            </p>
+          </Warning>
         </Section>
 
         {/* ---------------------------------------------------------- */}
