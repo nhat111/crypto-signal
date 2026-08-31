@@ -152,7 +152,13 @@ async function dispatchAlert(ctx: WorkerContext, signal: Signal, signalId: strin
 export async function processMatchedCandles(ctx: WorkerContext, spotCandle: Candle, futuresCandle: Candle): Promise<void> {
   const { symbol, timeframe } = futuresCandle;
   const state = ctx.states.get(stateKey(symbol, timeframe));
-  if (!state) return;
+  if (!state) {
+    // A dropped candle with no trace is how a symbol goes quiet without
+    // anything looking wrong: the collector keeps running, the socket stays
+    // open, and this symbol simply stops appearing in the database.
+    ctx.logger.warn({ symbol, timeframe }, 'no state for symbol/timeframe — candle dropped');
+    return;
+  }
 
   const spotResult = state.spotGuard.accept(spotCandle);
   if (!spotResult.accepted) {
@@ -216,7 +222,13 @@ export async function processMatchedCandles(ctx: WorkerContext, spotCandle: Cand
 export async function processFuturesOnlyCandle(ctx: WorkerContext, futuresCandle: Candle): Promise<void> {
   const { symbol, timeframe } = futuresCandle;
   const state = ctx.states.get(stateKey(symbol, timeframe));
-  if (!state) return;
+  if (!state) {
+    // A dropped candle with no trace is how a symbol goes quiet without
+    // anything looking wrong: the collector keeps running, the socket stays
+    // open, and this symbol simply stops appearing in the database.
+    ctx.logger.warn({ symbol, timeframe }, 'no state for symbol/timeframe — candle dropped');
+    return;
+  }
 
   const futuresResult = state.futuresGuard.accept(futuresCandle);
   if (!futuresResult.accepted) {

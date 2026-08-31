@@ -98,11 +98,19 @@ async function main(): Promise<void> {
     config.timeframes,
     (candle) => {
       if (ctx.futuresOnlySymbolSet.has(candle.symbol)) {
-        void processFuturesOnlyCandle(ctx, candle).catch((err) => logger.error({ err }, 'pipeline error'));
+        // Symbol and timeframe on the error, not just the stack: one symbol
+        // can fail upstream for hours while the rest keep collecting, and a
+        // bare 'pipeline error' gives no way to tell which one stopped.
+        void processFuturesOnlyCandle(ctx, candle).catch((err) =>
+          logger.error({ err, symbol: candle.symbol, timeframe: candle.timeframe }, 'pipeline error'),
+        );
         return;
       }
       const pair = ctx.pairBuffer.add(candle);
-      if (pair) void processMatchedCandles(ctx, pair.spot, pair.futures).catch((err) => logger.error({ err }, 'pipeline error'));
+      if (pair)
+        void processMatchedCandles(ctx, pair.spot, pair.futures).catch((err) =>
+          logger.error({ err, symbol: pair.futures.symbol, timeframe: pair.futures.timeframe }, 'pipeline error'),
+        );
     },
     (status) => {
       ctx.connectionStatus.futures = connectionStatusToState(status);
