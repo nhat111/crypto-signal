@@ -307,6 +307,35 @@ export interface StatusOutcomeHorizon {
   oldestPendingAt: number | null;
 }
 
+/** Futures 5m candles held for one symbol — the ruler every outcome is priced with. */
+export interface StatusPricingCoverage {
+  symbol: string;
+  candles: number;
+  earliestAt: number | null;
+  latestAt: number | null;
+}
+
+export interface StatusStuckRow {
+  symbol: string;
+  timeframe: string;
+  signalType: string;
+  timestamp: number;
+  source: string;
+  /** Candles inside the exact window the resolver searches. Zero means waiting will not help. */
+  candlesInWindow: number;
+}
+
+export interface StatusStuckHorizon {
+  horizon: Horizon;
+  rows: StatusStuckRow[];
+}
+
+export interface StatusOutcomeDiagnostics {
+  pricingCandles: StatusPricingCoverage[];
+  stuck: StatusStuckHorizon[];
+  serverTime: number;
+}
+
 export interface StatusJob {
   jobName: string;
   lastAttemptAt: number | null;

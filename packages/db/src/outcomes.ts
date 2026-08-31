@@ -342,3 +342,108 @@ export async function getOutcomeTrackerStatus(pool: Pool, nowMs: number = Date.n
 
   return out;
 }
+
+/* ------------------------------------------------------------------ */
+/* Diagnostics                                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Why the two functions below exist.
+ *
+ * `resolvableNow: 0` against `pending: 244` says the backlog cannot be
+ * priced, but not why — and the three causes need different fixes: the
+ * signals predate the candles, the candles have a hole where those
+ * signals sit, or the resolver's own window is wrong. Telling them apart
+ * meant a psql session, which on this platform means a laptop; the
+ * operator is on a phone, and a phone is exactly where a silent failure
+ * gets to stay silent.
+ *
+ * Both are scans, so they are on a route the status page fetches only
+ * when asked, never on its 30-second poll.
+ */
+
+export interface PricingCandleCoverage {
+  symbol: string;
+  /** Futures 5m candles stored — the ruler every outcome is measured with. */
+  candles: number;
+  earliestAt: number | null;
+  latestAt: number | null;
+}
+
+export async function getPricingCandleCoverage(pool: Pool): Promise<PricingCandleCoverage[]> {
+  const { rows } = await pool.query(
+    `SELECT symbol,
+            count(*)::int AS candles,
+            extract(epoch from min(open_time))*1000 AS earliest_ms,
+            extract(epoch from max(open_time))*1000 AS latest_ms
+     FROM market_candles
+     WHERE market = 'futures' AND timeframe = '5m'
+     GROUP BY symbol
+     ORDER BY symbol`,
+  );
+
+  return rows.map((r) => ({
+    symbol: String(r.symbol),
+    candles: Number(r.candles),
+    earliestAt: r.earliest_ms == null ? null : Math.round(Number(r.earliest_ms)),
+    latestAt: r.latest_ms == null ? null : Math.round(Number(r.latest_ms)),
+  }));
+}
+
+export interface StuckOutcomeRow {
+  symbol: string;
+  timeframe: string;
+  signalType: string;
+  timestamp: number;
+  source: string;
+  /**
+   * Candles inside the exact window the resolver searches. Zero is the
+   * answer to "will waiting help" — no.
+   */
+  candlesInWindow: number;
+}
+
+/**
+ * The oldest signals this horizon cannot price, each with the count of
+ * candles in its pricing window.
+ *
+ * The window is built from the same two constants `getResolvableOutcomes`
+ * uses, so the diagnostic can never disagree with the resolver about what
+ * it was looking for — a diagnostic that drifts from the thing it
+ * diagnoses is worse than none.
+ */
+export async function getStuckOutcomeSample(
+  pool: Pool,
+  horizon: OutcomeHorizon,
+  nowMs: number = Date.now(),
+  limit = 8,
+): Promise<StuckOutcomeRow[]> {
+  const dueBeforeMs = nowMs - HORIZON_MS[horizon];
+  const priceCol = HORIZON_PRICE_COLUMN[horizon];
+  const horizonMs = HORIZON_MS[horizon];
+
+  const { rows } = await pool.query(
+    `SELECT s.symbol, s.timeframe, s.signal_type, s.source,
+            extract(epoch from s.timestamp)*1000 AS ts_ms,
+            (SELECT count(*) FROM market_candles mc
+              WHERE mc.symbol = s.symbol AND mc.market = 'futures' AND mc.timeframe = '5m'
+                AND mc.open_time >= s.timestamp + ($2 || ' milliseconds')::interval
+                AND mc.open_time <= s.timestamp + ($3 || ' milliseconds')::interval
+            )::int AS candles_in_window
+     FROM signal_outcomes o
+     JOIN market_signals s ON s.signal_id = o.signal_id
+     WHERE o.${priceCol} IS NULL AND s.timestamp <= to_timestamp($1/1000.0)
+     ORDER BY s.timestamp ASC
+     LIMIT $4`,
+    [dueBeforeMs, horizonMs, horizonMs + OUTCOME_LOOKAHEAD_MS, limit],
+  );
+
+  return rows.map((r) => ({
+    symbol: String(r.symbol),
+    timeframe: String(r.timeframe),
+    signalType: String(r.signal_type),
+    timestamp: Math.round(Number(r.ts_ms)),
+    source: String(r.source),
+    candlesInWindow: Number(r.candles_in_window),
+  }));
+}

@@ -1,4 +1,5 @@
 import type {
+  FlowResponse,
   GemHorizon,
   GemPerformance,
   GemsResponse,
@@ -7,16 +8,16 @@ import type {
   PerformanceResponse,
   PerformanceResult,
   PerformanceSource,
-  FlowResponse,
-  SignalsResponse,
-  StatusResponse,
   SignalType,
+  SignalsResponse,
+  StatusOutcomeDiagnostics,
+  StatusResponse,
   SymbolDetailResponse,
   Timeframe,
   Trade,
-  TradesResponse,
   TradeSide,
   TradeSummary,
+  TradesResponse,
 } from './types';
 
 /**
@@ -119,6 +120,11 @@ export function getPerformance(horizon: Horizon, source: PerformanceSource = 'li
 
 export function getStatus(): Promise<StatusResponse> {
   return fetchJson<StatusResponse>('/api/status');
+}
+
+/** Fetched on demand, never polled: these are table scans. */
+export function getOutcomeDiagnostics(): Promise<StatusOutcomeDiagnostics> {
+  return fetchJson<StatusOutcomeDiagnostics>('/api/status/outcomes');
 }
 
 export function getFlow(): Promise<FlowResponse> {

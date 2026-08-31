@@ -1,9 +1,15 @@
 'use client';
 
-import { useCallback } from 'react';
-import { getStatus } from '@/lib/api';
+import { useCallback, useState } from 'react';
+import { getOutcomeDiagnostics, getStatus } from '@/lib/api';
 import { usePolling } from '@/lib/usePolling';
-import type { StatusJob, StatusOutcomeHorizon, StatusResponse, StatusService } from '@/lib/types';
+import type {
+  StatusJob,
+  StatusOutcomeDiagnostics,
+  StatusOutcomeHorizon,
+  StatusResponse,
+  StatusService,
+} from '@/lib/types';
 import { ago, Row, StatusCard } from '@/components/status/StatusBlocks';
 import {
   collectorVerdict,
@@ -13,6 +19,8 @@ import {
   jobsVerdict,
   outcomesVerdict,
   symbolVerdict,
+  diagnoseStuckOutcomes,
+  DIAGNOSIS_TEXT,
   versionVerdict,
   FAILURE_STREAK_WORTH_SHOWING,
   STALE_SNAPSHOT_MS,
@@ -188,10 +196,164 @@ function OutcomesCard({ outcomes }: { outcomes: StatusOutcomeHorizon[] }) {
       </div>
       <p className="mt-2.5 text-[11px] leading-relaxed text-slate-500">
         <span className="font-semibold text-slate-400">Đang chờ</span> lớn mà{' '}
-        <span className="font-semibold text-slate-400">Chấm được ngay</span> bằng 0 → mấy tín hiệu đó thiếu nến 5m
-        để chấm, đợi thêm cũng không giải quyết được. Thường do backfill chạy thiếu khung 5m.
+        <span className="font-semibold text-slate-400">Chấm được ngay</span> bằng 0 → mấy tín hiệu đó không có nến
+        5m để chấm, đợi thêm cũng không giải quyết được.
       </p>
+      {stuck.length > 0 && <StuckDiagnostics outcomes={outcomes} />}
     </StatusCard>
+  );
+}
+
+/**
+ * The "why" behind a stuck backlog, fetched only when asked.
+ *
+ * /api/status is polled every 30 seconds; these two queries are scans and
+ * their answer changes on the scale of a backfill, not of a poll. The
+ * alternative to this panel was a psql session, which on this platform
+ * means a laptop — and the operator is on a phone, which is exactly where
+ * a silent failure gets to stay silent.
+ */
+function StuckDiagnostics({ outcomes }: { outcomes: StatusOutcomeHorizon[] }) {
+  const [data, setData] = useState<StatusOutcomeDiagnostics | null>(null);
+  const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [error, setError] = useState<string>('');
+
+  const load = useCallback(() => {
+    setState('loading');
+    getOutcomeDiagnostics()
+      .then((res) => {
+        setData(res);
+        setState('idle');
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : String(err));
+        setState('error');
+      });
+  }, []);
+
+  if (data === null) {
+    return (
+      <div className="mt-3 border-t border-slate-800 pt-3">
+        <button
+          type="button"
+          onClick={load}
+          disabled={state === 'loading'}
+          className="rounded-md border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:border-slate-600 hover:text-slate-100 disabled:opacity-50"
+        >
+          {state === 'loading' ? 'Đang kiểm tra…' : 'Vì sao chưa chấm được?'}
+        </button>
+        {state === 'error' && <p className="mt-2 text-xs text-rose-300">{error}</p>}
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+          Quét toàn bộ kho nến nên chỉ chạy khi bấm, không chạy theo nhịp tự làm mới 30 giây.
+        </p>
+      </div>
+    );
+  }
+
+  // The first horizon that actually has stuck rows, paired with its own
+  // resolvable count — diagnosing 15m when only 24h is backed up would
+  // answer a question nobody asked.
+  const withRows = data.stuck.find((h) => h.rows.length > 0);
+  const horizon = withRows?.horizon ?? '15m';
+  const rows = withRows?.rows ?? [];
+  const resolvableNow = outcomes.find((o) => o.horizon === horizon)?.resolvableNow ?? 0;
+  const verdict = DIAGNOSIS_TEXT[diagnoseStuckOutcomes(data.pricingCandles, rows, resolvableNow)];
+
+  const tone =
+    verdict.tone === 'bad'
+      ? 'border-rose-500/25 bg-rose-500/[0.07]'
+      : verdict.tone === 'warn'
+        ? 'border-amber-500/25 bg-amber-500/[0.07]'
+        : 'border-emerald-500/25 bg-emerald-500/[0.07]';
+  const toneText =
+    verdict.tone === 'bad' ? 'text-rose-300' : verdict.tone === 'warn' ? 'text-amber-300' : 'text-emerald-300';
+
+  return (
+    <div className="mt-3 space-y-3 border-t border-slate-800 pt-3">
+      <div className={`rounded-lg border px-3.5 py-3 ${tone}`}>
+        <p className={`text-xs font-bold uppercase tracking-wide ${toneText}`}>Kết luận · khung {horizon}</p>
+        <p className="mt-1.5 text-sm font-semibold text-slate-100">{verdict.headline}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-300">{verdict.detail}</p>
+      </div>
+
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Nến 5m futures đang có</p>
+        <div className="mt-1.5 overflow-x-auto">
+          <table className="w-full border-collapse text-xs">
+            <thead>
+              <tr className="text-[10px] uppercase tracking-wide text-slate-500">
+                <th className="border-b border-slate-800 py-1.5 text-left font-semibold">Symbol</th>
+                <th className="border-b border-slate-800 py-1.5 text-right font-semibold">Số nến</th>
+                <th className="border-b border-slate-800 py-1.5 text-right font-semibold">Cũ nhất</th>
+                <th className="border-b border-slate-800 py-1.5 text-right font-semibold">Mới nhất</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.pricingCandles.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-2 text-xs text-rose-300">
+                    Không có cây nến 5m futures nào.
+                  </td>
+                </tr>
+              ) : (
+                data.pricingCandles.map((c) => (
+                  <tr key={c.symbol} className="tabular-nums">
+                    <td className="border-b border-slate-800/60 py-1.5 font-medium text-slate-300">{c.symbol}</td>
+                    <td className="border-b border-slate-800/60 py-1.5 text-right text-slate-200">{c.candles}</td>
+                    <td className="border-b border-slate-800/60 py-1.5 text-right text-slate-500">
+                      {c.earliestAt === null ? '—' : ago(Date.now() - c.earliestAt)}
+                    </td>
+                    <td className="border-b border-slate-800/60 py-1.5 text-right text-slate-500">
+                      {c.latestAt === null ? '—' : ago(Date.now() - c.latestAt)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          Tín hiệu cũ nhất chưa chấm được
+        </p>
+        <div className="mt-1.5 overflow-x-auto">
+          <table className="w-full border-collapse text-xs">
+            <thead>
+              <tr className="text-[10px] uppercase tracking-wide text-slate-500">
+                <th className="border-b border-slate-800 py-1.5 text-left font-semibold">Symbol</th>
+                <th className="border-b border-slate-800 py-1.5 text-left font-semibold">Lúc</th>
+                <th className="border-b border-slate-800 py-1.5 text-left font-semibold">Nguồn</th>
+                <th className="border-b border-slate-800 py-1.5 text-right font-semibold">Nến trong cửa sổ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr key={`${row.symbol}-${row.timestamp}-${i}`} className="tabular-nums">
+                  <td className="border-b border-slate-800/60 py-1.5 font-medium text-slate-300">{row.symbol}</td>
+                  <td className="border-b border-slate-800/60 py-1.5 text-slate-400">
+                    {ago(Date.now() - row.timestamp)}
+                  </td>
+                  <td className="border-b border-slate-800/60 py-1.5 text-slate-500">{row.source}</td>
+                  <td
+                    className={`border-b border-slate-800/60 py-1.5 text-right font-semibold ${
+                      row.candlesInWindow === 0 ? 'text-amber-300' : 'text-slate-400'
+                    }`}
+                  >
+                    {row.candlesInWindow}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+          <span className="font-semibold text-slate-400">Nến trong cửa sổ</span> đếm đúng khoảng mà bộ chấm đi tìm.
+          Bằng 0 nghĩa là chờ thêm bao lâu cũng không chấm được.
+        </p>
+      </div>
+    </div>
   );
 }
 

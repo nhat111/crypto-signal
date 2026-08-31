@@ -191,6 +191,15 @@ If the logs say `history replay already ran recently — skipping`, the
 exists so a crash-looping container cannot fire a fresh 30-day replay on
 every restart; forcing it is a deliberate, one-off act.
 
+When `/status` → **Chấm kết quả tín hiệu** shows a backlog with
+`Chấm được ngay` at 0, the **Vì sao chưa chấm được?** button on that card
+runs the two diagnostic queries and names the cause: no 5m candles at all,
+signals older than the candles held, a hole in the candles, or the
+resolver disagreeing with itself. It is a scan, so it runs only on that
+click, never on the page's 30-second poll — and it exists because the
+alternative was a psql session, which this platform only offers from a
+laptop.
+
 **5m is not optional.** Outcomes are priced off futures 5m candles, so a
 replay stores them for every symbol even when `TIMEFRAMES` leaves 5m out —
 without them every signal stays `pending` and `resolvableNow` is 0 forever,

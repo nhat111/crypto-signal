@@ -1,5 +1,13 @@
 import type { FastifyInstance } from 'fastify';
-import { getAllJobHealth, getEnabledSymbols, getOutcomeTrackerStatus, getServiceBuilds } from '@crypto-signal/db';
+import {
+  getAllJobHealth,
+  getEnabledSymbols,
+  getOutcomeTrackerStatus,
+  getPricingCandleCoverage,
+  getServiceBuilds,
+  getStuckOutcomeSample,
+  type OutcomeHorizon,
+} from '@crypto-signal/db';
 import { resolveBuildInfo } from '@crypto-signal/shared';
 import type { ApiDeps } from '../deps.js';
 
@@ -70,6 +78,29 @@ export function registerStatusRoute(app: FastifyInstance, deps: ApiDeps): void {
       outcomes,
       jobs,
       serverTime: now,
+    };
+  });
+
+  /**
+   * Why a backlog cannot be priced — a separate route on purpose.
+   *
+   * /api/status is polled every 30 seconds by an open tab. These are
+   * scans, and the answer they give changes on the scale of a backfill,
+   * not of a poll, so the page fetches them only when someone asks.
+   */
+  app.get('/api/status/outcomes', async () => {
+    const horizons: OutcomeHorizon[] = ['15m', '1h', '4h', '24h'];
+    const nowMs = Date.now();
+
+    const [coverage, ...samples] = await Promise.all([
+      getPricingCandleCoverage(deps.pool),
+      ...horizons.map((horizon) => getStuckOutcomeSample(deps.pool, horizon, nowMs)),
+    ]);
+
+    return {
+      pricingCandles: coverage,
+      stuck: horizons.map((horizon, i) => ({ horizon, rows: samples[i] ?? [] })),
+      serverTime: nowMs,
     };
   });
 }

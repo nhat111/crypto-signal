@@ -1,4 +1,11 @@
-import type { StatusCollectorSymbol, StatusJob, StatusOutcomeHorizon, StatusVersion } from './types';
+import type {
+  StatusCollectorSymbol,
+  StatusJob,
+  StatusOutcomeHorizon,
+  StatusPricingCoverage,
+  StatusStuckRow,
+  StatusVersion,
+} from './types';
 
 /**
  * The verdict rules for the status page, kept out of the JSX.
@@ -64,3 +71,98 @@ export function jobsVerdict(jobs: StatusJob[]): Verdict {
   if (jobs.some(isJobFailing)) return 'warn';
   return jobs.length === 0 ? 'idle' : 'ok';
 }
+
+/* ------------------------------------------------------------------ */
+/* Why a backlog cannot be priced                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * `resolvableNow: 0` against `pending: 244` says the backlog is stuck but
+ * not why, and the causes need different fixes. This turns the two
+ * diagnostic queries into one of them.
+ */
+export type OutcomeDiagnosis =
+  /** Nothing waiting. */
+  | 'clear'
+  /** No futures 5m candle exists at all — nothing can ever be priced. */
+  | 'no-pricing-candles'
+  /** The stuck signals are older than the oldest candle held for their symbol. */
+  | 'signals-predate-candles'
+  /** The signals sit inside the stored range, but their own windows are empty. */
+  | 'candle-gap'
+  /** Candles are there and the tracker is working through them. */
+  | 'draining'
+  /** Candles are there, yet the resolver reports none resolvable — the two disagree. */
+  | 'query-fault';
+
+export function diagnoseStuckOutcomes(
+  coverage: StatusPricingCoverage[],
+  rows: StatusStuckRow[],
+  resolvableNow: number,
+): OutcomeDiagnosis {
+  if (rows.length === 0) return 'clear';
+
+  const totalCandles = coverage.reduce((sum, c) => sum + c.candles, 0);
+  if (totalCandles === 0) return 'no-pricing-candles';
+
+  // Rows with an empty window are the finding, even when others alongside
+  // them are fine: those can never be priced, no matter how long the
+  // tracker runs. Reporting "draining" because *some* row is workable is
+  // the reassuring lie — the queue drains to a floor and stays there.
+  const dead = rows.filter((r) => r.candlesInWindow === 0);
+
+  if (dead.length === 0) {
+    // Every window holds candles, so every row is one the resolver should
+    // be able to take. If it says it can take none, the diagnostic and the
+    // resolver read the same window and disagree — a bug in one of them,
+    // worth saying so rather than blaming the data.
+    return resolvableNow > 0 ? 'draining' : 'query-fault';
+  }
+
+  // Either the candles start after these signals, or there is a hole where
+  // they sit. A backfill fixes the first; only the collector fixes the
+  // second, so the two must not be reported as one.
+  const allPredate = dead.every((row) => {
+    const held = coverage.find((c) => c.symbol === row.symbol);
+    return held === undefined || held.earliestAt === null || row.timestamp < held.earliestAt;
+  });
+
+  return allPredate ? 'signals-predate-candles' : 'candle-gap';
+}
+
+export const DIAGNOSIS_TEXT: Record<OutcomeDiagnosis, { tone: Verdict; headline: string; detail: string }> = {
+  clear: {
+    tone: 'ok',
+    headline: 'Không còn gì chờ chấm',
+    detail: 'Mọi tín hiệu đã đủ tuổi đều đã có kết quả.',
+  },
+  'no-pricing-candles': {
+    tone: 'bad',
+    headline: 'Không có nến 5m nào trong kho',
+    detail:
+      'Kết quả được chấm bằng nến 5m futures. Không có cây nào thì không tín hiệu nào chấm được. Kiểm tra biến TIMEFRAMES trên Railway có chứa 5m không, và worker có đang chạy không.',
+  },
+  'signals-predate-candles': {
+    tone: 'warn',
+    headline: 'Tín hiệu có trước nến',
+    detail:
+      'Mấy tín hiệu này ra đời trước cây nến 5m cũ nhất đang lưu — thường là do replay viết tín hiệu 30 ngày trước trong khi nến chỉ có từ lúc worker bắt đầu chạy. Chờ thêm không giải quyết được; phải backfill nến 5m cho đúng khoảng đó.',
+  },
+  'candle-gap': {
+    tone: 'bad',
+    headline: 'Thiếu nến ở đúng khoảng cần chấm',
+    detail:
+      'Tín hiệu nằm trong khoảng thời gian đã có nến, nhưng cửa sổ chấm của riêng nó lại trống — tức là kho nến có lỗ hổng. Thường do worker mất kết nối một đoạn.',
+  },
+  draining: {
+    tone: 'ok',
+    headline: 'Đang chấm dần',
+    detail: 'Nến có sẵn và bộ chấm đang xử lý. Chờ vài lượt là hàng đợi vơi.',
+  },
+  'query-fault': {
+    tone: 'bad',
+    headline: 'Nến có mà vẫn báo không chấm được',
+    detail:
+      'Cửa sổ chấm có nến, nhưng bộ chấm báo không lấy được dòng nào. Hai chỗ này soi cùng một cửa sổ nên đây là lỗi trong mã, không phải thiếu dữ liệu — báo lại để sửa.',
+  },
+};
