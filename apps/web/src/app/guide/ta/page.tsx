@@ -24,6 +24,7 @@ export const metadata: Metadata = {
 
 const TOC = [
   { id: 'lam-duoc-gi', label: 'TA làm được và không làm được gì' },
+  { id: 'spot', label: 'Spot khác futures ở đâu' },
   { id: 'khung', label: 'Vì sao 1D + 4H' },
   { id: 'quy-trinh', label: 'Quy trình đọc chart' },
   { id: 'vung-gia', label: 'Vùng giá quan trọng' },
@@ -98,6 +99,65 @@ export default function TaGuidePage() {
         </Section>
 
         {/* ---------------------------------------------------------- */}
+        <Section id="spot" eyebrow="Sân chơi của bro" title="Spot khác futures ở đâu">
+          <p>
+            Cả trang này viết cho <Term>spot</Term> — mua đứt bằng tiền mặt, ôm coin về tài khoản. Mọi con số, mọi
+            công thức bên dưới đều tính theo kiểu đó. Nhưng phần lớn nội dung TA bro đọc trên mạng lại viết cho
+            futures, nên biết trước chỗ khác nhau sẽ tránh được việc áp nhầm.
+          </p>
+          <Table
+            head={['', 'Spot (mua đứt)', 'Futures (đòn bẩy)']}
+            rows={[
+              ['Bro sở hữu gì', 'Coin thật, nằm trong tài khoản', 'Một hợp đồng cá cược giá, không có coin nào'],
+              [
+                <Term key="a">Bị ép bán</Term>,
+                <span key="b" className="text-emerald-300">Không bao giờ. Giá xuống 90% vẫn là coin của bro</span>,
+                <span key="c" className="text-rose-300">Có. Chạm mức là sàn bán sạch, không hỏi ý</span>,
+              ],
+              ['Phí giữ lệnh', 'Không có. Ôm bao lâu cũng được', 'Trả phí funding theo chu kỳ, thường mỗi 8 tiếng'],
+              [
+                'Kiếm được khi giá xuống',
+                <span key="d" className="text-rose-300">Không</span>,
+                'Có (bán khống)',
+              ],
+              ['Mất nhiều nhất', 'Toàn bộ số tiền đã bỏ vào coin đó', 'Toàn bộ ký quỹ, và nhanh hơn nhiều'],
+              ['Thời gian', 'Là bạn — không ai đuổi bro ra', 'Là kẻ thù — phí funding và mức thanh lý đều chờ sẵn'],
+            ]}
+          />
+          <Story title="Vì sao khác biệt đó đổi cả cách chơi">
+            <p>
+              Trên futures, người ta phải đoán đúng <Term>trong một khoảng thời gian</Term>, vì phí và mức thanh lý
+              không cho phép chờ. Trên spot, bro chỉ cần đúng — không cần đúng đúng lúc.
+            </p>
+            <p>
+              Đổi lại, spot chỉ kiếm được tiền theo một chiều. Thị trường đi xuống thì bro không có lệnh nào để đánh
+              cả. Đó không phải hạn chế cần khắc phục — đó là lý do vì sao mục{' '}
+              <Term>Ví dụ 3: khi không nên vào</Term> tồn tại.
+            </p>
+          </Story>
+          <Takeaway>
+            <Term>Giữ USDT cũng là một vị thế.</Term> Trong xu hướng giảm, đứng ngoài không phải là bỏ lỡ — đó là
+            lệnh đúng duy nhất mà spot cho phép.
+          </Takeaway>
+          <Warning>
+            <p>
+              <Term>Coin để trên sàn không hoàn toàn là của bro.</Term> Sàn sập, sàn bị hack, hay tài khoản bị khoá
+              thì số coin đó là chuyện của sàn, không phải của bro. Đó là rủi ro spot có mà futures cũng có, và không
+              biểu đồ nào cảnh báo được.
+            </p>
+            <p>
+              Phần định giữ lâu thì rút về ví riêng. Phần đang giao dịch mới để trên sàn.
+            </p>
+          </Warning>
+          <p>
+            <Term>Vậy tại sao dashboard này toàn số của futures?</Term> Open Interest, Funding, Thanh lý — đều là số
+            liệu futures, và bro chơi spot. Lý do: <Term>thị trường futures lớn hơn nhiều và nó kéo giá spot đi</Term>.
+            Một cú tăng chỉ do người vay tiền đẩy lên thì rất dễ sập ngược khi họ bị ép bán; một cú tăng có tiền mặt
+            thật mua vào thì chắc chân hơn. Đó chính là câu hỏi mà Health Score trả lời — và là lý do bro, một người
+            chơi spot, vẫn cần nhìn mấy con số đó.
+          </p>
+        </Section>
+
         <Section id="khung" eyebrow="Khung thời gian" title="Vì sao 1D + 4H">
           <Table
             head={['Khung', 'Dùng để', 'Vì sao']}
@@ -424,6 +484,49 @@ export default function TaGuidePage() {
               lợi</Term> — lên khi đang lãi, không bao giờ xuống khi đang lỗ.
             </p>
           </Warning>
+          <Warning>
+            <p>
+              <Term>Trên spot, lệnh cắt lỗ có thể không khớp — không phải khớp xấu, mà là không khớp gì cả.</Term>
+            </p>
+            <p>
+              Lệnh <Term>stop-limit</Term> có <Term>hai</Term> giá: giá kích hoạt và giá bán. Đặt kích hoạt 97,5 và
+              bán 97,5, rồi giá rơi thẳng từ 98 xuống 95 — lệnh bật lên nhưng không ai mua ở 97,5, nên nó nằm treo
+              đó và bro vẫn đang ôm coin trong lúc giá tiếp tục rơi.
+            </p>
+            <p>
+              Cách tránh: nếu sàn có lệnh dừng bán theo giá thị trường thì dùng cái đó. Nếu chỉ có stop-limit, đặt{' '}
+              <Term>giá bán thấp hơn giá kích hoạt một chút</Term> (ví dụ kích hoạt 97,5, bán 96,8) — chịu trượt giá
+              vài phần mười phần trăm để chắc chắn ra được, còn hơn không ra được.
+            </p>
+          </Warning>
+
+          <h3 className="pt-2 text-base font-bold text-slate-100">Mua rải nhiều lần (DCA) mà không phá vỡ quy tắc 1%</h3>
+          <p>
+            Mua làm nhiều lần là chuyện rất bình thường ở spot. Nó chỉ nguy hiểm khi bro mua thêm{' '}
+            <Term>vì giá đã xuống</Term> chứ không phải vì đã lên kế hoạch từ đầu — đó là gấp đôi lệnh khi lỗ, nằm
+            trong bảng sai lầm bên dưới.
+          </p>
+          <p>
+            Làm đúng thì phải chia trước, và chia sao cho <Term>nếu cả hai lần mua đều khớp rồi vẫn dính cắt lỗ, tổng
+            thiệt hại vẫn đúng 1%</Term>:
+          </p>
+          <Table
+            head={['Bước', 'Tính', 'Ra']}
+            rows={[
+              ['Kế hoạch', 'Mua 2 lần ở 103 và 100, cắt lỗ 97,5', '—'],
+              ['Giá vào trung bình', '(103 + 100) ÷ 2', '101,5'],
+              ['Khoảng cách cắt lỗ', '101,5 − 97,5', '4,0'],
+              ['Tổng số coin', '10 ÷ 4,0', '2,5 coin'],
+              [<Term key="a">Mỗi lần mua</Term>, '2,5 ÷ 2', <Term key="b">1,25 coin</Term>],
+              ['Nếu khớp cả hai rồi cắt lỗ', '2,5 × 4,0', '10 $ — đúng 1%'],
+              ['Nếu chỉ khớp lần đầu rồi cắt lỗ', '1,25 × 5,5', '6,88 $ — dưới 1%, không sao'],
+            ]}
+          />
+          <p>
+            Mấu chốt: tổng số coin tính từ <Term>giá trung bình đã dự tính</Term>, chia ra trước, và cắt lỗ chỉ có
+            một mức duy nhất cho cả hai lần. Không phải mua lần một hết cỡ rồi tới lúc lỗ mới nghĩ tới lần hai.
+          </p>
+
           <Takeaway>
             Chỉ giao dịch bằng số tiền mà mất hết vẫn không đổi gì trong cuộc sống của bro. Không phải tiền học, tiền
             nhà, và tuyệt đối không phải tiền đi vay.
