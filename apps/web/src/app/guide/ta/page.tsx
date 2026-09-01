@@ -29,6 +29,7 @@ const TOC = [
   { id: 'quy-trinh', label: 'Quy trình đọc chart' },
   { id: 'vung-gia', label: 'Vùng giá quan trọng' },
   { id: 'chi-bao', label: 'Chỉ ba chỉ báo' },
+  { id: 'bat-chi-bao', label: 'Cách bật EMA và RSI lên chart' },
   { id: 'co-lenh', label: 'Cỡ lệnh — phần quan trọng nhất' },
   { id: 'dat-lenh', label: 'Đặt lệnh và giữ kỷ luật' },
   { id: 'rr', label: 'R:R và tỉ lệ thắng' },
@@ -304,6 +305,21 @@ export default function TaGuidePage() {
             overlays={EMA_BASICS.overlays}
             markers={EMA_BASICS.markers}
           />
+          <div className="rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-3.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Con số đó tính thế nào</p>
+            <p className="mt-2 font-mono text-sm leading-relaxed text-slate-100">
+              EMA mới = giá đóng × k + EMA cũ × (1 − k), với k = 2 ÷ (N + 1)
+            </p>
+            <p className="mt-2.5 text-[13px] leading-relaxed text-slate-300">
+              Với <Term>N = 5</Term>: k = 2 ÷ 6 = <Term>0,33</Term> — cây nến mới chiếm <Term>33%</Term>, toàn bộ quá
+              khứ chiếm 67%. Với <Term>N = 200</Term>: k = 2 ÷ 201 = <Term>0,01</Term> — nến mới chỉ chiếm{' '}
+              <Term>1%</Term>.
+            </p>
+            <p className="mt-2 text-[13px] leading-relaxed text-slate-400">
+              Đó chính là &ldquo;nhớ lâu&rdquo; nói bằng số: EMA200 gần như không nhúc nhích vì một cây nến, nên nó
+              làm bộ lọc tốt và làm tín hiệu vào lệnh dở.
+            </p>
+          </div>
           <p>
             Đó là toàn bộ khác biệt giữa EMA50 và EMA200: cùng một phép tính, khác số nến được nhớ. EMA200 trên khung
             ngày nhớ 200 ngày, nên nó gần như không rung theo tin tức — đúng thứ cần cho một bộ lọc.
@@ -327,6 +343,24 @@ export default function TaGuidePage() {
             RSI đo <Term>trong 14 nến vừa rồi, phần tăng chiếm bao nhiêu so với phần giảm</Term>. Toàn tăng thì RSI
             gần 100, toàn giảm thì gần 0, cân bằng thì quanh 50. Nó không đo giá cao hay thấp — nó đo lực.
           </p>
+          <div className="rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-3.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Tính thử một lần</p>
+            <p className="mt-2 text-[13px] leading-relaxed text-slate-300">
+              Trong 14 nến vừa rồi, giả sử có 9 nến tăng cộng lại <Term>+18</Term> và 5 nến giảm cộng lại{' '}
+              <Term>−6</Term>.
+            </p>
+            <p className="mt-2 font-mono text-[13px] leading-relaxed text-slate-100">
+              tăng trung bình = 18 ÷ 14 = 1,29
+              <br />
+              giảm trung bình = 6 ÷ 14 = 0,43
+              <br />
+              RSI = 100 − 100 ÷ (1 + 1,29 ÷ 0,43) = <span className="font-bold">75</span>
+            </p>
+            <p className="mt-2.5 text-[13px] leading-relaxed text-slate-400">
+              Không có phép màu nào: RSI 75 chỉ đang nói <Term>phần tăng gấp 3 lần phần giảm</Term>. Nó mô tả lực
+              hiện tại, không dự báo gì cả — và chắc chắn không phải lệnh bán.
+            </p>
+          </div>
           <CandleChart
             caption="Đây là lý do câu “RSI trên 70 là bán” làm mất tiền: RSI nằm trên 70 suốt 13 nến liền trong khi giá đi từ 112 lên 130. Bán ở lần đầu chạm 70 là bỏ lỡ toàn bộ đoạn đó. Đến nhịp hồi cuối, RSI mới rơi vào vùng 40–50 rồi bật lên — đó mới là tín hiệu đáng nhìn trong xu hướng tăng. Đường RSI chỉ bắt đầu từ nến thứ 15, vì trước đó chưa đủ 14 nhịp thay đổi để tính."
             candles={RSI_FIG.candles}
@@ -358,6 +392,86 @@ export default function TaGuidePage() {
         </Section>
 
         {/* ---------------------------------------------------------- */}
+        <Section id="bat-chi-bao" eyebrow="Làm thực tế" title="Cách bật EMA và RSI lên chart">
+          <p>
+            Biết chỉ báo là gì rồi thì phải bật được nó lên. Chart miễn phí dùng được ngay có hai chỗ:{' '}
+            <Term>TradingView</Term> (bản miễn phí đủ dùng) và <Term>chart ngay trong app Binance</Term> — thực ra
+            cũng là TradingView, nên các bước gần như giống nhau.
+          </p>
+          <p>
+            Tên menu có thể lệch chút theo phiên bản, nhưng thứ cần tìm luôn là nút <Term>Indicators</Term> (hoặc{' '}
+            <Term>Chỉ báo</Term> / biểu tượng <Term>fx</Term>) ở thanh trên đầu chart.
+          </p>
+
+          <h3 className="pt-2 text-base font-bold text-slate-100">Bật EMA</h3>
+          <Steps
+            items={[
+              <>
+                Mở chart, đổi khung thời gian sang <Term>1D</Term> ở thanh chọn khung phía trên.
+              </>,
+              <>
+                Bấm <Term>Indicators</Term>, gõ tìm <Term>&ldquo;Moving Average Exponential&rdquo;</Term> rồi thêm
+                vào.
+              </>,
+              <>
+                Mở phần cài đặt của đường vừa thêm (bấm vào tên nó trên chart, hoặc biểu tượng bánh răng), đổi{' '}
+                <Term>Length</Term> thành <Term>200</Term>. Các ô còn lại để nguyên.
+              </>,
+              <>
+                Đổi khung sang <Term>4H</Term>, thêm một đường EMA nữa với <Term>Length = 50</Term>. Đó là hai đường
+                duy nhất trang này dùng.
+              </>,
+              <>
+                Lưu bố cục lại (<Term>Save</Term>) để lần sau mở lên không phải làm lại.
+              </>,
+            ]}
+          />
+          <Warning>
+            <p>
+              <Term>&ldquo;Moving Average&rdquo; trơn không phải EMA.</Term> Trong danh sách có cả{' '}
+              <Term>Moving Average Simple</Term> (SMA) — chọn nhầm thì đường vẽ ra khác, và mọi thứ trang này nói về
+              độ trễ sẽ không khớp. Phải là bản có chữ <Term>Exponential</Term>.
+            </p>
+            <p>
+              Trong app Binance, bộ EMA thường được đặt sẵn vài đường (hay gặp là 7 / 25 / 99). Đó không phải 50 và
+              200 — hoặc sửa lại số cho đúng, hoặc ít nhất phải biết rõ mình đang nhìn đường nào.
+            </p>
+          </Warning>
+
+          <h3 className="pt-2 text-base font-bold text-slate-100">Bật RSI</h3>
+          <Steps
+            items={[
+              <>
+                Vẫn nút <Term>Indicators</Term>, gõ <Term>&ldquo;Relative Strength Index&rdquo;</Term> rồi thêm vào.
+              </>,
+              <>
+                Không cần sửa gì: mặc định <Term>Length = 14</Term> đúng là con số trang này dùng.
+              </>,
+              <>
+                Nó hiện ra ở <Term>một khung riêng bên dưới chart giá</Term>, không nằm chồng lên nến — giống đúng
+                hình ở mục trước.
+              </>,
+              <>
+                Bật RSI trên khung <Term>4H</Term>, vì đây là khung dùng để tìm điểm vào.
+              </>,
+            ]}
+          />
+          <p>
+            Con số hiện tại của mỗi chỉ báo nằm ở <Term>góc trên bên trái</Term>, cạnh tên nó — không cần rê chuột đo
+            bằng mắt. Rê tới cây nến nào thì nó hiện giá trị của đúng cây nến đó.
+          </p>
+          <Warning>
+            <p>
+              Dừng ở ba thứ này: <Term>EMA200 trên 1D</Term>, <Term>EMA50 trên 4H</Term>, <Term>RSI trên 4H</Term>.
+              ATR bật thêm cũng được nếu muốn xem biên độ rung.
+            </p>
+            <p>
+              Thêm chỉ báo thứ tư, thứ năm không cho thêm thông tin — tất cả đều tính từ cùng một dữ liệu giá. Cái
+              chúng cho thêm là <Term>lý do để vào lệnh</Term>, và đó là thứ bro đang cần ít nhất.
+            </p>
+          </Warning>
+        </Section>
+
         <Section id="co-lenh" eyebrow="Quan trọng nhất" title="Cỡ lệnh — phần quyết định sống chết">
           <p>
             Bản gốc của mục này thường bị bỏ qua, mà nó lại là thứ duy nhất quyết định bro còn tiền để giao dịch tiếp
@@ -839,7 +953,7 @@ export default function TaGuidePage() {
             rows={[
               ['1–2', 'Mở 5 chart 1D. Đánh dấu đỉnh và đáy. Ghi lên / xuống / ngang.', 'Nhận ra xu hướng mà không cần chỉ báo nào.'],
               ['3', 'Vẽ 3–6 vùng trên mỗi chart. Chỉ vùng, không vẽ đường.', 'Thấy được giá phản ứng ở đâu.'],
-              ['4', 'Bật EMA200 (1D) và EMA50 (4H). Xem giá đã hồi về EMA50 bao nhiêu lần.', 'Phân biệt được hồi bình thường với đảo chiều.'],
+              ['4', 'Bật EMA200 (1D) và EMA50 (4H) theo mục Cách bật EMA và RSI. Xem giá đã hồi về EMA50 bao nhiêu lần.', 'Phân biệt được hồi bình thường với đảo chiều.'],
               ['5', 'Bật RSI. Tìm những lần RSI về 40–50 trong xu hướng tăng.', 'Không còn bán vì RSI trên 70 nữa.'],
               ['6', <Term key="a">Tính cỡ lệnh cho 10 setup trong quá khứ. Chỉ tính, không vào tiền.</Term>, 'Công thức tính cỡ lệnh thành phản xạ.'],
               ['7', 'Mỗi ngày chọn 5 chart, điền đủ 8 dòng ở mục Ghi chép và kiểm chứng. Kể cả khi bỏ qua.', 'Có thói quen viết kế hoạch trước, không phải sau.'],
