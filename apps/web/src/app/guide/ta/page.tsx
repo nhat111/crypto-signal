@@ -29,6 +29,7 @@ const TOC = [
   { id: 'vung-gia', label: 'Vùng giá quan trọng' },
   { id: 'chi-bao', label: 'Chỉ ba chỉ báo' },
   { id: 'co-lenh', label: 'Cỡ lệnh — phần quan trọng nhất' },
+  { id: 'dat-lenh', label: 'Đặt lệnh và giữ kỷ luật' },
   { id: 'rr', label: 'R:R và tỉ lệ thắng' },
   { id: 'vi-du-1', label: 'Ví dụ 1: mua khi hồi' },
   { id: 'vi-du-2', label: 'Ví dụ 2: phá vùng rồi test lại' },
@@ -151,7 +152,7 @@ export default function TaGuidePage() {
                 thì chưa được vào.
               </>,
               <>
-                <Term>Tính cỡ lệnh</Term> từ khoảng cách cắt lỗ — xem mục 6. Đây là bước hay bị bỏ nhất và cũng là
+                <Term>Tính cỡ lệnh</Term> từ khoảng cách cắt lỗ — xem mục Cỡ lệnh. Đây là bước hay bị bỏ nhất và cũng là
                 bước tốn tiền nhất khi bỏ.
               </>,
             ]}
@@ -227,7 +228,7 @@ export default function TaGuidePage() {
               [
                 <Term key="d">ATR(14)</Term>,
                 'Biên độ rung trung bình một cây nến. ATR = 5 nghĩa là mỗi 4H giá đi khoảng 5 điểm.',
-                'Cắt lỗ đặt gần hơn 1× ATR gần như chắc chắn bị quét, kể cả khi hướng đoán đúng.',
+                'Cắt lỗ đặt gần hơn 1× ATR rất dễ bị quét bởi dao động bình thường, kể cả khi hướng đoán đúng.',
               ],
             ]}
           />
@@ -257,7 +258,7 @@ export default function TaGuidePage() {
           <Warning>
             <p>
               Đường trung bình là <Term>nam châm, không phải bức tường</Term>. Giá xuyên qua nó suốt. Đừng bao giờ đặt
-              cắt lỗ dựa vào EMA — cắt lỗ đặt theo vùng giá, mục 4.
+              cắt lỗ dựa vào EMA — cắt lỗ đặt theo vùng giá — xem mục Vùng giá quan trọng.
             </p>
           </Warning>
 
@@ -283,7 +284,7 @@ export default function TaGuidePage() {
             khoảng 5 điểm. Nó không nói hướng, chỉ nói độ rung.
           </p>
           <CandleChart
-            caption="Cùng một mức cắt lỗ, hai chế độ thị trường. Nửa đầu ATR quanh 1,2 — nến bé, cắt lỗ không hề bị chạm. Nửa sau ATR lên 7,6 — biên độ gấp hơn sáu lần, và cắt lỗ bị quét ngay dù mức đặt không hề đổi. Rung mạnh thì phải đặt cắt lỗ xa hơn, và theo công thức mục 6, phải mua ít hơn."
+            caption="Cùng một mức cắt lỗ, hai chế độ thị trường. Nửa đầu ATR quanh 1,2 — nến bé, cắt lỗ không hề bị chạm. Nửa sau ATR lên 7,6 — biên độ gấp hơn sáu lần, và cắt lỗ bị quét ngay dù mức đặt không hề đổi. Rung mạnh thì phải đặt cắt lỗ xa hơn, và theo công thức ở mục Cỡ lệnh, phải mua ít hơn."
             candles={ATR_FIG.candles}
             domain={ATR_FIG.domain}
             levels={ATR_FIG.levels}
@@ -319,9 +320,54 @@ export default function TaGuidePage() {
               ['Tiền được phép mất', '1.000 × 1%', '10 $'],
               ['Khoảng cách cắt lỗ', '103 − 97,5', '5,5 / coin'],
               ['Số coin', '10 ÷ 5,5', '1,81 coin'],
-              [<Term key="a">Giá trị lệnh</Term>, '1,81 × 103', <Term key="b">187 $ (≈ 19% tài khoản)</Term>],
+              [<Term key="a">Giá trị lệnh</Term>, '1,81 × 103', <Term key="b">186 $ (≈ 19% tài khoản)</Term>],
             ]}
           />
+          <Warning>
+            <p>
+              <Term>Công thức này có thể đòi nhiều tiền hơn bro đang có.</Term> Nó không tự biết dừng, nên bro phải
+              biết.
+            </p>
+            <p>
+              Giá trị lệnh luôn bằng <Term>1% chia cho khoảng cách cắt lỗ tính theo phần trăm</Term>. Cắt lỗ càng gần
+              thì con số đó càng phình:
+            </p>
+          </Warning>
+          <Table
+            head={['Cắt lỗ cách giá vào', 'Lệnh chiếm bao nhiêu tài khoản', '']}
+            rows={[
+              ['10%', '10%', 'Thoải mái'],
+              ['5%', '20%', 'Như ví dụ 1'],
+              ['2%', '50%', 'Đã là một nửa tài khoản'],
+              ['1%', '100%', 'Toàn bộ tiền mặt, không còn gì để mua coin khác'],
+              [
+                <Term key="a">0,5%</Term>,
+                <Term key="b">200%</Term>,
+                <span key="c" className="text-rose-300">Không làm được trên spot — bro không có số tiền đó</span>,
+              ],
+            ]}
+          />
+          <p>
+            Khi công thức đòi quá số tiền đang có, chỉ có hai lối ra đúng: <Term>nới cắt lỗ ra chỗ thật sự phủ định
+            luận điểm</Term> (rồi mua ít lại theo công thức), hoặc <Term>bỏ qua lệnh đó</Term>. Lối ra sai — và là lối
+            gần như ai cũng chọn — là giữ nguyên cỡ lệnh rồi tự nhủ &ldquo;chắc không xuống tới đó đâu&rdquo;.
+          </p>
+          <Warning>
+            <p>
+              <Term>Cắt lỗ không phải lời hứa.</Term> Lệnh cắt lỗ khớp ở giá thị trường lúc chạm, không phải đúng con
+              số bro đặt. Thị trường rơi nhanh thì 97,5 có thể khớp ở 96,8 — mất khoảng 1,1% thay vì đúng 1%.
+            </p>
+            <p>
+              Nghĩa là 1% là <Term>mức thường lệ, không phải mức trần</Term>. Đó là thêm một lý do nữa để không đặt
+              1% sát mép khả năng chịu đựng của mình.
+            </p>
+          </Warning>
+          <p>
+            <Term>Tài khoản nhỏ:</Term> Binance có mức đặt lệnh tối thiểu (thường khoảng 5&nbsp;$/lệnh) và bước làm
+            tròn số lượng coin. Với tài khoản vài chục đô, công thức có thể ra một con số nhỏ hơn mức tối thiểu — lúc
+            đó bro <Term>không</Term> ép cho đủ bằng cách mua nhiều hơn, mà chấp nhận rằng số vốn đó chưa giao dịch
+            theo kỷ luật 1% được, và tập trước bằng giấy.
+          </p>
           <Warning>
             <p>
               Chú ý điều ngược đời ở đây: <Term>cắt lỗ càng xa thì phải mua càng ít</Term>. Người mới thường làm
@@ -334,12 +380,56 @@ export default function TaGuidePage() {
             </p>
           </Warning>
           <p>
-            Với 1% mỗi lệnh, thua liền 10 lệnh thì tài khoản còn khoảng 90%. Với 10% mỗi lệnh, thua liền 10 lệnh thì
-            còn 35%. Mà thua liền 10 lệnh là chuyện hoàn toàn bình thường với một hệ thống thắng 40%.
+            Với 1% mỗi lệnh, thua liền 10 lệnh thì tài khoản còn <Term>90%</Term>. Với 10% mỗi lệnh, thua liền 10
+            lệnh thì còn <Term>35%</Term> — và từ 35% muốn về lại vốn phải lãi 186%, gần như không thể.
+          </p>
+          <p>
+            Thua liền 10 lệnh không phải xui hiếm gặp. Với hệ thống thắng 40%, trong 100 lệnh thì{' '}
+            <Term>chuỗi thua dài nhất thường rơi vào khoảng 9 lệnh liên tiếp</Term>. Đó là con số phải sống được qua,
+            không phải con số để hy vọng tránh.
           </p>
         </Section>
 
         {/* ---------------------------------------------------------- */}
+        <Section id="dat-lenh" eyebrow="Thực hành" title="Đặt lệnh và giữ kỷ luật">
+          <Warning>
+            <p>
+              <Term>Đặt lệnh cắt lỗ lên sàn ngay lúc vào lệnh.</Term> Không phải ghi trong đầu, không phải &ldquo;để
+              đó canh&rdquo;.
+            </p>
+            <p>
+              Cắt lỗ nằm trong đầu là cắt lỗ không tồn tại. Lúc giá lao xuống đúng mức đó cũng là lúc bro đang ngủ,
+              đang họp, hoặc đang ngồi nhìn và tự thuyết phục mình đợi thêm một nến nữa. Cả trang này sụp đổ nếu bước
+              đó không được bấm.
+            </p>
+          </Warning>
+          <p>Vào lệnh xong thì chỉ còn đúng ba kết cục, và cả ba đều đã viết ra từ trước:</p>
+          <Steps
+            items={[
+              <>
+                <Term>Chạm cắt lỗ</Term> — ra, không suy nghĩ lại. Lệnh này sai, còn tiền để đánh lệnh sau.
+              </>,
+              <>
+                <Term>Chạm chốt lời</Term> — ra, hoặc bán một phần và dời cắt lỗ lên hoà vốn cho phần còn lại.
+              </>,
+              <>
+                <Term>Luận điểm hỏng trước khi chạm cái nào</Term> — ví dụ giá đóng nến 4H dưới vùng hỗ trợ mà chưa
+                tới giá cắt. Ra sớm cũng được, miễn là điều kiện đó đã viết ra <Term>trước</Term> khi vào lệnh.
+              </>,
+            ]}
+          />
+          <Warning>
+            <p>
+              Không có kết cục thứ tư tên là &ldquo;đợi thêm chút&rdquo;. Và cắt lỗ chỉ được dời <Term>theo hướng có
+              lợi</Term> — lên khi đang lãi, không bao giờ xuống khi đang lỗ.
+            </p>
+          </Warning>
+          <Takeaway>
+            Chỉ giao dịch bằng số tiền mà mất hết vẫn không đổi gì trong cuộc sống của bro. Không phải tiền học, tiền
+            nhà, và tuyệt đối không phải tiền đi vay.
+          </Takeaway>
+        </Section>
+
         <Section id="rr" eyebrow="Số học" title="R:R và tỉ lệ thắng — hai mặt của một đồng xu">
           <p>
             <Term>R</Term> là số tiền bro chấp nhận mất trong một lệnh. Lời gấp 3 lần số đó gọi là <Term>3R</Term>.
@@ -349,7 +439,7 @@ export default function TaGuidePage() {
             head={['R:R của lệnh', 'Thắng bao nhiêu là hoà vốn', 'Nghĩa là']}
             rows={[
               ['1 : 1', '50%', 'Phải đúng hơn nửa số lần. Rất khó.'],
-              ['1 : 2', '34%', 'Sai 2 trên 3 lần vẫn không mất tiền.'],
+              ['1 : 2', '33%', 'Sai 2 trên 3 lần vẫn không mất tiền.'],
               [<Term key="a">1 : 3</Term>, <Term key="b">25%</Term>, 'Sai 3 trên 4 lần vẫn hoà. Đây là chỗ nên nhắm.'],
             ]}
           />
@@ -362,7 +452,7 @@ export default function TaGuidePage() {
           </Takeaway>
           <Warning>
             <p>
-              <Term>Phí giao dịch ăn vào R.</Term> Spot trên Binance khoảng 0,1% mỗi chiều, khứ hồi 0,2%. Lệnh 187&nbsp;$
+              <Term>Phí giao dịch ăn vào R.</Term> Spot trên Binance khoảng 0,1% mỗi chiều, khứ hồi 0,2%. Lệnh 186&nbsp;$
               mất khoảng 0,40&nbsp;$ phí — bằng 4% của số tiền rủi ro 10&nbsp;$.
             </p>
             <p>
@@ -399,7 +489,7 @@ export default function TaGuidePage() {
               ['Rủi ro', '5,5 (5,3%)', '103 − 97,5'],
               ['Lợi nhuận', '15', '118 − 103'],
               [<Term key="c">R:R</Term>, <Term key="d">1 : 2,7</Term>, 'Chỉ cần đúng 27% số lần là hoà vốn.'],
-              ['Cỡ lệnh', '1,81 coin ≈ 187 $', 'Theo công thức mục 6, tài khoản 1.000 $.'],
+              ['Cỡ lệnh', '1,81 coin ≈ 187 $', 'Theo công thức ở mục Cỡ lệnh, tài khoản 1.000 $.'],
             ]}
           />
           <Warning>
@@ -648,8 +738,8 @@ export default function TaGuidePage() {
               ['3', 'Vẽ 3–6 vùng trên mỗi chart. Chỉ vùng, không vẽ đường.', 'Thấy được giá phản ứng ở đâu.'],
               ['4', 'Bật EMA200 (1D) và EMA50 (4H). Xem giá đã hồi về EMA50 bao nhiêu lần.', 'Phân biệt được hồi bình thường với đảo chiều.'],
               ['5', 'Bật RSI. Tìm những lần RSI về 40–50 trong xu hướng tăng.', 'Không còn bán vì RSI trên 70 nữa.'],
-              ['6', <Term key="a">Tính cỡ lệnh cho 10 setup trong quá khứ. Chỉ tính, không vào tiền.</Term>, 'Công thức mục 6 thành phản xạ.'],
-              ['7', 'Mỗi ngày chọn 5 chart, điền đủ 8 dòng ở mục 12. Kể cả khi bỏ qua.', 'Có thói quen viết kế hoạch trước, không phải sau.'],
+              ['6', <Term key="a">Tính cỡ lệnh cho 10 setup trong quá khứ. Chỉ tính, không vào tiền.</Term>, 'Công thức tính cỡ lệnh thành phản xạ.'],
+              ['7', 'Mỗi ngày chọn 5 chart, điền đủ 8 dòng ở mục Ghi chép và kiểm chứng. Kể cả khi bỏ qua.', 'Có thói quen viết kế hoạch trước, không phải sau.'],
             ]}
           />
           <Takeaway>

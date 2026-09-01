@@ -417,7 +417,9 @@ export function CandleLegend(): ReactNode {
         </span>
       </div>
       <p className="mt-2.5 text-[11px] leading-relaxed text-slate-500">
-        Râu nến là giá cao nhất và thấp nhất trong phiên; thân nến là giá mở và giá đóng. Mọi hình đều dừng lại{' '}
+        Mỗi cây nến gói trọn <span className="font-semibold text-slate-400">một khoảng thời gian</span>: trên khung
+        4H là 4 tiếng, trên khung 1D là một ngày. Thân nến là giá mở và giá đóng của khoảng đó; râu nến là giá cao
+        nhất và thấp nhất chạm tới bên trong nó. Mọi hình đều dừng lại{' '}
         <span className="font-semibold text-slate-400">ngay tại điểm ra quyết định</span> — không vẽ tiếp giá sau đó,
         vì lúc thật bro cũng không được nhìn thấy phần đó.
       </p>
