@@ -3,7 +3,18 @@ import Link from 'next/link';
 import { Section, Story, Table, Takeaway, Term, Warning, Steps } from '@/components/guide/GuideBlocks';
 import { GuideTabs } from '@/components/guide/GuideTabs';
 import { CandleChart, CandleLegend } from '@/components/guide/CandleChart';
-import { BREAKOUT, FLIP, NO_TRADE, PULLBACK, STOP_INSIDE, STRUCTURE } from '@/components/guide/taFigures';
+import {
+  ATR_FIG,
+  BREAKOUT,
+  EMA_BASICS,
+  EMA_FILTER,
+  FLIP,
+  NO_TRADE,
+  PULLBACK,
+  RSI_FIG,
+  STOP_INSIDE,
+  STRUCTURE,
+} from '@/components/guide/taFigures';
 
 export const metadata: Metadata = {
   title: 'Học phân tích kỹ thuật · Market Health Monitor',
@@ -220,6 +231,66 @@ export default function TaGuidePage() {
               ],
             ]}
           />
+          <h3 className="pt-2 text-base font-bold text-slate-100">EMA — đường trung bình là gì</h3>
+          <p>
+            Lấy giá đóng cửa của N nến gần nhất rồi tính trung bình, nến mới tính nặng hơn nến cũ. Vẽ ra thành một
+            đường mượt bám theo giá. Chấm hết — không có phép màu nào ở đây.
+          </p>
+          <CandleChart
+            caption="Hai đường trung bình trên cùng bộ nến. EMA 5 chỉ nhớ 5 nến nên bám sát giá và quay đầu sớm; EMA 15 nhớ lâu hơn nên mượt hơn và quay đầu trễ hơn. Nhớ càng lâu thì càng ít bị nhiễu đánh lừa, đổi lại càng chậm."
+            candles={EMA_BASICS.candles}
+            domain={EMA_BASICS.domain}
+            overlays={EMA_BASICS.overlays}
+            markers={EMA_BASICS.markers}
+          />
+          <p>
+            Đó là toàn bộ khác biệt giữa EMA50 và EMA200: cùng một phép tính, khác số nến được nhớ. EMA200 trên khung
+            ngày nhớ 200 ngày, nên nó gần như không rung theo tin tức — đúng thứ cần cho một bộ lọc.
+          </p>
+          <CandleChart
+            caption="Dùng làm bộ lọc: suốt đoạn giá nằm trên đường trung bình, chỉ đi tìm lệnh mua. Khi giá đóng hẳn xuống dưới và đường bắt đầu đi xuống, trạng thái đã đổi — đứng ngoài, không cố tìm lý do mua tiếp."
+            candles={EMA_FILTER.candles}
+            domain={EMA_FILTER.domain}
+            overlays={EMA_FILTER.overlays}
+            markers={EMA_FILTER.markers}
+          />
+          <Warning>
+            <p>
+              Đường trung bình là <Term>nam châm, không phải bức tường</Term>. Giá xuyên qua nó suốt. Đừng bao giờ đặt
+              cắt lỗ dựa vào EMA — cắt lỗ đặt theo vùng giá, mục 4.
+            </p>
+          </Warning>
+
+          <h3 className="pt-2 text-base font-bold text-slate-100">RSI — và vì sao 70 không phải tín hiệu bán</h3>
+          <p>
+            RSI đo <Term>trong 14 nến vừa rồi, phần tăng chiếm bao nhiêu so với phần giảm</Term>. Toàn tăng thì RSI
+            gần 100, toàn giảm thì gần 0, cân bằng thì quanh 50. Nó không đo giá cao hay thấp — nó đo lực.
+          </p>
+          <CandleChart
+            caption="Đây là lý do câu “RSI trên 70 là bán” làm mất tiền: RSI nằm trên 70 suốt 13 nến liền trong khi giá đi từ 112 lên 130. Bán ở lần đầu chạm 70 là bỏ lỡ toàn bộ đoạn đó. Đến nhịp hồi cuối, RSI mới rơi vào vùng 40–50 rồi bật lên — đó mới là tín hiệu đáng nhìn trong xu hướng tăng. Đường RSI chỉ bắt đầu từ nến thứ 15, vì trước đó chưa đủ 14 nhịp thay đổi để tính."
+            candles={RSI_FIG.candles}
+            domain={RSI_FIG.domain}
+            markers={RSI_FIG.markers}
+            pane={RSI_FIG.pane}
+          />
+          <Takeaway>
+            RSI cao nghĩa là lực mua đang mạnh — trong xu hướng tăng đó là tin tốt, không phải lệnh bán.
+          </Takeaway>
+
+          <h3 className="pt-2 text-base font-bold text-slate-100">ATR — thị trường đang rung mạnh cỡ nào</h3>
+          <p>
+            ATR là <Term>biên độ trung bình của một cây nến</Term>. ATR = 5 nghĩa là mỗi nến giá thường đi qua lại
+            khoảng 5 điểm. Nó không nói hướng, chỉ nói độ rung.
+          </p>
+          <CandleChart
+            caption="Cùng một mức cắt lỗ, hai chế độ thị trường. Nửa đầu ATR quanh 1,2 — nến bé, cắt lỗ không hề bị chạm. Nửa sau ATR lên 7,6 — biên độ gấp hơn sáu lần, và cắt lỗ bị quét ngay dù mức đặt không hề đổi. Rung mạnh thì phải đặt cắt lỗ xa hơn, và theo công thức mục 6, phải mua ít hơn."
+            candles={ATR_FIG.candles}
+            domain={ATR_FIG.domain}
+            levels={ATR_FIG.levels}
+            markers={ATR_FIG.markers}
+            pane={ATR_FIG.pane}
+          />
+
           <Takeaway>
             Chỉ báo không tạo ra tín hiệu. Nó chỉ mô tả cái mà giá đã làm. Vùng giá mới là nơi ra quyết định.
           </Takeaway>

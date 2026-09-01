@@ -1,4 +1,5 @@
 import type { Candle, Level, Marker, Zone } from './CandleChart';
+import { atr, ema, rsi } from '@/lib/taMath';
 
 /**
  * Candle data for the TA guide's figures.
@@ -205,4 +206,126 @@ export const NO_TRADE: {
     { from: 109, to: 111, label: 'Kháng cự ~110', tone: 'resistance' },
   ],
   markers: [{ index: 5, label: 'Giá ở giữa', place: 'above' }],
+};
+
+/* ------------------------------------------------------------------ */
+/* Indicator figures                                                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Every line below is computed from the candles beside it by the same
+ * functions in `lib/taMath.ts`, never drawn by eye. A moving average that
+ * does not actually track its own candles would teach a relationship that
+ * is not there.
+ */
+
+/** Plausible candles from a close series: each opens at the previous close, with an even wick. */
+function seriesFromCloses(closes: number[], wick = 0.7): Candle[] {
+  return closes.map((close, i) => {
+    const open = i === 0 ? close : (closes[i - 1] as number);
+    return c(open, Math.max(open, close) + wick, Math.min(open, close) - wick, close);
+  });
+}
+
+/** Price domain padded off the extremes, so no wick is ever clipped by a hand-picked range. */
+function domainOf(candles: Candle[], padFraction = 0.08): [number, number] {
+  const lo = Math.min(...candles.map((x) => x.l));
+  const hi = Math.max(...candles.map((x) => x.h));
+  const pad = (hi - lo) * padFraction;
+  return [lo - pad, hi + pad];
+}
+
+const closeOf = (candles: Candle[]): number[] => candles.map((x) => x.c);
+
+/* --- EMA: what it is, and why a longer one is slower ---------------- */
+
+const EMA_BASICS_CANDLES = seriesFromCloses([
+  100, 101.5, 103, 102, 104, 106, 105, 107.5, 109, 108, 110, 112, 111, 113.5, 115,
+  114, 112, 109.5, 107, 105, 106.5, 108, 110, 112.5, 115, 117, 116, 118.5, 121, 123,
+]);
+
+export const EMA_BASICS = {
+  candles: EMA_BASICS_CANDLES,
+  domain: domainOf(EMA_BASICS_CANDLES),
+  overlays: [
+    { values: ema(closeOf(EMA_BASICS_CANDLES), 5), label: 'EMA 5', tone: 'fast' as const },
+    { values: ema(closeOf(EMA_BASICS_CANDLES), 15), label: 'EMA 15', tone: 'slow' as const },
+  ],
+  markers: [{ index: 19, label: 'EMA 5 quay đầu trước', place: 'below' as const }],
+};
+
+/* --- EMA as a regime filter ---------------------------------------- */
+
+const EMA_FILTER_CANDLES = seriesFromCloses([
+  100, 102, 101.5, 104, 106, 105, 108, 110, 109, 112, 114, 113, 116, 118, 117.5,
+  120, 122, 121, 124, 126, 125, 127, 129, 128, 130, 129, 127, 124, 121, 118, 116, 114, 112.5, 111,
+]);
+
+export const EMA_FILTER = {
+  candles: EMA_FILTER_CANDLES,
+  domain: domainOf(EMA_FILTER_CANDLES),
+  overlays: [{ values: ema(closeOf(EMA_FILTER_CANDLES), 10), label: 'EMA 10', tone: 'slow' as const }],
+  markers: [
+    { index: 18, label: 'Trên EMA — tìm mua', place: 'above' as const },
+    { index: 29, label: 'Dưới EMA — đứng ngoài', place: 'below' as const },
+  ],
+};
+
+/* --- RSI ------------------------------------------------------------ */
+
+const RSI_CANDLES = seriesFromCloses([
+  100, 101, 100.5, 102, 103, 102.5, 104, 105.5, 105, 107, 108.5, 108, 110, 112, 111.5,
+  114, 116, 115.5, 118, 120, 122, 121, 124, 126, 125.5, 128, 130,
+  126.5, 123, 120, 117.5, 115, 113, 112, 113.5, 116, 119,
+]);
+
+export const RSI_FIG = {
+  candles: RSI_CANDLES,
+  domain: domainOf(RSI_CANDLES),
+  markers: [
+    { index: 20, label: 'Giá vẫn tăng', place: 'above' as const },
+    { index: 32, label: 'Hồi rồi bật', place: 'below' as const },
+  ],
+  pane: {
+    title: 'RSI (14)',
+    values: rsi(closeOf(RSI_CANDLES), 14),
+    domain: [20, 100] as [number, number],
+    bands: [{ from: 40, to: 50, label: '40–50' }],
+    lines: [{ at: 70, label: '70' }],
+  },
+};
+
+/* --- ATR ------------------------------------------------------------ */
+
+const ATR_CANDLES: Candle[] = [
+  ...Array.from({ length: 14 }, (_, i) => {
+    const base = 100 + i * 0.2;
+    return c(base, base + 0.6, base - 0.6, base + 0.2);
+  }),
+  // Alternating direction on purpose: ATR measures how far price travels,
+  // not which way. A volatile half drawn as twelve red candles would teach
+  // "volatile means falling", which is a different and wrong lesson.
+  ...Array.from({ length: 12 }, (_, i) => {
+    const base = 102.6 + (i % 2 === 0 ? 0.4 : -0.4);
+    const up = i % 2 === 0;
+    return c(base, base + 3.4, base - 4.2, up ? base + 2.2 : base - 2.6);
+  }),
+];
+
+export const ATR_FIG = {
+  candles: ATR_CANDLES,
+  domain: domainOf(ATR_CANDLES),
+  levels: [{ price: 98.6, label: 'Cắt lỗ', tone: 'stop' as const }],
+  markers: [
+    { index: 6, label: 'Nến nhỏ', place: 'above' as const },
+    { index: 20, label: 'Nến to gấp mấy lần', place: 'above' as const },
+  ],
+  pane: {
+    title: 'ATR (7) — biên độ rung trung bình',
+    values: atr(
+      ATR_CANDLES.map((x) => ({ high: x.h, low: x.l, close: x.c })),
+      7,
+    ),
+    domain: [0, 8] as [number, number],
+  },
 };

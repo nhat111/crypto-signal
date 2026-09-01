@@ -39,6 +39,25 @@ export interface Level {
   tone: 'entry' | 'stop' | 'target';
 }
 
+/** A line drawn in price space over the candles — a moving average. */
+export interface Overlay {
+  /** One value per candle; null where the average does not exist yet. */
+  values: Array<number | null>;
+  label: string;
+  tone: 'fast' | 'slow';
+}
+
+/** A sub-plot under the price chart, on its own scale (RSI 0-100, ATR in price units). */
+export interface Pane {
+  title: string;
+  values: Array<number | null>;
+  domain: [number, number];
+  /** Shaded rows worth naming, e.g. RSI 40-50. */
+  bands?: Array<{ from: number; to: number; label: string }>;
+  /** Horizontal reference lines, e.g. RSI 70. */
+  lines?: Array<{ at: number; label: string }>;
+}
+
 export interface Marker {
   /** 0-based candle index the note points at. */
   index: number;
@@ -57,6 +76,8 @@ interface Props {
   volumes?: number[];
   /** Index of the volume bar worth pointing at, if any. */
   volumeHighlight?: number;
+  overlays?: Overlay[];
+  pane?: Pane;
 }
 
 const W = 560;
@@ -67,6 +88,9 @@ const PAD_R_BARE = 12;
 const PAD_T = 22;
 const PLOT_H = 200;
 const VOL_H = 34;
+const PANE_H = 76;
+
+const OVERLAY_COLOR = { fast: '#38bdf8', slow: '#c084fc' } as const;
 
 const clamp = (v: number, min: number, max: number): number => Math.min(Math.max(v, min), max);
 
@@ -90,10 +114,12 @@ export function CandleChart({
   markers = [],
   volumes,
   volumeHighlight,
+  overlays = [],
+  pane,
 }: Props) {
   const [lo, hi] = domain;
-  const height = PAD_T + PLOT_H + (volumes ? VOL_H + 10 : 0) + 14;
-  const padR = levels.length > 0 || volumes ? PAD_R_LABELLED : PAD_R_BARE;
+  const height = PAD_T + PLOT_H + (volumes ? VOL_H + 10 : 0) + (pane ? PANE_H + 18 : 0) + 14;
+  const padR = levels.length > 0 || volumes || overlays.length > 0 || pane ? PAD_R_LABELLED : PAD_R_BARE;
   const plotW = W - PAD_L - padR;
   const step = plotW / candles.length;
   const bodyW = Math.min(step * 0.58, 15);
@@ -103,6 +129,24 @@ export function CandleChart({
 
   const volTop = PAD_T + PLOT_H + 10;
   const volMax = volumes ? Math.max(...volumes) : 1;
+  const paneTop = PAD_T + PLOT_H + 18;
+  const paneY = (value: number): number =>
+    pane ? paneTop + PANE_H - ((value - pane.domain[0]) / (pane.domain[1] - pane.domain[0])) * PANE_H : 0;
+
+  /** Broken into runs so a gap of nulls leaves a gap, not a straight line across it. */
+  const runs = (values: Array<number | null>, toY: (v: number) => number): string[] =>
+    values
+      .reduce<Array<Array<[number, number]>>>((acc, value, i) => {
+        if (value === null) {
+          if (acc.length > 0 && (acc[acc.length - 1] as Array<[number, number]>).length > 0) acc.push([]);
+          return acc;
+        }
+        if (acc.length === 0) acc.push([]);
+        (acc[acc.length - 1] as Array<[number, number]>).push([cx(i), toY(value)]);
+        return acc;
+      }, [])
+      .filter((run) => run.length > 1)
+      .map((run) => run.map(([x, yy]) => `${x.toFixed(1)},${yy.toFixed(1)}`).join(' '));
 
   return (
     <figure className="my-1">
@@ -179,6 +223,29 @@ export function CandleChart({
             );
           })}
 
+          {overlays.map((overlay) => {
+            const colour = OVERLAY_COLOR[overlay.tone];
+            const lastIndex = overlay.values.reduce<number>((last, v, i) => (v === null ? last : i), -1);
+            return (
+              <g key={overlay.label}>
+                {runs(overlay.values, y).map((points, i) => (
+                  <polyline key={i} points={points} fill="none" stroke={colour} strokeWidth="1.6" />
+                ))}
+                {lastIndex >= 0 && (
+                  <text
+                    x={PAD_L + plotW + 7}
+                    y={y(overlay.values[lastIndex] as number) + 3.5}
+                    fontSize="10"
+                    fill={colour}
+                    fontWeight="700"
+                  >
+                    {overlay.label}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+
           {/* Dashed deliberately: these are thresholds, not gridlines. There
               are no gridlines here at all — every number the reader needs is
               on a labelled line or in the table below. */}
@@ -211,7 +278,13 @@ export function CandleChart({
           {markers.map((marker) => {
             const candle = candles[marker.index] as Candle;
             const above = marker.place === 'above';
-            const tip = above ? y(candle.h) - 4 : y(candle.l) + 4;
+            // Cleared against the neighbouring candles, not just its own: a
+            // note under a candle in a falling run lands on top of the next
+            // three. The leader still points at the candle it belongs to.
+            const near = candles.slice(Math.max(0, marker.index - 3), marker.index + 4);
+            const tip = above
+              ? Math.min(y(candle.h), ...near.map((n) => y(n.h))) - 4
+              : Math.max(y(candle.l), ...near.map((n) => y(n.l))) + 4;
             // Nudge the note clear of any threshold line it would land on:
             // a note sitting on top of the dashed "Cắt 58,5" reads as part
             // of that label rather than as a note about a candle.
@@ -258,6 +331,48 @@ export function CandleChart({
             <text x={PAD_L + plotW + 7} y={volTop + VOL_H} fontSize="9.5" fill="#64748b" fontWeight="600">
               Khối lượng
             </text>
+          )}
+
+          {pane && (
+            <g>
+              <rect x={PAD_L} y={paneTop} width={plotW} height={PANE_H} fill="#0b1220" rx="2" />
+              {pane.bands?.map((band) => (
+                <g key={band.label}>
+                  <rect
+                    x={PAD_L}
+                    y={paneY(band.to)}
+                    width={plotW}
+                    height={paneY(band.from) - paneY(band.to)}
+                    fill="rgb(16 185 129 / 0.12)"
+                  />
+                  <text x={PAD_L + 5} y={paneY(band.to) - 3} fontSize="9" fill="#6ee7b7" fontWeight="600">
+                    {band.label}
+                  </text>
+                </g>
+              ))}
+              {pane.lines?.map((line) => (
+                <g key={line.label}>
+                  <line
+                    x1={PAD_L}
+                    x2={PAD_L + plotW}
+                    y1={paneY(line.at)}
+                    y2={paneY(line.at)}
+                    stroke="#fb7185"
+                    strokeWidth="1.1"
+                    strokeDasharray="4 4"
+                  />
+                  <text x={PAD_L + plotW + 7} y={paneY(line.at) + 3.5} fontSize="9.5" fill="#fb7185" fontWeight="700">
+                    {line.label}
+                  </text>
+                </g>
+              ))}
+              {runs(pane.values, paneY).map((points, i) => (
+                <polyline key={i} points={points} fill="none" stroke="#e2e8f0" strokeWidth="1.6" />
+              ))}
+              <text x={PAD_L + 5} y={paneTop - 5} fontSize="9.5" fill="#94a3b8" fontWeight="700">
+                {pane.title}
+              </text>
+            </g>
           )}
         </svg>
       </div>
