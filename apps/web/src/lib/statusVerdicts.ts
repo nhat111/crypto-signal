@@ -4,7 +4,6 @@ import type {
   StatusOutcomeHorizon,
   StatusPricingCoverage,
   StatusStuckCensus,
-  StatusStuckRow,
   StatusVersion,
   StatusWorkerRuntime,
 } from './types';
@@ -80,8 +79,8 @@ export function jobsVerdict(jobs: StatusJob[]): Verdict {
 
 /**
  * `resolvableNow: 0` against `pending: 244` says the backlog is stuck but
- * not why, and the causes need different fixes. This turns the two
- * diagnostic queries into one of them.
+ * not why, and the causes need different fixes. `diagnoseFromCensus`
+ * below picks one of these from a count of the whole backlog.
  */
 export type OutcomeDiagnosis =
   /** Nothing waiting. */
@@ -96,41 +95,6 @@ export type OutcomeDiagnosis =
   | 'draining'
   /** Candles are there, yet the resolver reports none resolvable — the two disagree. */
   | 'query-fault';
-
-export function diagnoseStuckOutcomes(
-  coverage: StatusPricingCoverage[],
-  rows: StatusStuckRow[],
-  resolvableNow: number,
-): OutcomeDiagnosis {
-  if (rows.length === 0) return 'clear';
-
-  const totalCandles = coverage.reduce((sum, c) => sum + c.candles, 0);
-  if (totalCandles === 0) return 'no-pricing-candles';
-
-  // Rows with an empty window are the finding, even when others alongside
-  // them are fine: those can never be priced, no matter how long the
-  // tracker runs. Reporting "draining" because *some* row is workable is
-  // the reassuring lie — the queue drains to a floor and stays there.
-  const dead = rows.filter((r) => r.candlesInWindow === 0);
-
-  if (dead.length === 0) {
-    // Every window holds candles, so every row is one the resolver should
-    // be able to take. If it says it can take none, the diagnostic and the
-    // resolver read the same window and disagree — a bug in one of them,
-    // worth saying so rather than blaming the data.
-    return resolvableNow > 0 ? 'draining' : 'query-fault';
-  }
-
-  // Either the candles start after these signals, or there is a hole where
-  // they sit. A backfill fixes the first; only the collector fixes the
-  // second, so the two must not be reported as one.
-  const allPredate = dead.every((row) => {
-    const held = coverage.find((c) => c.symbol === row.symbol);
-    return held === undefined || held.earliestAt === null || row.timestamp < held.earliestAt;
-  });
-
-  return allPredate ? 'signals-predate-candles' : 'candle-gap';
-}
 
 export const DIAGNOSIS_TEXT: Record<OutcomeDiagnosis, { tone: Verdict; headline: string; detail: string }> = {
   clear: {

@@ -1,0 +1,58 @@
+# Nothing gated a push before this. A broken build was found by Vercel
+# minutes later, or by nobody at all when the break was in the worker —
+# which has no build surface anyone watches. Every check below is one I
+# was running by hand and would eventually forget to run.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    services:
+      # The SQL in packages/db is the code where a silent wrong answer has
+      # cost the most here, and it is exactly the code a fake pool cannot
+      # check. Tests that need this skip themselves when it is absent, so a
+      # laptop without Postgres still runs everything else.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: crypto_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/crypto_test
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/crypto_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Same runner the Dockerfiles use at boot, so a migration that fails
+      # here is one that would have failed the deploy.
+      - name: Apply migrations
+        run: node db/migrate.mjs
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+      # Last, because it is the slowest and the least likely to be the
+      # thing that broke.
+      - run: npm run build

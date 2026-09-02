@@ -108,6 +108,13 @@ Check items as they land; each phase's commit message references the phase.
 - [x] Data-quality score feeding confidence (not just logged).
 - [x] Rate-limit backoff on Binance REST (429/418 handling).
 
+## Phase 14b — CI
+- [x] GitHub Actions on every push: migrations, typecheck, tests, build.
+- [x] Postgres service in CI so `packages/db` SQL is covered — the outcome
+      resolver, the stuck-backlog census and the worker heartbeat were
+      each verified by hand once and then had no regression cover.
+- [ ] Measure worker memory on Railway (api was 71 MB; worker never checked).
+
 ## Phase 15 — Docker
 - [x] `docker-compose.yml`: postgres, redis, api, worker, web, telegram.
 - [x] Dockerfiles per app.
