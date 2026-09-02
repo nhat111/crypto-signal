@@ -284,7 +284,6 @@ export default function MethodologyPage() {
               ['Nhịp tim cũ', 'Khoảng 3 phút không có nhịp — hệ thống báo đỏ.'],
             ]}
           />
-          <p>
           <Warning>
             <p>
               <Term>Điểm Health luôn gắn với một khung thời gian.</Term> Cùng một symbol có thể là 88 ở khung 5m và
