@@ -6,6 +6,7 @@ const runtime = (ageMs: number, connections: Record<string, string> = {}) => ({
   lastHeartbeatAt: 1_800_000_000_000 - ageMs,
   ageMs,
   connections: { spot: 'open', futures: 'open', liquidation: 'open', ...connections },
+  symbolIngest: {},
 });
 
 const STALE = 180_000;

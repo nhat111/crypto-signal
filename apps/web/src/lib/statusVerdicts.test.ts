@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   DIAGNOSIS_TEXT,
+  INGEST_TEXT,
   collectorVerdict,
   connectionVerdict,
+  diagnoseIngest,
   diagnoseStuckOutcomes,
   isHorizonStuck,
   isJobBroken,
@@ -273,5 +275,39 @@ describe('connectionVerdict', () => {
     expect(connectionVerdict('connecting', false)).toBe('warn');
     expect(connectionVerdict('closed', false)).toBe('bad');
     expect(connectionVerdict('error', false)).toBe('bad');
+  });
+});
+
+describe('diagnoseIngest', () => {
+  const now = 1_800_000_000_000;
+  const MIN = 60_000;
+
+  it('says nothing when the snapshot is current', () => {
+    expect(diagnoseIngest(now - 2 * MIN, now - MIN, now)).toBe('flowing');
+  });
+
+  it('separates a dead socket from a broken pipeline', () => {
+    // The distinction this exists for. Same symptom on the collector card,
+    // completely different fix.
+    expect(diagnoseIngest(now - 60 * MIN, now - MIN, now)).toBe('arriving-not-processed');
+    expect(diagnoseIngest(now - 60 * MIN, now - 60 * MIN, now)).toBe('not-arriving');
+  });
+
+  it('is unknown rather than a guess when the worker reported no ingest time', () => {
+    // An older worker build publishes no ingest map at all. Reading that
+    // absence as "not arriving" would blame the network for a deploy.
+    expect(diagnoseIngest(now - 60 * MIN, undefined, now)).toBe('unknown');
+  });
+
+  it('treats a symbol that never produced a snapshot as diagnosable', () => {
+    expect(diagnoseIngest(null, now - MIN, now)).toBe('arriving-not-processed');
+    expect(diagnoseIngest(null, now - 60 * MIN, now)).toBe('not-arriving');
+  });
+
+  it('has wording for every diagnosis except the healthy one', () => {
+    expect(INGEST_TEXT.flowing).toBe('');
+    for (const key of ['not-arriving', 'arriving-not-processed', 'unknown'] as const) {
+      expect(INGEST_TEXT[key].length).toBeGreaterThan(10);
+    }
   });
 });

@@ -25,6 +25,8 @@ import {
   workerVerdict,
   connectionVerdict,
   isHeartbeatStale,
+  diagnoseIngest,
+  INGEST_TEXT,
   versionVerdict,
   FAILURE_STREAK_WORTH_SHOWING,
   STALE_SNAPSHOT_MS,
@@ -183,6 +185,7 @@ function WorkerCard({ worker }: { worker: StatusWorkerRuntime | null }) {
 
 function CollectorCard({ data }: { data: StatusResponse }) {
   const rows = data.collector;
+  const now = data.serverTime;
   const noData = rows.filter((r) => r.lastSnapshotAt === null).length;
   const stale = rows.filter((r) => r.ageMs !== null && r.ageMs > STALE_SNAPSHOT_MS).length;
 
@@ -196,16 +199,30 @@ function CollectorCard({ data }: { data: StatusResponse }) {
 
   return (
     <StatusCard title="Thu thập dữ liệu" verdict={verdict} headline={headline}>
-      {rows.map((r) => (
-        <Row
-          key={r.symbol}
-          label={r.symbol}
-          value={r.lastSnapshotAt === null ? 'chưa có dữ liệu' : ago(r.ageMs)}
-          tone={symbolVerdict(r)}
-        />
-      ))}
+      {rows.map((r) => {
+        // Two clocks, deliberately. The snapshot time needs the whole
+        // pipeline to have worked; the ingest time is stamped the moment a
+        // candle arrives. A gap between them says which half is broken.
+        const verdict = diagnoseIngest(r.lastSnapshotAt, data.worker?.symbolIngest[r.symbol], now);
+        return (
+          <div key={r.symbol}>
+            <Row
+              label={r.symbol}
+              value={r.lastSnapshotAt === null ? 'chưa có dữ liệu' : ago(r.ageMs)}
+              tone={symbolVerdict(r)}
+            />
+            {verdict !== 'flowing' && (
+              <p className="-mt-0.5 pb-1.5 text-right text-[11px] leading-relaxed text-amber-300/80">
+                {INGEST_TEXT[verdict]}
+              </p>
+            )}
+          </div>
+        );
+      })}
       <p className="mt-2.5 text-[11px] leading-relaxed text-slate-500">
-        Mỗi symbol phải có dữ liệu mới trong vòng 15 phút. Cũ hơn nghĩa là worker chết hoặc mất kết nối Binance.
+        Mỗi symbol phải có dữ liệu mới trong vòng 15 phút. Dòng chữ vàng bên dưới một symbol cho biết hỏng ở đâu:{' '}
+        <span className="font-semibold text-slate-400">phía kết nối</span> (nến không tới) hay{' '}
+        <span className="font-semibold text-slate-400">phần xử lý</span> (nến tới mà không ra kết quả).
       </p>
     </StatusCard>
   );

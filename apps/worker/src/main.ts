@@ -61,6 +61,7 @@ async function main(): Promise<void> {
     states: buildStates(allSymbols, config.timeframes),
     pairBuffer: new CandlePairBuffer(),
     futuresOnlySymbolSet: new Set(config.futuresOnlySymbols),
+    symbolIngest: {},
     connectionStatus: { spot: 'connecting', futures: 'connecting', liquidation: 'connecting' },
     historicalScores: new Map(),
     gemConfig: gemConfig.enabled ? gemConfig : null,
@@ -97,6 +98,10 @@ async function main(): Promise<void> {
     allSymbols,
     config.timeframes,
     (candle) => {
+      // Stamped first, before every branch below. A candle that arrives and
+      // is then dropped must still count as arrived, or this measurement
+      // answers the same question the snapshot already answers.
+      ctx.symbolIngest[candle.symbol] = Date.now();
       if (ctx.futuresOnlySymbolSet.has(candle.symbol)) {
         // Symbol and timeframe on the error, not just the stack: one symbol
         // can fail upstream for hours while the rest keep collecting, and a

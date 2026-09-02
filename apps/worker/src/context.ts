@@ -19,6 +19,14 @@ export interface WorkerContext {
   pairBuffer: CandlePairBuffer;
   /** Symbols with only a Binance Futures listing — routed straight to processFuturesOnlyCandle, never through pairBuffer (there's no spot side to wait for). */
   futuresOnlySymbolSet: Set<SymbolId>;
+  /**
+   * Epoch millis of the last candle received per symbol, stamped before
+   * any processing. Separates "the candles stopped coming" from "they
+   * come and something drops them" — indistinguishable otherwise, because
+   * the only other signal is the snapshot, which needs the whole pipeline
+   * to have worked.
+   */
+  symbolIngest: Record<string, number>;
   connectionStatus: {
     spot: MarketConnectionState;
     futures: MarketConnectionState;

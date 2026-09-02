@@ -160,7 +160,7 @@ export function startSchedulers(ctx: WorkerContext): () => void {
       spot: ctx.connectionStatus.spot,
       futures: ctx.connectionStatus.futures,
       liquidation: ctx.connectionStatus.liquidation,
-    }).catch((err) => ctx.logger.error({ err }, 'worker heartbeat failed'));
+    }, ctx.symbolIngest).catch((err) => ctx.logger.error({ err }, 'worker heartbeat failed'));
   };
   timers.push(setInterval(beat, HEARTBEAT_INTERVAL_MS));
   beat();

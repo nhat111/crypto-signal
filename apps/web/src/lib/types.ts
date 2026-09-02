@@ -346,6 +346,8 @@ export interface StatusWorkerRuntime {
     futures: string;
     liquidation: string;
   };
+  /** Epoch millis of the last candle received per symbol, stamped before any processing. */
+  symbolIngest: Record<string, number>;
 }
 
 export interface StatusJob {

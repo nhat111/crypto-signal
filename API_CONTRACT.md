@@ -56,7 +56,8 @@ aggregates have no business running on an uptime probe.
              "lastError": "totalCirculatingUSD: Required" }],
   "worker": { "service": "worker", "lastHeartbeatAt": 0, "ageMs": 12000,
               "connections": { "spot": "open", "futures": "open",
-                               "liquidation": "closed" } },
+                               "liquidation": "closed" },
+              "symbolIngest": { "BTCUSDT": 0, "HYPEUSDT": 0 } },
   "serverTime": 0
 }
 ```
@@ -71,7 +72,15 @@ has started since this was added.
 `worker` is the collector's live state, republished every 60 seconds for
 the same reason `services` exists — it has no HTTP surface to ask. It is
 `null` until the first heartbeat, which is a cold start rather than a
-fault. Read `ageMs` first: past three missed beats the row describes a
+fault. `symbolIngest` is when a candle was last *received* per symbol, stamped
+in the websocket handler before any processing. Read against the matching
+`collector` entry it separates two failures that look identical from
+outside: a recent candle with a stale snapshot puts the fault in the
+pipeline, no candle at all puts it upstream. A symbol missing from this
+map means the worker has not reported one — an older build, not a dead
+feed.
+
+Read `ageMs` first: past three missed beats the row describes a
 process that may no longer exist, so its `connections` must be shown as
 unknown rather than as fact. An open socket beside a symbol that has gone
 quiet in `collector` puts the fault in the pipeline, not the network —

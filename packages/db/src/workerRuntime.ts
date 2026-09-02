@@ -21,6 +21,16 @@ export interface WorkerRuntime {
     futures: string;
     liquidation: string;
   };
+  /**
+   * Epoch millis of the last candle *received* per symbol, stamped in the
+   * websocket handler before any processing.
+   *
+   * Read against the collector's last-snapshot time, this separates the two
+   * failures that otherwise look the same: a recent candle with a stale
+   * snapshot puts the fault in the pipeline, no candle at all puts it
+   * upstream of us.
+   */
+  symbolIngest: Record<string, number>;
 }
 
 export const RUNTIME_WORKER = 'worker';
@@ -45,17 +55,19 @@ export async function recordWorkerHeartbeat(
   pool: Pool,
   service: string,
   connections: { spot: string; futures: string; liquidation: string },
+  symbolIngest: Record<string, number> = {},
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO worker_runtime (service, last_heartbeat_at, spot_ws, futures_ws, liquidation_ws, updated_at)
-     VALUES ($1, now(), $2, $3, $4, now())
+    `INSERT INTO worker_runtime (service, last_heartbeat_at, spot_ws, futures_ws, liquidation_ws, symbol_ingest, updated_at)
+     VALUES ($1, now(), $2, $3, $4, $5::jsonb, now())
      ON CONFLICT (service) DO UPDATE SET
        last_heartbeat_at = now(),
        spot_ws = EXCLUDED.spot_ws,
        futures_ws = EXCLUDED.futures_ws,
        liquidation_ws = EXCLUDED.liquidation_ws,
+       symbol_ingest = EXCLUDED.symbol_ingest,
        updated_at = now()`,
-    [service, connections.spot, connections.futures, connections.liquidation],
+    [service, connections.spot, connections.futures, connections.liquidation, JSON.stringify(symbolIngest)],
   );
 }
 
@@ -67,7 +79,7 @@ export async function getWorkerRuntime(
 ): Promise<WorkerRuntime | null> {
   const { rows } = await pool.query(
     `SELECT service, extract(epoch from last_heartbeat_at)*1000 AS beat_ms,
-            spot_ws, futures_ws, liquidation_ws
+            spot_ws, futures_ws, liquidation_ws, symbol_ingest
      FROM worker_runtime WHERE service = $1`,
     [service],
   );
@@ -84,5 +96,6 @@ export async function getWorkerRuntime(
       futures: String(row.futures_ws),
       liquidation: String(row.liquidation_ws),
     },
+    symbolIngest: (row.symbol_ingest ?? {}) as Record<string, number>,
   };
 }

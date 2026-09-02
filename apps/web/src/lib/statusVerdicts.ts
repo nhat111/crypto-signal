@@ -202,3 +202,48 @@ export function connectionVerdict(state: string, stale: boolean): Verdict {
   if (state === 'connecting') return 'warn';
   return 'bad';
 }
+
+/* ------------------------------------------------------------------ */
+/* Where a quiet symbol went quiet                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A symbol with no recent snapshot fails in one of two places, and the
+ * page could not tell which: its candles stopped arriving, or they arrive
+ * and something downstream drops them. Those need different fixes — a
+ * reconnect versus a bug in the pipeline — and guessing between them cost
+ * several rounds on one symbol.
+ *
+ * Comparing when a candle was last *received* against when a snapshot was
+ * last *written* separates them, because receiving is stamped before any
+ * processing.
+ */
+export type IngestDiagnosis =
+  /** Snapshot is current. */
+  | 'flowing'
+  /** No candle has arrived recently — the fault is upstream of us. */
+  | 'not-arriving'
+  /** Candles arrive but no snapshot follows — the fault is in our pipeline. */
+  | 'arriving-not-processed'
+  /** No ingest timestamp for this symbol at all: an old worker build, or it never subscribed. */
+  | 'unknown';
+
+export function diagnoseIngest(
+  lastSnapshotAt: number | null,
+  lastCandleAt: number | undefined,
+  nowMs: number,
+  staleMs: number = STALE_SNAPSHOT_MS,
+): IngestDiagnosis {
+  if (lastSnapshotAt !== null && nowMs - lastSnapshotAt <= staleMs) return 'flowing';
+  if (lastCandleAt === undefined) return 'unknown';
+  // Candles still coming in while the snapshot has gone stale: whatever is
+  // wrong is downstream of the socket, which is the half we control.
+  return nowMs - lastCandleAt <= staleMs ? 'arriving-not-processed' : 'not-arriving';
+}
+
+export const INGEST_TEXT: Record<IngestDiagnosis, string> = {
+  flowing: '',
+  'not-arriving': 'không nhận được nến — lỗi phía kết nối',
+  'arriving-not-processed': 'vẫn nhận được nến nhưng không ra snapshot — lỗi ở phần xử lý',
+  unknown: 'chưa rõ (worker chưa báo cáo nến của symbol này)',
+};
