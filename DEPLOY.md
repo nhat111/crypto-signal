@@ -104,6 +104,14 @@ against a half-applied schema.
    return `{"status":"ok",...}` (or `"degraded"` with `no_data_yet` right
    after the worker's first deploy, before it's produced a snapshot yet).
 
+**Do not point Railway's own healthcheck at `/health`.** It reports on
+things outside the api — collector freshness and the worker's heartbeat —
+so it answers "is the system working", not "is this process alive". Wired
+as a platform healthcheck it would have Railway restart the *api* when the
+*worker* dies, which fixes nothing and hides the api's own state behind
+someone else's. Point external uptime monitoring at it by all means; that
+is what it is for.
+
 ### 4. Telegram bot (optional)
 
 1. **New → GitHub Repo** → same repo, third service.

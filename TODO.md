@@ -101,6 +101,10 @@ Check items as they land; each phase's commit message references the phase.
 ## Phase 14 — Observability
 - [x] Structured logging (pino) across worker/api/telegram.
 - [x] `/health` endpoint (API) reporting DB/Redis/collector freshness.
+- [x] Worker heartbeat (`worker_runtime`, 60s) surfaced on `/api/status`
+      and on `/health` as `checks.worker` — a dead collector shows in three
+      minutes instead of fifteen. Only a stale heartbeat reddens the probe;
+      a reconnecting socket reports `degraded` and stays 200.
 - [x] Data-quality score feeding confidence (not just logged).
 - [x] Rate-limit backoff on Binance REST (429/418 handling).
 

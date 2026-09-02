@@ -15,6 +15,27 @@ red. This is how you confirm a deploy landed; see DEPLOY.md.
 
 `checks` carries `database`, `symbols`, `symbolFreshness` and `collector`.
 
+`checks.worker` is the collector's heartbeat, republished every 60
+seconds into `worker_runtime` because the worker has no HTTP surface:
+
+| `status` | meaning | HTTP |
+|---|---|---|
+| `no_heartbeat_yet` | never reported — a cold start, not a fault | 200 |
+| `ok` | beat is fresh, all three sockets open | 200 |
+| `degraded` | beat is fresh, a socket is not open | 200 |
+| `stale` | no beat for over 180s — the process may be gone | **503** |
+| `error` | the row could not be read | **503** |
+
+Only `stale` and `error` turn the endpoint red. A socket that is
+reconnecting is a real problem but a different one, and a probe that goes
+red for it stops being believed. When `status` is `stale`, `connections`
+is the last thing the worker said rather than what is true now — the row
+simply stopped being updated.
+
+Note that this endpoint reports on the whole system, not on the api
+process, so it is for external uptime monitoring and not for a platform
+healthcheck. See DEPLOY.md.
+
 ## `GET /api/status`
 Everything needed to answer "is this thing working?" — read by the
 dashboard's `/status` page, on demand rather than on a poll, because its

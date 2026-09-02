@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
-import { getEnabledSymbols } from '@crypto-signal/db';
+import { getEnabledSymbols, getWorkerRuntime } from '@crypto-signal/db';
 import { resolveBuildInfo } from '@crypto-signal/shared';
 import type { ApiDeps } from '../deps.js';
+import { evaluateWorkerHealth } from '../workerHealth.js';
 
 // Resolved once at module load: this is the build that is running, and it
 // cannot change without the process restarting.
@@ -99,6 +100,19 @@ export function registerHealthRoute(app: FastifyInstance, deps: ApiDeps): void {
       }
     } catch (err) {
       checks['collector'] = { status: 'error', message: (err as Error).message };
+      healthy = false;
+    }
+
+    // The collector's own heartbeat, which catches a dead worker in three
+    // minutes where snapshot freshness takes fifteen. Deliberately after
+    // the collector block: if both are unhappy, the more specific reading
+    // is the one worth having in view.
+    try {
+      const { healthy: workerOk, ...worker } = evaluateWorkerHealth(await getWorkerRuntime(deps.pool));
+      checks['worker'] = worker;
+      if (!workerOk) healthy = false;
+    } catch (err) {
+      checks['worker'] = { status: 'error', message: (err as Error).message };
       healthy = false;
     }
 
