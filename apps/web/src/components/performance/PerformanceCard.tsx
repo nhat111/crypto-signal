@@ -1,6 +1,7 @@
 import { SignalTypeBadge } from '@/components/SignalTypeBadge';
 import type { PerformanceBaseline, PerformanceResult } from '@/lib/types';
 import { cx, formatPct } from '@/lib/format';
+import { compareToBaseline, samplesNeeded } from '@/lib/edge';
 
 const MIN_SAMPLES = 30;
 
@@ -50,28 +51,51 @@ export function PerformanceCard({ result, baseline }: PerformanceCardProps) {
 }
 
 /**
- * The only line on this card that answers the question worth asking: did
- * this beat doing nothing? Shown as a delta rather than two numbers side
- * by side, because the gap is the finding — a signal matching the baseline
- * is a signal that selected for nothing, however good its raw hit rate looks.
+ * The signal against the baseline, with the sample size taken seriously.
+ *
+ * This used to subtract two percentages and colour the result green when
+ * the difference was positive, which treats thirty outcomes and ten
+ * thousand identically. A signal at 58% on 30 samples showed "+7pp" in
+ * green against a 51% baseline — the interval there spans roughly 40% to
+ * 76%, so the honest reading is "cannot tell yet", and green said the
+ * opposite.
+ *
+ * `sufficientData` decides a number may be shown. It says nothing about
+ * whether that number differs from doing nothing, and conflating the two
+ * is how this page would have manufactured edge out of noise exactly when
+ * replayed outcomes started arriving in bulk.
  */
 function VsBaseline({ result, baseline }: { result: PerformanceResult; baseline: PerformanceBaseline }) {
   if (baseline.positiveMovePct === null || baseline.medianMovePct === null) return null;
 
-  const hitDelta = result.positiveMovePct - baseline.positiveMovePct;
+  const { verdict, deltaPp, marginPp } = compareToBaseline(
+    result.positiveMovePct,
+    result.sampleCount,
+    baseline.positiveMovePct,
+    baseline.sampleCount,
+  );
   const medianDelta = result.medianMovePct - baseline.medianMovePct;
-  // Rounded before comparing: a 0.4pp gap on a few dozen samples is noise,
-  // and colouring it green would invent an edge out of rounding.
-  const beats = Math.round(hitDelta) > 0 && Number(medianDelta.toFixed(2)) > 0;
-  const matches = Math.round(hitDelta) === 0 && Number(medianDelta.toFixed(2)) === 0;
+  const needed = verdict === 'indistinguishable' ? samplesNeeded(result.positiveMovePct, baseline.positiveMovePct, baseline.sampleCount) : null;
+
+  const tone =
+    verdict === 'beats' ? 'text-emerald-400' : verdict === 'worse' ? 'text-rose-400' : 'text-slate-400';
 
   return (
     <div className="mt-3 rounded border border-slate-800 bg-slate-950/40 px-3 py-2">
       <p className="text-[10px] uppercase tracking-wide text-slate-500">vs baseline</p>
-      <p className={cx('mt-0.5 text-xs font-semibold tabular-nums', beats ? 'text-emerald-400' : matches ? 'text-slate-500' : 'text-amber-400')}>
-        {signed(hitDelta, 0)}pp hit rate · {signed(medianDelta, 2)}% median
+      <p className={cx('mt-0.5 text-xs font-semibold tabular-nums', tone)}>
+        {signed(deltaPp, 0)}pp hit rate · {signed(medianDelta, 2)}% median
+        {marginPp !== null && <span className="font-normal text-slate-500"> (±{marginPp.toFixed(0)}pp)</span>}
       </p>
-      {matches && <p className="mt-1 text-[11px] text-slate-500">Same as doing nothing.</p>}
+      {verdict === 'indistinguishable' && (
+        <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+          Chưa phân biệt được với việc không làm gì — khoảng sai số còn phủ lên baseline.
+          {needed !== null && ` Cần khoảng ${needed.toLocaleString('vi-VN')} mẫu để nói chắc.`}
+        </p>
+      )}
+      {verdict === 'worse' && (
+        <p className="mt-1 text-[11px] leading-relaxed text-slate-500">Kém hơn baseline một cách rõ rệt.</p>
+      )}
     </div>
   );
 }
