@@ -60,6 +60,13 @@ export function SymbolCard({ symbol, overviewRow, snapshot, activeSignalCount, l
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <HealthBadge score={overviewRow.healthScore} status={overviewRow.healthStatus} />
         <RiskBadge score={overviewRow.riskScore} />
+        {/* A health score without its timeframe is not a number, it is two
+            numbers wearing one label: the same symbol scores differently on
+            5m and 15m, and this card reads 5m while the Telegram bot reads
+            15m. Unlabelled, that reads as the two disagreeing. */}
+        <span className="rounded border border-slate-800 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+          khung {overviewRow.timeframe}
+        </span>
       </div>
 
       {/* A stopped stream is invisible on a card that only shows values:

@@ -13,6 +13,15 @@ import { LoadingPanel, StatePanel } from '@/components/StatePanel';
 
 const POLL_MS = 20_000;
 const FLOW_POLL_MS = 10 * 60_000;
+/**
+ * Which timeframe the cards headline.
+ *
+ * Deliberately named and commented because it silently disagreed with the
+ * Telegram bot, which reports 15m: the same symbol scored 88 here and 69
+ * there at the same moment, both correct, and neither surface said which
+ * timeframe it meant. The cards now label it. Change this to '15m' to make
+ * the two read the same, at the cost of a slower-moving headline.
+ */
 const DEFAULT_TIMEFRAME: Timeframe = '5m';
 
 export default function OverviewPage() {
