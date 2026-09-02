@@ -9,6 +9,7 @@ import type {
   StatusOutcomeHorizon,
   StatusResponse,
   StatusService,
+  StatusWorkerRuntime,
 } from '@/lib/types';
 import { ago, Row, StatusCard } from '@/components/status/StatusBlocks';
 import {
@@ -21,6 +22,9 @@ import {
   symbolVerdict,
   diagnoseStuckOutcomes,
   DIAGNOSIS_TEXT,
+  workerVerdict,
+  connectionVerdict,
+  isHeartbeatStale,
   versionVerdict,
   FAILURE_STREAK_WORTH_SHOWING,
   STALE_SNAPSHOT_MS,
@@ -59,6 +63,7 @@ function StatusBody({ data }: { data: StatusResponse }) {
   return (
     <div className="space-y-3">
       <BuildCard data={data} />
+      <WorkerCard worker={data.worker} />
       <CollectorCard data={data} />
       <OutcomesCard outcomes={data.outcomes} />
       <JobsCard jobs={data.jobs} />
@@ -100,6 +105,75 @@ function BuildCard({ data }: { data: StatusResponse }) {
       <p className="mt-2.5 text-[11px] leading-relaxed text-slate-500">
         Dòng <span className="font-semibold text-slate-400">Commit</span> đầu là của api. Mỗi service khác tự
         báo bản của nó khi khởi động. Cái nào còn hiện commit cũ → service đó chưa deploy lại.
+      </p>
+    </StatusCard>
+  );
+}
+
+/* ---------------- worker ---------------- */
+
+const CONNECTION_LABEL: Record<string, string> = {
+  spot: 'Sàn thường (spot)',
+  futures: 'Sàn đòn bẩy (futures)',
+  liquidation: 'Thanh lý',
+};
+
+const STATE_TEXT: Record<string, string> = {
+  open: 'đang mở',
+  connecting: 'đang kết nối',
+  closed: 'đã đóng',
+  error: 'lỗi',
+};
+
+/**
+ * Whether each Binance socket is actually open.
+ *
+ * The collector card below says a symbol has gone quiet; this one says
+ * whether the connection feeding it is alive. Those are different
+ * failures with different fixes — a dead socket is a reconnect problem, an
+ * open socket with a quiet symbol is a bug in the pipeline behind it — and
+ * without this the operator could only guess between them.
+ */
+function WorkerCard({ worker }: { worker: StatusWorkerRuntime | null }) {
+  const verdict = workerVerdict(worker);
+  const stale = worker !== null && isHeartbeatStale(worker);
+
+  const headline =
+    worker === null
+      ? 'chưa báo cáo'
+      : stale
+        ? `nhịp tim ngừng ${ago(worker.ageMs)}`
+        : Object.values(worker.connections).every((s) => s === 'open')
+          ? 'mọi kết nối đang mở'
+          : 'có kết nối không mở';
+
+  return (
+    <StatusCard title="Kết nối Binance" verdict={verdict} headline={headline}>
+      {worker === null ? (
+        <p className="text-xs text-slate-500">
+          Worker chưa gửi nhịp tim nào. Bình thường nếu nó vừa deploy hoặc chưa chạy bản có tính năng này — kiểm lại
+          sau vài phút.
+        </p>
+      ) : (
+        <>
+          <Row label="Nhịp tim gần nhất" value={ago(worker.ageMs)} tone={stale ? 'bad' : 'ok'} />
+          {(['spot', 'futures', 'liquidation'] as const).map((key) => (
+            <Row
+              key={key}
+              label={CONNECTION_LABEL[key] ?? key}
+              // A stale row's socket states describe a process that may not
+              // exist any more. Showing them as fact would be inventing an
+              // observation — the exact thing this page must never do.
+              value={stale ? 'không rõ (nhịp tim đã cũ)' : (STATE_TEXT[worker.connections[key]] ?? worker.connections[key])}
+              tone={connectionVerdict(worker.connections[key], stale)}
+            />
+          ))}
+        </>
+      )}
+      <p className="mt-2.5 text-[11px] leading-relaxed text-slate-500">
+        Kết nối <span className="font-semibold text-slate-400">đang mở</span> mà symbol vẫn đứng ở thẻ dưới → lỗi nằm
+        ở phần xử lý, không phải đường truyền. Kết nối <span className="font-semibold text-slate-400">đã đóng</span>{' '}
+        → mất kết nối tới Binance.
       </p>
     </StatusCard>
   );

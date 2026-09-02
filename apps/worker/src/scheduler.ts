@@ -1,9 +1,12 @@
 import {
-  getHistoricalScoreForSignalType,
+  HEARTBEAT_INTERVAL_MS,
+  RUNTIME_WORKER,
   countPendingOutcomes,
+  getHistoricalScoreForSignalType,
   getResolvableOutcomes,
   pruneOldLiquidations,
   recordOutcomePrice,
+  recordWorkerHeartbeat,
   type OutcomeHorizon,
 } from '@crypto-signal/db';
 import { ALL_SIGNAL_TYPES } from '@crypto-signal/signal-engine';
@@ -146,6 +149,21 @@ export function startSchedulers(ctx: WorkerContext): () => void {
   timers.push(setInterval(() => void refreshHistoricalScores(ctx).catch((err) => ctx.logger.error({ err }, 'historical score refresh failed')), 10 * 60_000));
   timers.push(setInterval(() => void runRetention(ctx).catch((err) => ctx.logger.error({ err }, 'retention job failed')), 24 * 60 * 60_000));
   timers.push(setInterval(() => void resolveTimedOutPairs(ctx).catch((err) => ctx.logger.error({ err }, 'pair buffer timeout resolution failed')), 5_000));
+
+  // Publishes what the sockets are doing, because nothing outside this
+  // process can see ctx.connectionStatus. Failure is logged and dropped:
+  // a heartbeat that could not be written is a worse thing to crash the
+  // collector over than to go quiet about, and its own staleness is what
+  // the reader is checking anyway.
+  const beat = (): void => {
+    void recordWorkerHeartbeat(ctx.pool, RUNTIME_WORKER, {
+      spot: ctx.connectionStatus.spot,
+      futures: ctx.connectionStatus.futures,
+      liquidation: ctx.connectionStatus.liquidation,
+    }).catch((err) => ctx.logger.error({ err }, 'worker heartbeat failed'));
+  };
+  timers.push(setInterval(beat, HEARTBEAT_INTERVAL_MS));
+  beat();
 
   void refreshHistoricalScores(ctx).catch((err) => ctx.logger.error({ err }, 'initial historical score refresh failed'));
 

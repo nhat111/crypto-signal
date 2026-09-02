@@ -336,6 +336,18 @@ export interface StatusOutcomeDiagnostics {
   serverTime: number;
 }
 
+/** The worker's live state, republished to the database because it has no HTTP surface. */
+export interface StatusWorkerRuntime {
+  service: string;
+  lastHeartbeatAt: number;
+  ageMs: number;
+  connections: {
+    spot: string;
+    futures: string;
+    liquidation: string;
+  };
+}
+
 export interface StatusJob {
   jobName: string;
   lastAttemptAt: number | null;
@@ -359,5 +371,7 @@ export interface StatusResponse {
   collector: StatusCollectorSymbol[];
   outcomes: StatusOutcomeHorizon[];
   jobs: StatusJob[];
+  /** Null before the worker's first heartbeat — a cold start, not a failure. */
+  worker: StatusWorkerRuntime | null;
   serverTime: number;
 }

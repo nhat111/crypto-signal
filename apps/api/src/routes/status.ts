@@ -6,6 +6,7 @@ import {
   getPricingCandleCoverage,
   getServiceBuilds,
   getStuckOutcomeSample,
+  getWorkerRuntime,
   type OutcomeHorizon,
 } from '@crypto-signal/db';
 import { resolveBuildInfo } from '@crypto-signal/shared';
@@ -29,11 +30,12 @@ const BUILD = resolveBuildInfo();
  */
 export function registerStatusRoute(app: FastifyInstance, deps: ApiDeps): void {
   app.get('/api/status', async () => {
-    const [symbols, outcomes, jobs, serviceBuilds] = await Promise.all([
+    const [symbols, outcomes, jobs, serviceBuilds, workerRuntime] = await Promise.all([
       getEnabledSymbols(deps.pool),
       getOutcomeTrackerStatus(deps.pool),
       getAllJobHealth(deps.pool),
       getServiceBuilds(deps.pool),
+      getWorkerRuntime(deps.pool),
     ]);
 
     const { rows: migrations } = await deps.pool.query(
@@ -77,6 +79,9 @@ export function registerStatusRoute(app: FastifyInstance, deps: ApiDeps): void {
       }),
       outcomes,
       jobs,
+      // Null until the worker has published once. That is a cold start, not
+      // a fault, and the page has to be able to tell those apart.
+      worker: workerRuntime,
       serverTime: now,
     };
   });

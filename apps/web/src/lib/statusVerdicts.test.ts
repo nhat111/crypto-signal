@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DIAGNOSIS_TEXT,
   collectorVerdict,
+  connectionVerdict,
   diagnoseStuckOutcomes,
   isHorizonStuck,
   isJobBroken,
@@ -10,6 +11,7 @@ import {
   outcomesVerdict,
   symbolVerdict,
   versionVerdict,
+  workerVerdict,
 } from './statusVerdicts';
 import type { OutcomeDiagnosis } from './statusVerdicts';
 import type { StatusCollectorSymbol, StatusJob, StatusOutcomeHorizon, StatusVersion } from './types';
@@ -221,5 +223,55 @@ describe('diagnoseStuckOutcomes', () => {
       expect(DIAGNOSIS_TEXT[key].headline.length).toBeGreaterThan(0);
       expect(DIAGNOSIS_TEXT[key].detail.length).toBeGreaterThan(20);
     }
+  });
+});
+
+describe('workerVerdict', () => {
+  const worker = (ageMs: number, connections: Record<string, string>) => ({
+    service: 'worker',
+    lastHeartbeatAt: 1_800_000_000_000 - ageMs,
+    ageMs,
+    connections: { spot: 'open', futures: 'open', liquidation: 'open', ...connections },
+  });
+
+  it('is neutral before the first heartbeat', () => {
+    // A cold start is not a fault, and colouring it red teaches the reader
+    // to ignore the colour.
+    expect(workerVerdict(null)).toBe('idle');
+  });
+
+  it('is green when every socket is open and the beat is fresh', () => {
+    expect(workerVerdict(worker(30_000, {}))).toBe('ok');
+  });
+
+  it('flags a socket that is not open', () => {
+    expect(workerVerdict(worker(30_000, { futures: 'closed' }))).toBe('warn');
+    expect(workerVerdict(worker(30_000, { liquidation: 'connecting' }))).toBe('warn');
+  });
+
+  it('goes red on a stale heartbeat even when the row says every socket is open', () => {
+    // The trap this exists for: the process died with "open" written in the
+    // row, so the row keeps claiming health forever.
+    expect(workerVerdict(worker(10 * 60_000, {}))).toBe('bad');
+  });
+
+  it('tolerates a couple of missed beats', () => {
+    expect(workerVerdict(worker(2 * 60_000 + 1, {}))).toBe('ok');
+  });
+});
+
+describe('connectionVerdict', () => {
+  it('reads a stale row as unknown, never as a state', () => {
+    // Reporting "closed" from a row nobody updated in an hour would be
+    // inventing an observation.
+    expect(connectionVerdict('open', true)).toBe('idle');
+    expect(connectionVerdict('closed', true)).toBe('idle');
+  });
+
+  it('maps live states', () => {
+    expect(connectionVerdict('open', false)).toBe('ok');
+    expect(connectionVerdict('connecting', false)).toBe('warn');
+    expect(connectionVerdict('closed', false)).toBe('bad');
+    expect(connectionVerdict('error', false)).toBe('bad');
   });
 });

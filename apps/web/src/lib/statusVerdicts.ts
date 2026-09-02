@@ -5,6 +5,7 @@ import type {
   StatusPricingCoverage,
   StatusStuckRow,
   StatusVersion,
+  StatusWorkerRuntime,
 } from './types';
 
 /**
@@ -166,3 +167,38 @@ export const DIAGNOSIS_TEXT: Record<OutcomeDiagnosis, { tone: Verdict; headline:
       'Cửa sổ chấm có nến, nhưng bộ chấm báo không lấy được dòng nào. Hai chỗ này soi cùng một cửa sổ nên đây là lỗi trong mã, không phải thiếu dữ liệu — báo lại để sửa.',
   },
 };
+
+/* ------------------------------------------------------------------ */
+/* Worker heartbeat and sockets                                        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Three missed beats, matching HEARTBEAT_STALE_MS in packages/db. A GC
+ * pause or a slow query should not be reported as a dead worker, and the
+ * two sides must not disagree about where the line is.
+ */
+export const HEARTBEAT_STALE_MS = 3 * 60_000;
+
+/**
+ * A stale heartbeat does not mean the sockets are down — it means their
+ * reported state is old and must not be read as current. Saying "socket
+ * closed" from a row nobody has updated in an hour is inventing an
+ * observation, which is the failure this whole page exists to avoid.
+ */
+export function workerVerdict(worker: StatusWorkerRuntime | null): Verdict {
+  if (worker === null) return 'idle';
+  if (worker.ageMs > HEARTBEAT_STALE_MS) return 'bad';
+  return Object.values(worker.connections).every((state) => state === 'open') ? 'ok' : 'warn';
+}
+
+/** True when the row is too old for its connection states to mean anything. */
+export function isHeartbeatStale(worker: StatusWorkerRuntime): boolean {
+  return worker.ageMs > HEARTBEAT_STALE_MS;
+}
+
+export function connectionVerdict(state: string, stale: boolean): Verdict {
+  if (stale) return 'idle';
+  if (state === 'open') return 'ok';
+  if (state === 'connecting') return 'warn';
+  return 'bad';
+}

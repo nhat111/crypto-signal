@@ -33,6 +33,9 @@ aggregates have no business running on an uptime probe.
   "jobs": [{ "jobName": "stablecoin_flow", "lastAttemptAt": 0,
              "lastSuccessAt": null, "consecutiveFailures": 14,
              "lastError": "totalCirculatingUSD: Required" }],
+  "worker": { "service": "worker", "lastHeartbeatAt": 0, "ageMs": 12000,
+              "connections": { "spot": "open", "futures": "open",
+                               "liquidation": "closed" } },
   "serverTime": 0
 }
 ```
@@ -43,6 +46,15 @@ database at boot, because none of them has an HTTP surface to ask. They are
 deployed separately, so a commit here that differs from `version.commit`
 means that service has not rolled over yet. An empty array means nothing
 has started since this was added.
+
+`worker` is the collector's live state, republished every 60 seconds for
+the same reason `services` exists — it has no HTTP surface to ask. It is
+`null` until the first heartbeat, which is a cold start rather than a
+fault. Read `ageMs` first: past three missed beats the row describes a
+process that may no longer exist, so its `connections` must be shown as
+unknown rather than as fact. An open socket beside a symbol that has gone
+quiet in `collector` puts the fault in the pipeline, not the network —
+which is the distinction the whole field exists to make.
 
 Two fields carry most of the diagnostic weight:
 
