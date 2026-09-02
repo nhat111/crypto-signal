@@ -12,7 +12,6 @@ const LINKS = [
   { href: '/journal', label: 'Journal' },
   { href: '/performance', label: 'Performance' },
   { href: '/guide', label: 'Guide' },
-  { href: '/methodology', label: 'Phương pháp' },
   { href: '/status', label: 'Status' },
 ];
 

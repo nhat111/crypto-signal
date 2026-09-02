@@ -14,6 +14,7 @@ import { cx } from '@/lib/format';
 const TABS = [
   { href: '/guide', label: 'Đọc dashboard' },
   { href: '/guide/ta', label: 'Học phân tích kỹ thuật' },
+  { href: '/guide/methodology', label: 'Phương pháp' },
 ];
 
 export function GuideTabs() {

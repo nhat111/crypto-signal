@@ -23,7 +23,7 @@ export default function GuidePage() {
   return (
     <div className="mx-auto max-w-3xl pb-24">
       <header className="border-b border-slate-800 pb-6">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-100">How to read this dashboard</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-100">Đọc dashboard</h1>
         <p className="mt-2.5 text-[15px] leading-relaxed text-slate-400">
           Giải thích mọi con số trên trang này bằng ví dụ đời thường. Không cần biết gì về trading từ trước.
         </p>

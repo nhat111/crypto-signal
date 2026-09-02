@@ -43,7 +43,7 @@ export default function StatusPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-4 pb-16">
       <header>
-        <h1 className="text-lg font-bold text-slate-100">System status</h1>
+        <h1 className="text-lg font-bold text-slate-100">Trạng thái hệ thống</h1>
         <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
           Kiểm tra deploy đã lên chưa và có gì đang hỏng âm thầm không — không cần terminal. Trang tự làm mới mỗi
           30 giây.
