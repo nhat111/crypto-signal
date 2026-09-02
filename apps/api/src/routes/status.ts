@@ -5,6 +5,7 @@ import {
   getOutcomeTrackerStatus,
   getPricingCandleCoverage,
   getServiceBuilds,
+  getStuckOutcomeCensus,
   getStuckOutcomeSample,
   getWorkerRuntime,
   type OutcomeHorizon,
@@ -97,14 +98,18 @@ export function registerStatusRoute(app: FastifyInstance, deps: ApiDeps): void {
     const horizons: OutcomeHorizon[] = ['15m', '1h', '4h', '24h'];
     const nowMs = Date.now();
 
-    const [coverage, ...samples] = await Promise.all([
+    const [coverage, samples, census] = await Promise.all([
       getPricingCandleCoverage(deps.pool),
-      ...horizons.map((horizon) => getStuckOutcomeSample(deps.pool, horizon, nowMs)),
+      Promise.all(horizons.map((horizon) => getStuckOutcomeSample(deps.pool, horizon, nowMs))),
+      Promise.all(horizons.map((horizon) => getStuckOutcomeCensus(deps.pool, horizon, nowMs))),
     ]);
 
     return {
       pricingCandles: coverage,
       stuck: horizons.map((horizon, i) => ({ horizon, rows: samples[i] ?? [] })),
+      // Counted rather than inferred from the sample above: that sample is
+      // oldest-first, and the oldest rows are the permanently dead ones.
+      census,
       serverTime: nowMs,
     };
   });

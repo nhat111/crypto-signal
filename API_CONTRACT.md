@@ -86,6 +86,14 @@ unknown rather than as fact. An open socket beside a symbol that has gone
 quiet in `collector` puts the fault in the pipeline, not the network —
 which is the distinction the whole field exists to make.
 
+`GET /api/status/outcomes` answers *why* a backlog is stuck, on demand
+rather than on the page's poll because it scans. Alongside a sample of the
+oldest unpriced rows it returns `census` — an exact count per horizon of
+`withCandles`, `predateCandles` and `insideCoverageNoCandle`, which sum to
+`pending`. Read the census, not the sample: the sample is oldest-first and
+the oldest rows are the permanently dead ones, so it cannot tell you what
+the bulk of the backlog is doing.
+
 Two fields carry most of the diagnostic weight:
 
 - **`outcomes[].resolvableNow`** against `pending`. A backlog being worked

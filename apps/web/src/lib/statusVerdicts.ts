@@ -3,6 +3,7 @@ import type {
   StatusJob,
   StatusOutcomeHorizon,
   StatusPricingCoverage,
+  StatusStuckCensus,
   StatusStuckRow,
   StatusVersion,
   StatusWorkerRuntime,
@@ -247,3 +248,28 @@ export const INGEST_TEXT: Record<IngestDiagnosis, string> = {
   'arriving-not-processed': 'vẫn nhận được nến nhưng không ra snapshot — lỗi ở phần xử lý',
   unknown: 'chưa rõ (worker chưa báo cáo nến của symbol này)',
 };
+
+/**
+ * The same question as `diagnoseStuckOutcomes`, answered from a count of
+ * the whole backlog instead of its eight oldest rows.
+ *
+ * The sample version could not be right for long: it reads oldest-first,
+ * and the oldest rows are the permanently dead ones, so a handful of
+ * ancient signals made every verdict say "signals predate candles" while
+ * the rest of the backlog did something else entirely. This weighs the
+ * causes against each other and names the one that actually dominates.
+ */
+export function diagnoseFromCensus(census: StatusStuckCensus, resolvableNow: number): OutcomeDiagnosis {
+  if (census.pending === 0) return 'clear';
+
+  // Rows a candle exists for are rows the resolver should be taking. If it
+  // reports none resolvable while these exist, the two disagree about the
+  // same window, and that is a bug rather than missing data.
+  if (census.withCandles > 0) return resolvableNow > 0 ? 'draining' : 'query-fault';
+
+  if (census.predateCandles === 0 && census.insideCoverageNoCandle === 0) return 'no-pricing-candles';
+
+  // Whichever is larger is the one worth acting on: a backfill fixes the
+  // first, only the collector fixes the second.
+  return census.predateCandles >= census.insideCoverageNoCandle ? 'signals-predate-candles' : 'candle-gap';
+}

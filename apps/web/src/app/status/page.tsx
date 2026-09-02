@@ -20,7 +20,7 @@ import {
   jobsVerdict,
   outcomesVerdict,
   symbolVerdict,
-  diagnoseStuckOutcomes,
+  diagnoseFromCensus,
   DIAGNOSIS_TEXT,
   workerVerdict,
   connectionVerdict,
@@ -344,11 +344,15 @@ function StuckDiagnostics({ outcomes }: { outcomes: StatusOutcomeHorizon[] }) {
   // The first horizon that actually has stuck rows, paired with its own
   // resolvable count — diagnosing 15m when only 24h is backed up would
   // answer a question nobody asked.
-  const withRows = data.stuck.find((h) => h.rows.length > 0);
-  const horizon = withRows?.horizon ?? '15m';
-  const rows = withRows?.rows ?? [];
+  // The horizon with the largest backlog, not the first with any rows: the
+  // point is to explain the bulk of the problem, not its oldest corner.
+  const worst = [...data.census].sort((a, b) => b.pending - a.pending)[0];
+  const horizon = worst?.horizon ?? '15m';
+  const rows = data.stuck.find((h) => h.horizon === horizon)?.rows ?? [];
   const resolvableNow = outcomes.find((o) => o.horizon === horizon)?.resolvableNow ?? 0;
-  const verdict = DIAGNOSIS_TEXT[diagnoseStuckOutcomes(data.pricingCandles, rows, resolvableNow)];
+  const verdict = DIAGNOSIS_TEXT[
+    worst ? diagnoseFromCensus(worst, resolvableNow) : 'clear'
+  ];
 
   const tone =
     verdict.tone === 'bad'
@@ -366,6 +370,32 @@ function StuckDiagnostics({ outcomes }: { outcomes: StatusOutcomeHorizon[] }) {
         <p className="mt-1.5 text-sm font-semibold text-slate-100">{verdict.headline}</p>
         <p className="mt-1.5 text-xs leading-relaxed text-slate-300">{verdict.detail}</p>
       </div>
+
+      {worst && (
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Đếm toàn bộ hàng đợi · khung {worst.horizon}
+          </p>
+          <div className="mt-1.5 space-y-0">
+            <Row label="Tổng đang chờ" value={String(worst.pending)} />
+            <Row
+              label="Có nến, đáng lẽ chấm được"
+              value={String(worst.withCandles)}
+              tone={worst.withCandles > 0 && resolvableNow === 0 ? 'bad' : 'ok'}
+            />
+            <Row label="Ra đời trước mọi cây nến" value={String(worst.predateCandles)} tone="idle" />
+            <Row
+              label="Nằm trong khoảng có nến nhưng thiếu nến"
+              value={String(worst.insideCoverageNoCandle)}
+              tone={worst.insideCoverageNoCandle > 0 ? 'warn' : 'ok'}
+            />
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+            Đây là <span className="font-semibold text-slate-400">đếm hết</span>, không phải suy từ vài dòng cũ nhất
+            — nên một nhúm tín hiệu cổ không kéo được kết luận đi sai nữa.
+          </p>
+        </div>
+      )}
 
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Nến 5m futures đang có</p>

@@ -330,9 +330,19 @@ export interface StatusStuckHorizon {
   rows: StatusStuckRow[];
 }
 
+/** An exact count of why a horizon's backlog is stuck, not a guess from its oldest rows. */
+export interface StatusStuckCensus {
+  horizon: Horizon;
+  pending: number;
+  withCandles: number;
+  predateCandles: number;
+  insideCoverageNoCandle: number;
+}
+
 export interface StatusOutcomeDiagnostics {
   pricingCandles: StatusPricingCoverage[];
   stuck: StatusStuckHorizon[];
+  census: StatusStuckCensus[];
   serverTime: number;
 }
 

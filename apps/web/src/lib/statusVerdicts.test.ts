@@ -4,6 +4,7 @@ import {
   INGEST_TEXT,
   collectorVerdict,
   connectionVerdict,
+  diagnoseFromCensus,
   diagnoseIngest,
   diagnoseStuckOutcomes,
   isHorizonStuck,
@@ -16,6 +17,7 @@ import {
   workerVerdict,
 } from './statusVerdicts';
 import type { OutcomeDiagnosis } from './statusVerdicts';
+import type { StatusStuckCensus } from './types';
 import type { StatusCollectorSymbol, StatusJob, StatusOutcomeHorizon, StatusVersion } from './types';
 
 const version = (commit: string | null): StatusVersion => ({
@@ -311,3 +313,44 @@ describe('diagnoseIngest', () => {
     }
   });
 });
+
+describe('diagnoseFromCensus', () => {
+  const census = (over: Partial<StatusStuckCensus>): StatusStuckCensus => ({
+    horizon: '15m',
+    pending: 0,
+    withCandles: 0,
+    predateCandles: 0,
+    insideCoverageNoCandle: 0,
+    ...over,
+  });
+
+  it('is clear when nothing is pending', () => {
+    expect(diagnoseFromCensus(census({}), 0)).toBe('clear');
+  });
+
+  it('is not dominated by a small ancient tail', () => {
+    // The exact failure the sample version had: eight ancient rows made the
+    // verdict say "predate" while ninety-nine percent of the backlog sat in
+    // a candle gap. Counting decides it the other way, correctly.
+    const c = census({ pending: 107, predateCandles: 7, insideCoverageNoCandle: 100 });
+    expect(diagnoseFromCensus(c, 0)).toBe('candle-gap');
+  });
+
+  it('still names predating when that is what dominates', () => {
+    const c = census({ pending: 107, predateCandles: 100, insideCoverageNoCandle: 7 });
+    expect(diagnoseFromCensus(c, 0)).toBe('signals-predate-candles');
+  });
+
+  it('calls a resolver that contradicts itself a bug, not missing data', () => {
+    const c = census({ pending: 50, withCandles: 50 });
+    expect(diagnoseFromCensus(c, 0)).toBe('query-fault');
+    expect(diagnoseFromCensus(c, 12)).toBe('draining');
+  });
+
+  it('reports an empty candle store as such', () => {
+    // Nothing has a candle and nothing is inside coverage either, because
+    // there is no coverage.
+    const c = census({ pending: 40, predateCandles: 0, insideCoverageNoCandle: 0 });
+    expect(diagnoseFromCensus(c, 0)).toBe('no-pricing-candles');
+  });
+})

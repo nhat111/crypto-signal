@@ -447,3 +447,80 @@ export async function getStuckOutcomeSample(
     candlesInWindow: Number(r.candles_in_window),
   }));
 }
+
+export interface StuckOutcomeCensus {
+  horizon: OutcomeHorizon;
+  /** Every row past its horizon and still unpriced. */
+  pending: number;
+  /** Rows a candle exists for. Non-zero here with resolvableNow at 0 is a contradiction, not a data problem. */
+  withCandles: number;
+  /** No candle, and the signal is older than the oldest candle held for its symbol. Permanently unpriceable. */
+  predateCandles: number;
+  /** No candle, but the signal sits inside the stored range — a hole in the candles. */
+  insideCoverageNoCandle: number;
+}
+
+/**
+ * An exact count of why the backlog is stuck, rather than a guess from
+ * its oldest rows.
+ *
+ * `getStuckOutcomeSample` orders oldest-first, which turned out to be a
+ * trap: the oldest rows are the permanently dead ones — signals from
+ * before any candle exists — so a small ancient tail made every verdict
+ * read "signals predate candles" no matter what the other ninety-nine
+ * percent of the backlog was doing. A census cannot be dominated that
+ * way.
+ *
+ * One EXISTS per pending row, so it costs in proportion to the backlog,
+ * not the candle table. Fine for a route that only runs when asked.
+ */
+export async function getStuckOutcomeCensus(
+  pool: Pool,
+  horizon: OutcomeHorizon,
+  nowMs: number = Date.now(),
+): Promise<StuckOutcomeCensus> {
+  const dueBeforeMs = nowMs - HORIZON_MS[horizon];
+  const priceCol = HORIZON_PRICE_COLUMN[horizon];
+  const horizonMs = HORIZON_MS[horizon];
+
+  const { rows } = await pool.query(
+    `WITH coverage AS (
+       SELECT symbol, min(open_time) AS earliest
+       FROM market_candles
+       WHERE market = 'futures' AND timeframe = '5m'
+       GROUP BY symbol
+     ),
+     stuck AS (
+       SELECT s.symbol, s.timestamp,
+              EXISTS (
+                SELECT 1 FROM market_candles mc
+                WHERE mc.symbol = s.symbol AND mc.market = 'futures' AND mc.timeframe = '5m'
+                  AND mc.open_time >= s.timestamp + ($2 || ' milliseconds')::interval
+                  AND mc.open_time <= s.timestamp + ($3 || ' milliseconds')::interval
+              ) AS has_candle
+       FROM signal_outcomes o
+       JOIN market_signals s ON s.signal_id = o.signal_id
+       WHERE o.${priceCol} IS NULL AND s.timestamp <= to_timestamp($1/1000.0)
+     )
+     SELECT
+       count(*)::int AS pending,
+       count(*) FILTER (WHERE stuck.has_candle)::int AS with_candles,
+       count(*) FILTER (
+         WHERE NOT stuck.has_candle AND (c.earliest IS NULL OR stuck.timestamp < c.earliest)
+       )::int AS predate,
+       count(*) FILTER (
+         WHERE NOT stuck.has_candle AND c.earliest IS NOT NULL AND stuck.timestamp >= c.earliest
+       )::int AS gap
+     FROM stuck LEFT JOIN coverage c ON c.symbol = stuck.symbol`,
+    [dueBeforeMs, horizonMs, horizonMs + OUTCOME_LOOKAHEAD_MS],
+  );
+
+  const r = rows[0];
+  return {
+    horizon,
+    pending: Number(r?.pending ?? 0),
+    withCandles: Number(r?.with_candles ?? 0),
+    predateCandles: Number(r?.predate ?? 0),
+    insideCoverageNoCandle: Number(r?.gap ?? 0),
+  };
+}
