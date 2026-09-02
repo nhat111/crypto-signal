@@ -52,6 +52,26 @@ export default function PerformancePage() {
               reaches back 30 days, which bounds how far the replay can go.
             </div>
           )}
+          {/* A page that says "not enough data" while thousands of replayed
+              outcomes sit one click away is a dead end pretending to be an
+              answer. The switcher above is easy to miss, so when the
+              selected source has nothing usable, say where the data is. */}
+          {source === 'live' &&
+            performance.data &&
+            performance.data.results.every((r) => !r.sufficientData) && (
+              <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 p-3 text-xs leading-relaxed text-sky-200/80">
+                Chưa tín hiệu nào đủ mẫu ở nguồn <span className="font-semibold">Live</span>. Dữ liệu{' '}
+                <button
+                  type="button"
+                  onClick={() => setSource('backfill')}
+                  className="font-semibold text-sky-300 underline decoration-sky-500/50 underline-offset-2"
+                >
+                  Replay
+                </button>{' '}
+                tính lại engine trên 30 ngày lịch sử nên thường có nhiều mẫu hơn — kèm cảnh báo về những gì nó không
+                đo được.
+              </div>
+            )}
           {performance.data && <BaselinePanel baseline={performance.data.baseline} />}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {performance.data?.results.map((result) => (

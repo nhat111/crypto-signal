@@ -112,6 +112,23 @@ as a platform healthcheck it would have Railway restart the *api* when the
 someone else's. Point external uptime monitoring at it by all means; that
 is what it is for.
 
+### Health alerts on Telegram
+
+Set `TELEGRAM_ALERT_CHAT_IDS` on the **worker** (comma-separated chat ids)
+and it reports its own failures: a symbol that stops producing snapshots,
+a Binance socket that is not open, a background job that has never
+succeeded, and the collector losing its heartbeat.
+
+It reports **transitions only** — once when something breaks, once when it
+recovers, silence in between. That is deliberate: an alert repeating every
+cycle gets muted within a day, and a muted alert looks like coverage while
+providing none. Leave the variable unset and no alerting runs at all, and
+no queries are made for it.
+
+A restart re-announces whatever is still broken, because the "already told
+you" set lives in memory. One duplicate message after a deploy costs less
+than a table and a migration to avoid it.
+
 ### 4. Telegram bot (optional)
 
 1. **New → GitHub Repo** → same repo, third service.

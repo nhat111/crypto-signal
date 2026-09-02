@@ -113,6 +113,8 @@ Check items as they land; each phase's commit message references the phase.
 - [x] Postgres service in CI so `packages/db` SQL is covered — the outcome
       resolver, the stuck-backlog census and the worker heartbeat were
       each verified by hand once and then had no regression cover.
+- [x] Telegram health alerts from the worker — transitions only, opt-in via
+      TELEGRAM_ALERT_CHAT_IDS.
 - [ ] Measure worker memory on Railway (api was 71 MB; worker never checked).
 
 ## Phase 15 — Docker

@@ -13,6 +13,7 @@ import { ALL_SIGNAL_TYPES } from '@crypto-signal/signal-engine';
 import { processMatchedCandles } from './pipeline.js';
 import { runGemOutcomeTracker, runGemScanCycle, type GemScanDeps } from './gemScan.js';
 import { runGemWatchCycle, type GemWatchDeps } from './gemWatch.js';
+import { runHealthAlertCycle } from './healthAlerts.js';
 import { runStablecoinFlowCycle } from './stablecoinFlow.js';
 import type { WorkerContext } from './context.js';
 
@@ -164,6 +165,23 @@ export function startSchedulers(ctx: WorkerContext): () => void {
   };
   timers.push(setInterval(beat, HEARTBEAT_INTERVAL_MS));
   beat();
+
+  // Pushed rather than pulled: the status page answers every one of these
+  // questions and answers none of them at three in the morning. Fifteen
+  // minutes matches the staleness window it reports on, so an alert never
+  // fires for something the page would still call healthy.
+  const alertDeps = {
+    pool: ctx.pool,
+    logger: ctx.logger,
+    notifier: ctx.notifier,
+    chatIds: ctx.config.telegramAlertChatIds,
+  };
+  timers.push(
+    setInterval(
+      () => void runHealthAlertCycle(alertDeps).catch((err) => ctx.logger.error({ err }, 'health alert cycle failed')),
+      15 * 60_000,
+    ),
+  );
 
   void refreshHistoricalScores(ctx).catch((err) => ctx.logger.error({ err }, 'initial historical score refresh failed'));
 
