@@ -110,6 +110,8 @@ export interface BackfillWindowReport {
   unpairedCandles: number;
   /** Candles with no open-interest point in range. Every OI-dependent rule is unevaluable there, so they are skipped rather than scored with a stale value. */
   missingOpenInterest: number;
+  /** Candles written to the database. Always >= evaluatedCandles: a candle the engine could not score is still a price the outcome tracker can use. */
+  storedCandles: number;
 }
 
 /** Pages forward through klines until the window is covered. Binance returns ascending order, at most `limit` per call. */
@@ -243,6 +245,7 @@ export async function backfillWindow(
     fundingPoints: 0,
     warmupCandles: 0,
     evaluatedCandles: 0,
+    storedCandles: 0,
     signalsWritten: 0,
     unpairedCandles: 0,
     missingOpenInterest: 0,
@@ -299,6 +302,23 @@ export async function backfillWindow(
   for (const futuresCandle of futuresCandles) {
     const spotCandle = spotByOpenTime.get(futuresCandle.openTime);
     const isWarmup = futuresCandle.openTime < startMs;
+
+    // Stored before any of the gates below, because a candle is an
+    // observation of price and every gate below is about whether the
+    // *engine* can score it — a missing spot counterpart, a warm-up bar,
+    // no open-interest point in range.
+    //
+    // Storing it last meant those gates silently discarded candles, and
+    // the one they discarded most was 5m: Binance serves far fewer open
+    // interest points than there are 5m bars in a 30-day window, so most
+    // of them hit `continue` before ever reaching upsertCandle. Outcomes
+    // are priced off futures 5m candles, so the replay was writing
+    // signals it had just thrown away the means to score — thousands of
+    // rows pending with nothing able to resolve them, and no error
+    // anywhere.
+    await upsertCandle(deps.pool, futuresCandle, 'backfill');
+    if (spotCandle) await upsertCandle(deps.pool, spotCandle, 'backfill');
+    report.storedCandles += 1;
 
     if (!futuresOnly && !spotCandle) {
       // No spot counterpart: state must not advance either, or the CVD and
@@ -384,8 +404,6 @@ export async function backfillWindow(
     const health = computeHealth(snapshot, signals, deps.thresholds, deps.healthWeights);
     const risk = computeRisk(snapshot, signals, deps.thresholds, deps.riskWeights);
 
-    await upsertCandle(deps.pool, futuresCandle, 'backfill');
-    if (spotCandle) await upsertCandle(deps.pool, spotCandle, 'backfill');
     if (snapshot.spot) await saveSpotMetrics(deps.pool, snapshot, 'backfill');
     await saveFuturesMetrics(deps.pool, snapshot, 'backfill');
     await saveHealthSnapshot(deps.pool, snapshot, health, risk, 'backfill');
@@ -452,6 +470,8 @@ export interface BackfillSummary {
   totalEvaluated: number;
   /** Rules that cannot fire in a replay at all, listed so a zero count is never read as "this never happens". */
   unreplayableSignalTypes: string[];
+  /** Candles written. Larger than totalEvaluated by however many the engine could not score — those are still prices the outcome tracker can use. */
+  totalStored: number;
   /** Windows that threw. Counted rather than only logged, so a caller can tell a partial run from a total one. */
   failedWindows: number;
   /** Futures 5m candles stored purely so outcomes can be priced. Zero when 5m was already a scored timeframe. */
@@ -515,6 +535,7 @@ export async function runHistoryBackfill(deps: BackfillDeps, options: BackfillOp
     windows,
     totalSignals: windows.reduce((sum, w) => sum + w.signalsWritten, 0),
     totalEvaluated: windows.reduce((sum, w) => sum + w.evaluatedCandles, 0),
+    totalStored: windows.reduce((sum, w) => sum + w.storedCandles, 0),
     unreplayableSignalTypes: [...UNREPLAYABLE_SIGNAL_TYPES],
     failedWindows,
     pricingCandles,

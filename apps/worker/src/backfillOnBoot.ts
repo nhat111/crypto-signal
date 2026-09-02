@@ -130,6 +130,11 @@ export async function maybeBackfillOnBoot(
     logger.info(
       {
         evaluatedCandles: summary.totalEvaluated,
+        // Larger than evaluated by design. If these are close together on a
+        // 5m window, open interest is covering more candles than expected;
+        // if storedCandles is near zero the replay has nothing to price
+        // against and outcomesUnresolved below will be large.
+        storedCandles: summary.totalStored,
         signalsWritten: summary.totalSignals,
         outcomesResolved: outcomes.resolved,
         outcomesUnresolved: outcomes.unresolved,

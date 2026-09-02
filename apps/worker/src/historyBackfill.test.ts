@@ -308,3 +308,67 @@ describe('runHistoryBackfill — pricing candles', () => {
     expect(deps.logger.error).toHaveBeenCalled();
   });
 });
+
+/**
+ * The bug these cover ran in production and produced no error at all: the
+ * replay reported 6.720 candles evaluated and 5.086 outcomes it could not
+ * price, because the candles it needed to price them with had been thrown
+ * away by the scoring gates before ever being written.
+ */
+describe('backfillWindow — candles are stored even when they cannot be scored', () => {
+  const base = 1_700_000_000_000;
+
+  it('stores a candle whose open interest is missing, and scores nothing from it', async () => {
+    // Binance serves far fewer open-interest points than there are 5m bars
+    // in a 30-day window, so this is the ordinary case on 5m, not an edge.
+    const recorded = emptyRecorded();
+    const total = 96 + 10;
+    const futures = Array.from({ length: total }, (_, i) => candle(base + i * STEP, 100 + i * 0.01));
+    const deps = buildDeps(futures, [], [], [], recorded); // no OI points at all
+
+    const report = await backfillWindow(deps, SYMBOL, TF, base + 96 * STEP, base + total * STEP);
+
+    expect(report.evaluatedCandles).toBe(0);
+    expect(report.missingOpenInterest).toBeGreaterThan(0);
+    expect(report.signalsWritten).toBe(0);
+    // The point of the fix: the prices survive even though nothing scored.
+    expect(report.storedCandles).toBe(total);
+    expect(recorded.candles).toHaveLength(total);
+    expect(recorded.candles.every((c) => c.source === 'backfill')).toBe(true);
+  });
+
+  it('stores warm-up candles too', async () => {
+    // A signal early in the window is priced off candles from before it,
+    // which are exactly the warm-up bars.
+    const recorded = emptyRecorded();
+    const futures = Array.from({ length: 20 }, (_, i) => candle(base + i * STEP, 100 + i * 0.01));
+    const deps = buildDeps(futures, [], [], [], recorded);
+
+    // Whole range is warm-up: nothing is scored, everything is stored.
+    const report = await backfillWindow(deps, SYMBOL, TF, base + 20 * STEP, base + 21 * STEP);
+
+    expect(report.warmupCandles).toBe(20);
+    expect(report.evaluatedCandles).toBe(0);
+    expect(report.storedCandles).toBe(20);
+  });
+
+  it('never stores fewer candles than it evaluates', async () => {
+    // The invariant the old code broke. Storage is a superset of scoring.
+    const recorded = emptyRecorded();
+    const total = 96 + 20;
+    const futures = Array.from({ length: total }, (_, i) => candle(base + i * STEP, 100 + i * 0.01));
+    const oi = Array.from({ length: total }, (_, i) => ({
+      symbol: SYMBOL,
+      timeframe: TF,
+      timestamp: base + i * STEP,
+      sumOpenInterest: 1000 + i,
+      sumOpenInterestValue: (1000 + i) * 100,
+    }));
+    const deps = buildDeps(futures, [], oi, [], recorded);
+
+    const report = await backfillWindow(deps, SYMBOL, TF, base + 96 * STEP, base + total * STEP);
+
+    expect(report.evaluatedCandles).toBeGreaterThan(0);
+    expect(report.storedCandles).toBeGreaterThanOrEqual(report.evaluatedCandles);
+  });
+});
