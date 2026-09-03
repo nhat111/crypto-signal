@@ -222,7 +222,8 @@ export default function MethodologyPage() {
         {/* ---------------------------------------------------------- */}
         <Section id="confidence" eyebrow="Chấm điểm" title="Confidence và Severity">
           <p>
-            <Term>Confidence (0–100)</Term> ghép bốn thứ, theo đúng trọng số trong mã:
+            <Term>Confidence (0–100)</Term> — trên màn hình ghi là <Term>độ tin cậy</Term> — ghép bốn thứ, theo đúng
+            trọng số trong mã:
           </p>
           <Table
             head={['Thành phần', 'Trọng số', 'Nghĩa là']}

@@ -210,15 +210,26 @@ export default function GuidePage() {
                 'Mức đáng chú ý của sự việc. Từ thấp tới cao: INFO → LOW → MEDIUM → HIGH → EXTREME.',
               ],
               [
-                <Term key="b">Confidence</Term>,
+                <Term key="b">Độ tin cậy</Term>,
                 'Mức độ rõ ràng của tín hiệu: dữ liệu có đầy đủ không, điều kiện khớp bao nhiêu cái, vượt ngưỡng bao xa.',
+              ],
+              [
+                <Term key="c">Chip &ldquo;kém hơn mức nền&rdquo;</Term>,
+                'Loại tín hiệu này đã được đo và kết luận là đi kém hơn cả khi không làm gì. Chi tiết ở banner vàng đầu danh sách, và ở mục Trang Performance bên dưới.',
               ],
             ]}
           />
           <Warning>
             <p>
-              Confidence 78 <Term>không</Term> nghĩa là &ldquo;78% đúng&rdquo;. Nó chỉ nghĩa là tín hiệu này rõ ràng,
+              Độ tin cậy 78 <Term>không</Term> nghĩa là &ldquo;78% đúng&rdquo;. Nó chỉ nghĩa là tín hiệu này rõ ràng,
               dữ liệu sạch. Một tín hiệu rất rõ ràng vẫn có thể sai.
+            </p>
+            <p>
+              Muốn biết một loại tín hiệu có &ldquo;ăn&rdquo; hay không thì phải xem{' '}
+              <a href="#performance" className="text-sky-400 underline underline-offset-2 hover:text-sky-300">
+                Trang Performance
+              </a>
+              . Độ tin cậy nói về <Term>một lần</Term> tín hiệu bật; Performance nói về <Term>cả nghìn lần</Term>.
             </p>
           </Warning>
         </Section>
@@ -245,57 +256,180 @@ export default function GuidePage() {
             head={['Thấy gì', 'Là gì']}
             rows={[
               [
-                <Term key="a">Khung xanh trên cùng</Term>,
-                'Đây là "trời tự mưa bao nhiêu %". Tức là: nếu mua bừa, không nhìn tín hiệu gì hết, thì bao nhiêu lần giá đi lên?',
+                <Term key="a">Khung xanh trên cùng — &ldquo;Baseline&rdquo;</Term>,
+                'Đây là "trời tự mưa bao nhiêu %". Tức là: nếu mua bừa vào một lúc ngẫu nhiên, không nhìn tín hiệu gì hết, thì bao nhiêu lần giá đi lên? Bốn ô: Tăng, Trung vị, và hai ô "đủ bù phí" (xem mục phí bên dưới).',
               ],
               [<Term key="b">Chín cái thẻ</Term>, 'Mỗi thẻ là một "ông hàng xóm" — một kiểu tín hiệu.'],
+              [<Term key="c">Tăng</Term>, 'Bao nhiêu % số lần giá lên sau đó. Là số LẦN, không phải lên bao nhiêu tiền.'],
+              [<Term key="d">Giảm</Term>, 'Bao nhiêu % số lần giá xuống.'],
               [
-                <Term key="c">Positive move</Term>,
-                'Bao nhiêu % số lần giá lên sau đó. Là số LẦN, không phải lên bao nhiêu tiền.',
-              ],
-              [<Term key="d">Negative move</Term>, 'Bao nhiêu % số lần giá xuống.'],
-              [
-                <Term key="e">Median move</Term>,
+                <Term key="e">Trung vị</Term>,
                 'Lên/xuống bao nhiêu, lấy mức Ở GIỮA. Xếp hết các lần theo thứ tự rồi lấy cái nằm chính giữa — để một lần trúng đậm không kéo cả bảng lên trông đẹp giả tạo.',
               ],
               [
-                <Term key="f">Dòng &ldquo;vs baseline&rdquo;</Term>,
-                'Ông này hơn hay kém việc đoán bừa. ĐÂY LÀ DÒNG DUY NHẤT CẦN NHÌN.',
-              ],
-            ]}
-          />
-
-          <h3 className="pt-2 text-lg font-bold text-slate-100">Màu của dòng &ldquo;vs baseline&rdquo;</h3>
-          <Table
-            head={['Màu', 'Nghĩa']}
-            rows={[
-              [<span key="a" className="font-semibold text-emerald-300">Xanh</span>, 'Có hơn việc mua bừa.'],
-              [
-                <span key="b" className="font-semibold text-slate-400">Xám</span>,
-                'Ngang y hệt. Kèm chữ "Same as doing nothing" — bằng với không làm gì.',
+                <Term key="f">Khối &ldquo;so với baseline&rdquo;</Term>,
+                'Ông này hơn hay kém việc đoán bừa. ĐÂY LÀ KHỐI QUAN TRỌNG NHẤT.',
               ],
               [
-                <span key="c" className="font-semibold text-amber-300">Vàng</span>,
-                'Chưa rõ là hơn. Không có nghĩa là xấu.',
+                <Term key="g">Khối &ldquo;sau phí&rdquo;</Term>,
+                'Trừ tiền phí ra thì còn lại bao nhiêu. Có mục riêng bên dưới.',
               ],
-            ]}
-          />
-
-          <h3 className="pt-2 text-lg font-bold text-slate-100">Cách đọc</h3>
-          <Steps
-            items={[
-              'Nhìn khung xanh trước — không làm gì thì được bao nhiêu?',
-              'Quét hết 9 thẻ, chỉ đọc dòng "vs baseline".',
-              'Thẻ nào hơn thì mới xem dòng cuối thẻ: "N samples" — tín hiệu đó đã chạy bao nhiêu lần rồi.',
-              'Cuối cùng mới đọc ba ô số.',
             ]}
           />
           <Warning>
             <p>
-              Đừng nhìn &ldquo;Positive move 58%&rdquo; trước. Con số đó một mình không nói lên gì — y như biết
-              &ldquo;ông đúng 60 lần&rdquo; mà chưa biết trời tự mưa mấy lần.
+              Đừng nhìn ô <Term>Tăng 58%</Term> trước. Con số đó một mình không nói lên gì — y như biết &ldquo;ông
+              đúng 60 lần&rdquo; mà chưa biết trời tự mưa mấy lần.
             </p>
           </Warning>
+
+          <h3 className="pt-2 text-lg font-bold text-slate-100">Khối &ldquo;so với baseline&rdquo; nói gì</h3>
+          <p>Chỉ có đúng ba câu trả lời. Không có câu thứ tư.</p>
+          <Table
+            head={['Màu + chữ', 'Nghĩa thật', 'Nên làm gì']}
+            rows={[
+              [
+                <span key="a" className="font-semibold text-emerald-300">
+                  Xanh — &ldquo;Tốt hơn baseline một cách rõ rệt&rdquo;
+                </span>,
+                'Có bằng chứng thật là hơn việc mua bừa.',
+                'Đọc tiếp khối "sau phí" trước khi kết luận là giao dịch được.',
+              ],
+              [
+                <span key="b" className="font-semibold text-rose-300">
+                  Đỏ — &ldquo;Kém hơn baseline một cách rõ rệt&rdquo;
+                </span>,
+                'Có bằng chứng thật là TỆ HƠN cả việc không làm gì.',
+                'Đừng dùng cái này làm lý do vào lệnh.',
+              ],
+              [
+                <span key="c" className="font-semibold text-slate-400">
+                  Xám — &ldquo;Chưa phân biệt được&rdquo;
+                </span>,
+                'Chưa đủ bằng chứng để nói hơn hay kém. KHÔNG phải là "xấu".',
+                'Chờ thêm mẫu. Trang có ghi luôn cần khoảng bao nhiêu mẫu nữa.',
+              ],
+            ]}
+          />
+          <Warning>
+            <p>
+              Thẻ <Term>đỏ</Term> không có nghĩa là &ldquo;vậy làm ngược lại thì lời&rdquo;. Nó chỉ nói: đừng lấy tín
+              hiệu này làm lý do vào lệnh. Làm ngược lại là một cú cược khác, chưa ai đo.
+            </p>
+            <p>
+              Thẻ <Term>xám</Term> không có nghĩa là tín hiệu dở. Nó nghĩa là <Term>chưa biết</Term> — hai chuyện
+              hoàn toàn khác nhau.
+            </p>
+          </Warning>
+
+          <h3 className="pt-2 text-lg font-bold text-slate-100">Con số &ldquo;±3pp&rdquo; là gì?</h3>
+          <Story title="Cái cân ở chợ">
+            <p>
+              Bro cân con gà, cân báo <Term>2kg</Term>. Nhưng cái cân đó sai số nửa lạng. Nên con gà thật ra nặng đâu
+              đó từ <Term>1,95kg đến 2,05kg</Term>.
+            </p>
+            <p>
+              Giờ có người nói &ldquo;con gà của tôi 2,02kg, nặng hơn của bro&rdquo;. Nặng hơn thật không? Không biết
+              được — chênh lệch còn nhỏ hơn cả sai số của cân.
+            </p>
+          </Story>
+          <p>
+            <Term>±pp</Term> chính là &ldquo;sai số của cái cân&rdquo;. Thẻ ghi{' '}
+            <Term>&ldquo;+2pp tỉ lệ đúng (±3pp)&rdquo;</Term> nghĩa là: đo được hơn 2 điểm, nhưng cây thước sai tới 3
+            điểm — nên chưa kết luận được gì.
+          </p>
+          <Table
+            head={['Thẻ ghi', 'Kết luận']}
+            rows={[
+              ['+2pp (±3pp)', 'Xám. Chênh lệch nhỏ hơn sai số.'],
+              ['+7pp (±3pp)', 'Xanh. Chênh lệch vượt hẳn sai số.'],
+              ['−3pp (±1pp)', 'Đỏ. Kém hơn, và kém chắc chắn.'],
+            ]}
+          />
+          <p>
+            Sai số nhỏ lại khi <Term>số mẫu tăng lên</Term>. Đó là lý do một thẻ 900 mẫu có thể kết luận với chênh
+            lệch 3 điểm, còn thẻ 60 mẫu thì chênh 15 điểm vẫn chưa nói được gì.
+          </p>
+
+          <h3 className="pt-2 text-lg font-bold text-slate-100">
+            Vì sao có dòng &ldquo;N thẻ đang cùng đưa ra kết luận&rdquo;
+          </h3>
+          <Story title="Chín người cùng tung đồng xu">
+            <p>
+              Cho 9 người, mỗi người tung đồng xu 10 lần. Kiểu gì cũng có <Term>ít nhất một người</Term> ra 8 lần
+              ngửa. Người đó có tay ăn may không? Không. Chỉ là <Term>tung nhiều lượt thì kiểu gì cũng có lượt dị
+              thường</Term>.
+            </p>
+            <p>Giờ nếu bro chỉ nhìn đúng người ra 8 ngửa và kết luận &ldquo;anh này có biệt tài&rdquo; — bro bị lừa.</p>
+          </Story>
+          <p>
+            Trang này bày 9 thẻ cùng lúc, mắt bro tự động dừng ở thẻ có màu. Nếu mỗi thẻ đều dùng một cây thước
+            &ldquo;sai 1 lần trên 20&rdquo;, thì gần như <Term>mỗi lần mở trang sẽ có một thẻ ăn may bị tô màu</Term>.
+          </p>
+          <p>
+            Nên trang <Term>nới cây thước rộng ra</Term> theo số thẻ đang cùng kết luận. Càng nhiều thẻ cùng đưa ra
+            kết luận, ±pp càng lớn, càng khó được tô màu. Đó là lý do con số ±pp có thể đổi khi số thẻ đủ mẫu thay
+            đổi.
+          </p>
+          <Warning>
+            <p>
+              Trang chỉ trừ hao được số thẻ <Term>trên một màn hình</Term>. Bro bấm qua lại 15m → 1h → 4h → 24h để tìm
+              thẻ xanh thì đang tự mở rộng số lượt tung xu, và không ai trừ hao chỗ đó. Chọn khung thời gian{' '}
+              <Term>trước</Term> khi xem, đừng chọn sau khi thấy màu.
+            </p>
+          </Warning>
+
+          <h3 className="pt-2 text-lg font-bold text-slate-100">Khối &ldquo;sau phí&rdquo; — cái bẫy chết người</h3>
+          <Story title="Bán trà đá">
+            <p>
+              Bro bán một ly trà đá lời <Term>500 đồng</Term>. Ngày bán 100 ly, lời 50 nghìn. Nghe ổn.
+            </p>
+            <p>
+              Nhưng mỗi ngày đi lấy đá tốn <Term>60 nghìn tiền xăng</Term>. Bán càng nhiều càng lỗ.
+            </p>
+            <p>&ldquo;Có lời&rdquo; và &ldquo;lời đủ bù chi phí&rdquo; là hai chuyện khác nhau.</p>
+          </Story>
+          <p>
+            Mỗi lần vào rồi ra một lệnh, sàn ăn khoảng <Term>0,1%</Term> (phí hai chiều cộng chênh lệch mua/bán). Mà{' '}
+            <Term>trung vị của baseline ở khung 4h chỉ khoảng +0,05%</Term>.
+          </p>
+          <p>
+            Nghĩa là: một lần giá nhích lên <Term>0,02%</Term> vẫn được đếm là &ldquo;Tăng&rdquo; ở ô trên cùng — mà
+            thực tế vào lệnh lần đó là <Term>lỗ</Term>.
+          </p>
+          <Table
+            head={['Thẻ ghi', 'Nghĩa']}
+            rows={[
+              [<Term key="a">54% đủ lãi khi long</Term>, 'Chỉ 54% số lần giá lên ĐỦ XA để bù phí. Phần còn lại: đúng hướng nhưng vẫn lỗ.'],
+              [
+                <Term key="b">41% đủ lãi khi short</Term>,
+                'Tương tự cho chiều xuống. Có ô này vì bán khống cũng trả phí y hệt — tín hiệu báo trước cú giảm vẫn dùng được.',
+              ],
+              [
+                <Term key="c">Baseline sau phí: 45% / 44%</Term>,
+                'Mức nền, cũng đã trừ phí. So thẻ với dòng này, đừng so với 0%.',
+              ],
+            ]}
+          />
+          <Warning>
+            <p>
+              Một thẻ có thể <Term>xanh ở khối trên</Term> mà vẫn không đáng đánh, nếu khối &ldquo;sau phí&rdquo; của
+              nó không hơn baseline sau phí. Khối trên trả lời &ldquo;tín hiệu có nhìn thấy gì không&rdquo;; khối dưới
+              trả lời &ldquo;có đáng vào lệnh không&rdquo;. Hai câu hỏi khác nhau.
+            </p>
+          </Warning>
+
+          <h3 className="pt-2 text-lg font-bold text-slate-100">Cách đọc, theo thứ tự</h3>
+          <Steps
+            items={[
+              'Chọn khung thời gian và nguồn dữ liệu TRƯỚC. Đừng đổi sau khi thấy màu.',
+              'Nhìn khung xanh baseline — không làm gì thì được bao nhiêu %?',
+              'Quét 9 thẻ, chỉ đọc khối "so với baseline" và con số ±pp.',
+              'Thẻ nào xanh hoặc đỏ mới đọc tiếp. Thẻ xám là "chưa biết", bỏ qua.',
+              'Với thẻ xanh: đọc khối "sau phí", so với baseline sau phí.',
+              'Cuối cùng mới liếc số mẫu ở đáy thẻ.',
+            ]}
+          />
 
           <h3 className="pt-2 text-lg font-bold text-slate-100">Khi nào tin được con số?</h3>
           <Story title="Tung đồng xu">
@@ -308,40 +442,32 @@ export default function GuidePage() {
           <Table
             head={['Đã chạy được', 'Tin được chưa?']}
             rows={[
-              ['Dưới 30 lần', 'Trang không thèm hiện số. Nó ghi "Not enough data yet".'],
-              ['53 lần, đúng 55%', 'Giống tung xu 53 lần ra 29 ngửa. Chưa nói lên gì cả.'],
+              ['Dưới 30 lần', 'Trang không thèm hiện số. Nó ghi "Chưa đủ dữ liệu".'],
+              ['53 lần, đúng 55%', 'Giống tung xu 53 lần ra 29 ngửa. ±pp sẽ rất to, thẻ ra xám.'],
               ['Vài nghìn lần', 'Lúc đó mới nói chuyện được.'],
             ]}
           />
           <p>
-            Mốc 30 chỉ là ngưỡng để <Term>hiện</Term> số ra, chưa phải ngưỡng để <Term>tin</Term>.
+            Mốc 30 chỉ là ngưỡng để <Term>hiện</Term> số ra, chưa phải ngưỡng để <Term>tin</Term>. Cái quyết định tin
+            hay không là <Term>±pp</Term>, không phải con số 30.
           </p>
 
-          <h3 className="pt-2 text-lg font-bold text-slate-100">Còn một cái bẫy nữa: phí</h3>
-          <p>
-            Mỗi lần mua rồi bán, sàn ăn khoảng <Term>0.1%</Term>. Nếu tín hiệu chỉ giúp lời thêm{' '}
-            <Term>0.02%</Term> — nghe là dương đó, nhưng trừ phí xong vẫn lỗ.
-          </p>
-          <Takeaway>
-            Nhìn khung xanh trước. Rồi xem thẻ nào hơn được khung xanh. Rồi xem nó đã chạy đủ nhiều lần chưa. Xong.
-          </Takeaway>
-
-          <h3 className="pt-2 text-lg font-bold text-slate-100">Nút Observed / Replayed / Both</h3>
+          <h3 className="pt-2 text-lg font-bold text-slate-100">Nút Quan sát / Replay / Cả hai</h3>
           <Table
             head={['Nút', 'Nghĩa']}
             rows={[
-              [<Term key="a">Observed</Term>, 'Dữ liệu hệ thống tận mắt ghi lại lúc nó đang chạy. Mặc định.'],
+              [<Term key="a">Quan sát</Term>, 'Dữ liệu hệ thống tận mắt ghi lại lúc nó đang chạy. Mặc định.'],
               [
-                <Term key="b">Replayed</Term>,
+                <Term key="b">Replay</Term>,
                 'Hệ thống chạy lại trên dữ liệu quá khứ để có nhiều lần thử hơn, nhanh hơn.',
               ],
-              [<Term key="c">Both</Term>, 'Gộp cả hai.'],
+              [<Term key="c">Cả hai</Term>, 'Gộp chung.'],
             ]}
           />
           <Warning>
             <p>
-              Khi bật <Term>Replayed</Term>, hai thẻ <Term>LONG_LIQUIDATION</Term> và <Term>SHORT_LIQUIDATION</Term>{' '}
-              sẽ hiện &ldquo;chưa có tín hiệu nào&rdquo;.
+              Khi bật <Term>Replay</Term> hoặc <Term>Cả hai</Term>, hai thẻ <Term>Long Liquidation</Term> và{' '}
+              <Term>Short Liquidation</Term> sẽ hiện &ldquo;chưa có tín hiệu nào&rdquo;.
             </p>
             <p>
               Đó <Term>không phải</Term> &ldquo;chuyện này chưa từng xảy ra&rdquo;. Đó là{' '}
@@ -349,6 +475,36 @@ export default function GuidePage() {
               lại quá khứ thì không có dữ liệu đó.
             </p>
           </Warning>
+
+          <h3 className="pt-2 text-lg font-bold text-slate-100">Kết luận đi theo bro ra ngoài trang này</h3>
+          <p>
+            Không ai mở trang Performance đúng lúc một tín hiệu đang nổ. Nên khi một loại tín hiệu bị kết luận{' '}
+            <Term>kém hơn mức nền</Term>, hệ thống mang kết luận đó theo:
+          </p>
+          <Table
+            head={['Ở đâu', 'Thấy gì']}
+            rows={[
+              [<Term key="a">Trang Signals</Term>, 'Banner vàng đầu danh sách + chip "KÉM HƠN MỨC NỀN" cạnh tên loại.'],
+              [<Term key="b">Trang symbol</Term>, 'Y hệt, trong danh sách tín hiệu của mã đó.'],
+              [<Term key="c">Alert Telegram</Term>, 'Một dòng ⚠️ ở cuối tin nhắn, kèm số mẫu và khung thời gian.'],
+            ]}
+          />
+          <p>
+            Kết luận này luôn lấy ở <Term>khung 4h</Term>, nguồn <Term>Cả hai</Term>, cố định — không phải chọn khung
+            nào đẹp nhất cho từng loại. Cập nhật lại mỗi giờ.
+          </p>
+          <Warning>
+            <p>
+              Hệ thống <Term>không bao giờ</Term> gắn nhãn xanh &ldquo;loại này ngon&rdquo; ở ngoài trang Performance.
+              Chỉ cảnh báo chiều xấu. Vì một cái nhãn xanh cạnh tín hiệu đang nổ thì đọc ra thành lời khuyên vào lệnh
+              — và hệ thống này không khuyên bro vào lệnh bao giờ.
+            </p>
+          </Warning>
+
+          <Takeaway>
+            Baseline trước. Rồi khối &ldquo;so với baseline&rdquo; kèm ±pp. Thẻ xám là chưa biết, không phải dở. Thẻ
+            xanh còn phải qua cửa &ldquo;sau phí&rdquo;. Xong.
+          </Takeaway>
         </Section>
 
         {/* ---------------------------------------------------------- */}
