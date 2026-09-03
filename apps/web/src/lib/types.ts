@@ -118,6 +118,15 @@ export interface PerformanceResult {
   positiveMovePct: number;
   negativeMovePct: number;
   medianMovePct: number;
+  /**
+   * The same hit rates counted against `costPct` instead of against zero:
+   * a window that rose 0.02% is a "positive move" and a losing trade. The
+   * server sends the cost floor it used rather than the client assuming
+   * one, so the two can never drift apart.
+   */
+  netPositiveMovePct: number;
+  netNegativeMovePct: number;
+  costPct: number;
   sufficientData: boolean;
 }
 
@@ -131,6 +140,9 @@ export interface PerformanceBaseline {
   sampleCount: number;
   positiveMovePct: number | null;
   medianMovePct: number | null;
+  netPositiveMovePct: number | null;
+  netNegativeMovePct: number | null;
+  costPct: number;
   fromMs: number | null;
   toMs: number | null;
 }

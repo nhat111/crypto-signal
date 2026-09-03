@@ -140,6 +140,24 @@ export async function recordOutcomePrice(pool: Pool, signalId: string, horizon: 
   );
 }
 
+/**
+ * Round-trip cost of actually taking a trade, in percent.
+ *
+ * Binance USDⓈ-M taker is 0.04% per side; two sides plus a tick of spread
+ * lands near 0.10%. It is an assumption rather than a measurement, which
+ * is why every figure derived from it is reported *alongside* the raw one
+ * and the value itself is returned to the caller — never folded in
+ * silently, never presented as if it were observed.
+ *
+ * It matters far more than the size suggests. The 4h baseline median move
+ * is about +0.05%: the typical window does not pay for its own execution.
+ * A hit rate counted from `move > 0` scores those windows as wins, so a
+ * signal can beat the baseline on paper and still lose money every time
+ * it is traded. Counting hits against this floor is the difference
+ * between "the signal saw something" and "the signal was worth acting on".
+ */
+export const ROUND_TRIP_COST_PCT = 0.1;
+
 export interface SignalPerformance {
   signalType: string;
   sampleCount: number;
@@ -149,6 +167,16 @@ export interface SignalPerformance {
   positiveMovePct: number | null;
   negativeMovePct: number | null;
   medianMovePct: number | null;
+  /**
+   * Share of samples that moved further than `costPct` — up for
+   * `netPositiveMovePct`, down for `netNegativeMovePct`. The pair is
+   * symmetric because a short pays the same fee as a long: a signal that
+   * precedes drops is tradeable on the down side by the same standard.
+   */
+  netPositiveMovePct: number | null;
+  netNegativeMovePct: number | null;
+  /** The cost floor the net figures were counted against, so the reader can judge the assumption. */
+  costPct: number;
   /** Minimum sample size before we'll report a number at all (spec §24: "phải được tính từ historical data thực tế", never claimed without evidence). */
   sufficientData: boolean;
 }
@@ -171,11 +199,25 @@ export async function getSignalPerformance(pool: Pool, signalType: string, horiz
   const sampleCount = moves.length;
 
   if (sampleCount === 0) {
-    return { signalType, sampleCount, horizon, source, positiveMovePct: null, negativeMovePct: null, medianMovePct: null, sufficientData: false };
+    return {
+      signalType,
+      sampleCount,
+      horizon,
+      source,
+      positiveMovePct: null,
+      negativeMovePct: null,
+      medianMovePct: null,
+      netPositiveMovePct: null,
+      netNegativeMovePct: null,
+      costPct: ROUND_TRIP_COST_PCT,
+      sufficientData: false,
+    };
   }
 
   const positive = moves.filter((m) => m > 0).length;
   const negative = moves.filter((m) => m < 0).length;
+  const netPositive = moves.filter((m) => m > ROUND_TRIP_COST_PCT).length;
+  const netNegative = moves.filter((m) => m < -ROUND_TRIP_COST_PCT).length;
   const mid = Math.floor(moves.length / 2);
   const median = moves.length % 2 === 0 ? ((moves[mid - 1] as number) + (moves[mid] as number)) / 2 : (moves[mid] as number);
 
@@ -187,6 +229,9 @@ export async function getSignalPerformance(pool: Pool, signalType: string, horiz
     positiveMovePct: Math.round((positive / sampleCount) * 1000) / 10,
     negativeMovePct: Math.round((negative / sampleCount) * 1000) / 10,
     medianMovePct: Math.round(median * 100) / 100,
+    netPositiveMovePct: Math.round((netPositive / sampleCount) * 1000) / 10,
+    netNegativeMovePct: Math.round((netNegative / sampleCount) * 1000) / 10,
+    costPct: ROUND_TRIP_COST_PCT,
     sufficientData: sampleCount >= MIN_SAMPLES,
   };
 }
@@ -196,6 +241,10 @@ export interface BaselinePerformance {
   sampleCount: number;
   positiveMovePct: number | null;
   medianMovePct: number | null;
+  /** Same cost floor as the signal cards, counted the same way — a control measured on a different standard controls for nothing. */
+  netPositiveMovePct: number | null;
+  netNegativeMovePct: number | null;
+  costPct: number;
   /** The window measured, so the UI can say whether it really matches the signals' period. Null when there are no outcomes to bound it by. */
   fromMs: number | null;
   toMs: number | null;
@@ -233,7 +282,17 @@ export async function getBaselinePerformance(pool: Pool, horizon: OutcomeHorizon
   const toMs = bounds[0]?.to_ms === null || bounds[0]?.to_ms === undefined ? null : Number(bounds[0].to_ms);
 
   if (fromMs === null || toMs === null) {
-    return { horizon, sampleCount: 0, positiveMovePct: null, medianMovePct: null, fromMs: null, toMs: null };
+    return {
+      horizon,
+      sampleCount: 0,
+      positiveMovePct: null,
+      medianMovePct: null,
+      netPositiveMovePct: null,
+      netNegativeMovePct: null,
+      costPct: ROUND_TRIP_COST_PCT,
+      fromMs: null,
+      toMs: null,
+    };
   }
 
   // Aggregated in SQL rather than pulled row by row: this scans every 5m
@@ -243,6 +302,8 @@ export async function getBaselinePerformance(pool: Pool, horizon: OutcomeHorizon
   const { rows } = await pool.query(
     `SELECT count(*)::int AS n,
             count(*) FILTER (WHERE later.close > base.close)::int AS positive,
+            count(*) FILTER (WHERE later.close > base.close * (1 + $5 / 100.0))::int AS net_positive,
+            count(*) FILTER (WHERE later.close < base.close * (1 - $5 / 100.0))::int AS net_negative,
             percentile_cont(0.5) WITHIN GROUP (
               ORDER BY (later.close - base.close) / base.close * 100
             ) AS median_move
@@ -260,12 +321,22 @@ export async function getBaselinePerformance(pool: Pool, horizon: OutcomeHorizon
        AND base.open_time >= to_timestamp($3/1000.0)
        AND base.open_time <= to_timestamp($4/1000.0)
        AND base.close > 0`,
-    [horizonMs, horizonMs + LOOKAHEAD_MS, fromMs, toMs],
+    [horizonMs, horizonMs + LOOKAHEAD_MS, fromMs, toMs, ROUND_TRIP_COST_PCT],
   );
 
   const n = Number(rows[0]?.n ?? 0);
   if (n === 0) {
-    return { horizon, sampleCount: 0, positiveMovePct: null, medianMovePct: null, fromMs, toMs };
+    return {
+      horizon,
+      sampleCount: 0,
+      positiveMovePct: null,
+      medianMovePct: null,
+      netPositiveMovePct: null,
+      netNegativeMovePct: null,
+      costPct: ROUND_TRIP_COST_PCT,
+      fromMs,
+      toMs,
+    };
   }
 
   return {
@@ -273,6 +344,9 @@ export async function getBaselinePerformance(pool: Pool, horizon: OutcomeHorizon
     sampleCount: n,
     positiveMovePct: Math.round((Number(rows[0].positive) / n) * 1000) / 10,
     medianMovePct: Math.round(Number(rows[0].median_move) * 100) / 100,
+    netPositiveMovePct: Math.round((Number(rows[0].net_positive) / n) * 1000) / 10,
+    netNegativeMovePct: Math.round((Number(rows[0].net_negative) / n) * 1000) / 10,
+    costPct: ROUND_TRIP_COST_PCT,
     fromMs,
     toMs,
   };

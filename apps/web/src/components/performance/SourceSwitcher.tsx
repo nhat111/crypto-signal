@@ -7,15 +7,15 @@ interface SourceSwitcherProps {
 }
 
 const LABELS: Record<PerformanceSource, string> = {
-  live: 'Observed',
-  backfill: 'Replayed',
-  all: 'Both',
+  live: 'Quan sát',
+  backfill: 'Replay',
+  all: 'Cả hai',
 };
 
 const HINTS: Record<PerformanceSource, string> = {
-  live: 'Only what the collector watched happen.',
-  backfill: 'The engine re-run over historical data.',
-  all: 'Counted together — read with the caveat above.',
+  live: 'Chỉ những gì collector tận mắt thấy diễn ra.',
+  backfill: 'Engine chạy lại trên dữ liệu lịch sử.',
+  all: 'Gộp chung — đọc kèm cảnh báo phía trên.',
 };
 
 /**

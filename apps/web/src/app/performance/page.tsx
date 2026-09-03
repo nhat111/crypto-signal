@@ -18,17 +18,21 @@ export default function PerformancePage() {
   const fetcher = useCallback(() => getPerformance(horizon, source), [horizon, source]);
   const performance = usePolling(fetcher, POLL_MS, [horizon, source]);
   const isBootstrapping = performance.loading && !performance.data;
+  // Only the cards that actually render a verdict belong to the family; the
+  // "not enough data" ones make no claim, so counting them would penalise
+  // the rest for nothing.
+  const comparisons = performance.data?.results.filter((r) => r.sufficientData).length ?? 1;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-slate-100">Historical Signal Performance</h1>
+          <h1 className="text-lg font-bold text-slate-100">Hiệu quả tín hiệu trong quá khứ</h1>
           <p className="mt-1 max-w-2xl text-xs text-slate-500">
-            What happened to price after each signal type fired, at the selected horizon. Figures only render
-            once a signal type has at least 30 recorded outcomes — otherwise this refuses to claim edge that
-            isn&apos;t backed by evidence yet. Read every card against the baseline below it: a hit rate only
-            means something if it beats what price did anyway over the same window.
+            Giá đã đi thế nào sau khi mỗi loại tín hiệu bật, ở khung thời gian đang chọn. Chỉ hiện số khi loại
+            tín hiệu đó có ít nhất 30 kết quả đã ghi nhận — dưới ngưỡng đó trang này từ chối khẳng định một lợi
+            thế chưa có bằng chứng. Đọc mọi thẻ dựa trên baseline ngay bên dưới: một tỉ lệ đúng chỉ có nghĩa khi
+            nó vượt được mức giá vốn dĩ đã tự đi trong cùng khoảng thời gian.
           </p>
         </div>
         <div className="flex flex-wrap items-start gap-3">
@@ -38,18 +42,18 @@ export default function PerformancePage() {
       </div>
 
       {isBootstrapping ? (
-        <LoadingPanel label="Loading performance data…" />
+        <LoadingPanel label="Đang tải dữ liệu hiệu quả…" />
       ) : performance.error && !performance.data ? (
-        <StatePanel tone="error" title="Could not reach the API" detail={performance.error} />
+        <StatePanel tone="error" title="Không kết nối được tới API" detail={performance.error} />
       ) : (
         <>
           {source !== 'live' && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-relaxed text-amber-200/80">
-              Replayed samples come from re-running the engine over historical market data. They are real
-              measurements, but of a weaker thing: no liquidation history exists upstream, so{' '}
-              <span className="font-semibold">{UNREPLAYABLE_SIGNAL_TYPES.join(' and ')}</span> cannot fire at all
-              here — a zero for those means unmeasurable, not that the pattern never occurred. Open interest only
-              reaches back 30 days, which bounds how far the replay can go.
+              Mẫu &ldquo;Replay&rdquo; đến từ việc chạy lại engine trên dữ liệu thị trường lịch sử. Đó là phép đo
+              thật, nhưng đo một thứ yếu hơn: sàn không lưu lịch sử thanh lý, nên{' '}
+              <span className="font-semibold">{UNREPLAYABLE_SIGNAL_TYPES.join(' và ')}</span> hoàn toàn không thể
+              bật ở đây — số 0 ở hai loại đó nghĩa là <em>không đo được</em>, không phải là mẫu hình chưa từng xảy
+              ra. Open Interest cũng chỉ tra ngược được 30 ngày, giới hạn luôn độ dài của bản replay.
             </div>
           )}
           {/* A page that says "not enough data" while thousands of replayed
@@ -73,9 +77,23 @@ export default function PerformancePage() {
               </div>
             )}
           {performance.data && <BaselinePanel baseline={performance.data.baseline} />}
+          {comparisons > 1 && (
+            <p className="text-[11px] leading-relaxed text-slate-500">
+              {comparisons} thẻ đang cùng đưa ra kết luận trên màn hình này, nên khoảng sai số (±pp) đã được nới
+              ra theo số phép so sánh: một phép kiểm định 95% sai 1 lần trên 20, chạy {comparisons} lần cùng lúc
+              thì gần như chắc chắn có một thẻ &ldquo;có ý nghĩa&rdquo; do ngẫu nhiên. Bấm qua lại giữa các khung
+              thời gian và nguồn dữ liệu còn nới rộng thêm nữa — phần đó trang không tự trừ hao được, bro tự trừ
+              trong đầu giúp.
+            </p>
+          )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {performance.data?.results.map((result) => (
-              <PerformanceCard key={result.signalType} result={result} baseline={performance.data!.baseline} />
+              <PerformanceCard
+                key={result.signalType}
+                result={result}
+                baseline={performance.data!.baseline}
+                comparisons={comparisons}
+              />
             ))}
           </div>
         </>
