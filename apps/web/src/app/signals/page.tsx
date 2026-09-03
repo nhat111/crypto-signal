@@ -31,16 +31,20 @@ export default function SignalsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-bold text-slate-100">Signals</h1>
+        <h1 className="text-lg font-bold text-slate-100">Tín hiệu</h1>
         <SignalFilters value={filters} onChange={setFilters} />
       </div>
 
       {isBootstrapping ? (
-        <LoadingPanel label="Loading signals…" />
+        <LoadingPanel label="Đang tải tín hiệu…" />
       ) : signals.error && !signals.data ? (
-        <StatePanel tone="error" title="Could not reach the API" detail={signals.error} />
+        <StatePanel tone="error" title="Không kết nối được tới API" detail={signals.error} />
       ) : (
-        <SignalList signals={signals.data?.signals ?? []} emptyLabel="No signals match these filters." />
+        <SignalList
+          signals={signals.data?.signals ?? []}
+          verdicts={signals.data?.verdicts}
+          emptyLabel="Không có tín hiệu nào khớp bộ lọc này."
+        />
       )}
     </div>
   );

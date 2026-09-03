@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
 import { createTestPool, hasTestDatabase } from './testPool.js';
+import { getSignalVerdicts, saveSignalVerdicts, type SignalVerdict } from './verdicts.js';
 import {
   ROUND_TRIP_COST_PCT,
   countPendingOutcomes,
@@ -239,5 +240,71 @@ describe.skipIf(!hasTestDatabase)('cost-adjusted performance against real Postgr
     const base = await getBaselinePerformance(pool, '15m');
     expect(base.netPositiveMovePct).toBe(100);
     expect(base.netNegativeMovePct).toBe(0);
+  });
+});
+
+/**
+ * The verdict cache round-trip.
+ *
+ * The read and the write are trivial on their own; what is not trivial is
+ * that the write *replaces* rather than merges. A type that has dropped
+ * below the sample threshold must lose its verdict, because a stale
+ * "worse than doing nothing" badge on a type nobody is measuring any more
+ * is exactly the confident-and-wrong this project spends its effort
+ * avoiding — and a merging upsert would leave it there forever.
+ */
+describe.skipIf(!hasTestDatabase)('signal verdict cache against real Postgres', () => {
+  let pool: Pool;
+
+  function verdict(signalType: string, overrides: Partial<SignalVerdict> = {}): SignalVerdict {
+    return {
+      signalType,
+      horizon: '4h',
+      source: 'all',
+      verdict: 'worse',
+      deltaPp: -3,
+      marginPp: 1.4,
+      sampleCount: 10_655,
+      hitPct: 51,
+      baselinePct: 54,
+      baselineSampleCount: 35_547,
+      comparisons: 5,
+      computedAt: Date.parse('2026-09-02T12:00:00Z'),
+      ...overrides,
+    };
+  }
+
+  beforeAll(async () => {
+    pool = createTestPool();
+    await pool.query('DELETE FROM signal_verdicts');
+  });
+
+  afterAll(async () => {
+    await pool.end();
+  });
+
+  it('round-trips every field, numerics included', async () => {
+    await saveSignalVerdicts(pool, [verdict('SELLING_ABSORPTION_POSSIBLE')]);
+    const [row] = await getSignalVerdicts(pool);
+    expect(row).toEqual(verdict('SELLING_ABSORPTION_POSSIBLE'));
+  });
+
+  it('drops a type that no longer has a verdict instead of keeping the last one', async () => {
+    await saveSignalVerdicts(pool, [verdict('A'), verdict('B')]);
+    await saveSignalVerdicts(pool, [verdict('A')]);
+    expect((await getSignalVerdicts(pool)).map((v) => v.signalType)).toEqual(['A']);
+  });
+
+  it('clears everything when nothing is conclusive any more', async () => {
+    await saveSignalVerdicts(pool, [verdict('A')]);
+    await saveSignalVerdicts(pool, []);
+    expect(await getSignalVerdicts(pool)).toEqual([]);
+  });
+
+  it('keeps a null margin null rather than turning it into zero', async () => {
+    // Zero would read as "no uncertainty at all", the strongest possible
+    // claim, from the case where the comparison could not be made.
+    await saveSignalVerdicts(pool, [verdict('A', { marginPp: null })]);
+    expect((await getSignalVerdicts(pool))[0]?.marginPp).toBeNull();
   });
 });

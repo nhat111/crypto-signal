@@ -64,6 +64,7 @@ async function main(): Promise<void> {
     symbolIngest: {},
     connectionStatus: { spot: 'connecting', futures: 'connecting', liquidation: 'connecting' },
     historicalScores: new Map(),
+    signalVerdicts: new Map(),
     gemConfig: gemConfig.enabled ? gemConfig : null,
   };
 

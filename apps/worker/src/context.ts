@@ -3,6 +3,7 @@ import type { AppConfig, Logger, SymbolId } from '@crypto-signal/shared';
 import type { BinanceFuturesAdapter, BinanceSpotAdapter, ConnectionStatus } from '@crypto-signal/market-data';
 import type { SignalType } from '@crypto-signal/signal-engine';
 import type { GemConfig } from '@crypto-signal/gem-scanner';
+import type { SignalVerdict } from '@crypto-signal/db';
 import { TelegramNotifier } from './telegramNotifier.js';
 import { CandlePairBuffer, SymbolTimeframeState, stateKey } from './state.js';
 
@@ -33,6 +34,15 @@ export interface WorkerContext {
     liquidation: MarketConnectionState;
   };
   historicalScores: Map<SignalType, number>;
+  /**
+   * What the recorded outcomes have concluded about each signal type,
+   * refreshed hourly. Held in memory for the same reason historicalScores
+   * is: an alert must not wait on a lateral join across every candle in
+   * the measured window just to decide whether to add a warning line.
+   * Empty until the first refresh completes, which reads as "nothing
+   * concluded yet" — the correct thing to say on a fresh deploy.
+   */
+  signalVerdicts: Map<SignalType, SignalVerdict>;
   /** Null when small-cap discovery is disabled — it's an opt-in, independent subsystem (ASSUMPTIONS.md §16). */
   gemConfig: GemConfig | null;
 }

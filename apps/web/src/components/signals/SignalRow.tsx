@@ -9,13 +9,19 @@ interface SignalRowProps {
   signal: Signal;
   /** Show the symbol chip — hidden on the symbol-detail page where it's redundant. */
   showSymbol?: boolean;
+  /**
+   * Whether the recorded outcomes say this type does worse than doing
+   * nothing. A chip, not a paragraph: the numbers and the link are in the
+   * banner above the list, once, instead of on every row.
+   */
+  flagged?: boolean;
 }
 
 /**
  * One signal, reasons always visible inline (never behind a click/tooltip) —
  * this is the product's explainability, per the task's product intent.
  */
-export function SignalRow({ signal, showSymbol = true }: SignalRowProps) {
+export function SignalRow({ signal, showSymbol = true, flagged = false }: SignalRowProps) {
   const colors = SEVERITY_COLORS[signal.severity];
 
   return (
@@ -25,6 +31,14 @@ export function SignalRow({ signal, showSymbol = true }: SignalRowProps) {
       <div className="flex flex-wrap items-center gap-2">
         <SeverityBadge severity={signal.severity} />
         <SignalTypeBadge signalType={signal.signalType} />
+        {flagged && (
+          <span
+            title="Loại này đang kém hơn mức nền — xem chi tiết ở đầu danh sách"
+            className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300"
+          >
+            kém hơn mức nền
+          </span>
+        )}
         {showSymbol && (
           <Link
             href={`/symbol/${signal.symbol}`}
@@ -37,7 +51,7 @@ export function SignalRow({ signal, showSymbol = true }: SignalRowProps) {
           {signal.timeframe}
         </span>
         <span className="text-[11px] font-medium text-slate-400">
-          confidence {Math.round(signal.confidence)}%
+          độ tin cậy {Math.round(signal.confidence)}%
         </span>
         <span className="ml-auto text-[11px] text-slate-500">{formatDateTime(signal.timestamp)}</span>
       </div>

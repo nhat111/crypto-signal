@@ -66,6 +66,12 @@ export interface Signal {
 
 export interface SignalsResponse {
   signals: Signal[];
+  /**
+   * Sent alongside the list rather than embedded per signal: there are
+   * nine types and up to five hundred rows, so a copy per row would be the
+   * same handful of objects repeated a hundred times over the wire.
+   */
+  verdicts?: SignalVerdict[];
 }
 
 export interface SymbolLatest extends OverviewRow {
@@ -109,6 +115,7 @@ export interface SymbolDetailResponse {
   series: SymbolSeriesPoint[];
   signals: Signal[];
   priceLevels: PriceLevels | null;
+  verdicts?: SignalVerdict[];
 }
 
 export interface PerformanceResult {
@@ -128,6 +135,43 @@ export interface PerformanceResult {
   netNegativeMovePct: number;
   costPct: number;
   sufficientData: boolean;
+  /**
+   * The comparison against the baseline, decided server-side.
+   *
+   * Not computed here: the confidence interval widens with how many types
+   * are being judged together, and only the server knows that count. Two
+   * implementations of the same test is two chances to disagree about
+   * what the evidence says. Null when the type has too few samples to
+   * judge at all — which is a different statement from "judged and could
+   * not tell" (that is `indistinguishable`).
+   */
+  verdict: EdgeVerdict | null;
+  deltaPp: number | null;
+  marginPp: number | null;
+  samplesNeeded: number | null;
+}
+
+/** 'beats' / 'worse' clear the baseline in one direction; 'indistinguishable' means not enough evidence, never "no edge". */
+export type EdgeVerdict = 'beats' | 'worse' | 'indistinguishable';
+
+/**
+ * What the recorded outcomes have concluded about a signal type, cached by
+ * the worker and read wherever a signal is shown. Fixed horizon and source
+ * so the conclusion cannot be quietly picked to suit the answer.
+ */
+export interface SignalVerdict {
+  signalType: SignalType;
+  horizon: Horizon;
+  source: string;
+  verdict: EdgeVerdict;
+  deltaPp: number;
+  marginPp: number | null;
+  sampleCount: number;
+  hitPct: number;
+  baselinePct: number;
+  baselineSampleCount: number;
+  comparisons: number;
+  computedAt: number;
 }
 
 /**
@@ -166,6 +210,8 @@ export interface PerformanceResponse {
   source: PerformanceSource;
   results: PerformanceResult[];
   baseline: PerformanceBaseline;
+  /** How many results were judged together — what the margins were widened by. */
+  comparisons: number;
 }
 
 /* ---------- Macro flow ---------- */

@@ -1,6 +1,12 @@
 /**
  * Whether a signal's hit rate is distinguishable from the baseline.
  *
+ * Lives here rather than in the web app because three surfaces now ask the
+ * same question — the performance page, the signal list, and the Telegram
+ * alert — and the web app deliberately has no workspace dependencies, so a
+ * copy over there would be a second implementation free to drift from this
+ * one. The API computes the verdict and every surface renders it.
+ *
  * The card used to subtract two percentages and colour the result green
  * when the difference was positive. That treats 30 samples and 10.000
  * samples identically, so a signal at 58% on 30 outcomes rendered as

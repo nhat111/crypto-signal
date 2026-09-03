@@ -120,7 +120,7 @@ async function dispatchAlert(ctx: WorkerContext, signal: Signal, signalId: strin
   const shouldAlert = shouldSendAlert(signal, lastAlert, ctx.config.alert.cooldownMinutes, ctx.config.alert.confidenceDeltaRetrigger, Date.now());
   if (!shouldAlert) return;
 
-  const text = formatAlertMessage(signal, health, risk);
+  const text = formatAlertMessage(signal, health, risk, ctx.signalVerdicts.get(signal.signalType));
 
   // Subscribers = static env list (ALERT_CHAT_IDS) union chats that ran
   // /start and have alerts_enabled in bot_settings (spec §20 /alerts,

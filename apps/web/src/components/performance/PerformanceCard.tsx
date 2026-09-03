@@ -1,15 +1,12 @@
 import { SignalTypeBadge } from '@/components/SignalTypeBadge';
 import type { PerformanceBaseline, PerformanceResult } from '@/lib/types';
 import { cx, formatPct } from '@/lib/format';
-import { compareToBaseline, samplesNeeded } from '@/lib/edge';
 
 const MIN_SAMPLES = 30;
 
 interface PerformanceCardProps {
   result: PerformanceResult;
   baseline: PerformanceBaseline;
-  /** How many cards on this screen are making a claim at once — see `criticalZ`. */
-  comparisons: number;
 }
 
 /**
@@ -18,7 +15,7 @@ interface PerformanceCardProps {
  * data" state as the headline — same size/weight as the real numbers would
  * have been, not a footnote — so it can't be skimmed past.
  */
-export function PerformanceCard({ result, baseline, comparisons }: PerformanceCardProps) {
+export function PerformanceCard({ result, baseline }: PerformanceCardProps) {
   const { signalType, sampleCount, positiveMovePct, negativeMovePct, medianMovePct, sufficientData, horizon } =
     result;
 
@@ -37,7 +34,7 @@ export function PerformanceCard({ result, baseline, comparisons }: PerformanceCa
             <Stat label="Giảm" value={`${negativeMovePct.toFixed(0)}%`} tone="rose" />
             <Stat label="Trung vị" value={formatPct(medianMovePct)} />
           </div>
-          <VsBaseline result={result} baseline={baseline} comparisons={comparisons} />
+          <VsBaseline result={result} baseline={baseline} />
           <AfterCost result={result} baseline={baseline} />
         </>
       )}
@@ -64,29 +61,16 @@ export function PerformanceCard({ result, baseline, comparisons }: PerformanceCa
  * is how this page would have manufactured edge out of noise exactly when
  * replayed outcomes started arriving in bulk.
  */
-function VsBaseline({
-  result,
-  baseline,
-  comparisons,
-}: {
-  result: PerformanceResult;
-  baseline: PerformanceBaseline;
-  comparisons: number;
-}) {
+function VsBaseline({ result, baseline }: { result: PerformanceResult; baseline: PerformanceBaseline }) {
   if (baseline.positiveMovePct === null || baseline.medianMovePct === null) return null;
 
-  const { verdict, deltaPp, marginPp } = compareToBaseline(
-    result.positiveMovePct,
-    result.sampleCount,
-    baseline.positiveMovePct,
-    baseline.sampleCount,
-    comparisons,
-  );
+  // Decided server-side. The margin widens with how many types are judged
+  // together and only the API knows that count, so a second
+  // implementation here could only ever disagree with the one that the
+  // Telegram alert and the signal list also read from.
+  const { verdict, deltaPp, marginPp, samplesNeeded: needed } = result;
+  if (verdict === null || deltaPp === null) return null;
   const medianDelta = result.medianMovePct - baseline.medianMovePct;
-  const needed =
-    verdict === 'indistinguishable'
-      ? samplesNeeded(result.positiveMovePct, baseline.positiveMovePct, baseline.sampleCount, comparisons)
-      : null;
 
   const tone =
     verdict === 'beats' ? 'text-emerald-400' : verdict === 'worse' ? 'text-rose-400' : 'text-slate-400';

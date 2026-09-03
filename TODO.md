@@ -101,9 +101,15 @@ Check items as they land; each phase's commit message references the phase.
       the cost of taking the trade as well as against zero. At 4h the
       baseline median move is +0.05%, so a card could beat the baseline and
       still lose on every fill; both figures are now shown side by side.
-- [ ] Per-signal-type verdicts do not reach the dashboard or Telegram — a
-      type proven worse than baseline is still presented neutrally where
-      the decision is actually made.
+- [x] Per-signal-type verdicts reach the dashboard and Telegram: the worker
+      re-judges every type hourly into `signal_verdicts` (migration 014),
+      and a type proven worse than the baseline is flagged on the signals
+      list, the symbol page and the alert push. Fixed horizon and source
+      (`VERDICT_HORIZON`), chosen in advance so the conclusion cannot be
+      picked to suit the answer.
+- [x] One implementation of the significance test, in `packages/db/src/edge.ts`
+      — the web app has no workspace deps, so a copy there could only drift
+      from the one the API and Telegram read.
 - [ ] Signal rarity: ~10.000 SELLING_ABSORPTION outcomes in a month means
       the rule is nearly always on. Thresholds need tuning against recorded
       outcomes now that there are some (see also Phase 17's weights).

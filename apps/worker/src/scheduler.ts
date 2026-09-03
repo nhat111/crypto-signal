@@ -1,15 +1,17 @@
 import {
   HEARTBEAT_INTERVAL_MS,
   RUNTIME_WORKER,
+  computeSignalVerdicts,
   countPendingOutcomes,
   getHistoricalScoreForSignalType,
   getResolvableOutcomes,
   pruneOldLiquidations,
   recordOutcomePrice,
   recordWorkerHeartbeat,
+  saveSignalVerdicts,
   type OutcomeHorizon,
 } from '@crypto-signal/db';
-import { ALL_SIGNAL_TYPES } from '@crypto-signal/signal-engine';
+import { ALL_SIGNAL_TYPES, type SignalType } from '@crypto-signal/signal-engine';
 import { processMatchedCandles } from './pipeline.js';
 import { runGemOutcomeTracker, runGemScanCycle, type GemScanDeps } from './gemScan.js';
 import { runGemWatchCycle, type GemWatchDeps } from './gemWatch.js';
@@ -68,6 +70,30 @@ export async function refreshHistoricalScores(ctx: WorkerContext): Promise<void>
     if (score !== undefined) ctx.historicalScores.set(signalType, score);
     else ctx.historicalScores.delete(signalType);
   }
+}
+
+/**
+ * Re-judges every signal type against the baseline and caches the result.
+ *
+ * The judgement itself is not new — /performance has made it per request
+ * for a while. What is new is that the dashboard and the Telegram alert
+ * can now read it, and neither could afford to compute it: the baseline
+ * is a lateral join across every 5m candle in the measured window.
+ *
+ * Hourly is generous. Outcomes resolve on a 5-minute tracker and the
+ * sample counts here are in the thousands, so an hour of staleness cannot
+ * move a verdict — and a verdict that would flip within an hour was never
+ * a verdict worth showing.
+ */
+export async function refreshSignalVerdicts(ctx: WorkerContext): Promise<void> {
+  const verdicts = await computeSignalVerdicts(ctx.pool, ALL_SIGNAL_TYPES);
+  await saveSignalVerdicts(ctx.pool, verdicts);
+  // Replaced wholesale, not merged: a type that has fallen below the
+  // sample threshold must lose its verdict rather than keep the last one.
+  ctx.signalVerdicts.clear();
+  for (const v of verdicts) ctx.signalVerdicts.set(v.signalType as SignalType, v);
+  const worse = verdicts.filter((v) => v.verdict === 'worse').map((v) => v.signalType);
+  ctx.logger.info({ judged: verdicts.length, worse }, 'signal verdicts refreshed');
 }
 
 export async function runRetention(ctx: WorkerContext): Promise<void> {
@@ -148,6 +174,7 @@ export function startSchedulers(ctx: WorkerContext): () => void {
 
   timers.push(setInterval(() => void runOutcomeTracker(ctx).catch((err) => ctx.logger.error({ err }, 'outcome tracker failed')), 5 * 60_000));
   timers.push(setInterval(() => void refreshHistoricalScores(ctx).catch((err) => ctx.logger.error({ err }, 'historical score refresh failed')), 10 * 60_000));
+  timers.push(setInterval(() => void refreshSignalVerdicts(ctx).catch((err) => ctx.logger.error({ err }, 'signal verdict refresh failed')), 60 * 60_000));
   timers.push(setInterval(() => void runRetention(ctx).catch((err) => ctx.logger.error({ err }, 'retention job failed')), 24 * 60 * 60_000));
   timers.push(setInterval(() => void resolveTimedOutPairs(ctx).catch((err) => ctx.logger.error({ err }, 'pair buffer timeout resolution failed')), 5_000));
 
@@ -184,6 +211,9 @@ export function startSchedulers(ctx: WorkerContext): () => void {
   );
 
   void refreshHistoricalScores(ctx).catch((err) => ctx.logger.error({ err }, 'initial historical score refresh failed'));
+  // On boot too: a fresh deploy would otherwise show no verdicts anywhere
+  // for an hour, which reads identically to "nothing has been concluded".
+  void refreshSignalVerdicts(ctx).catch((err) => ctx.logger.error({ err }, 'initial signal verdict refresh failed'));
 
   return () => timers.forEach(clearInterval);
 }

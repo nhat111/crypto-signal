@@ -1,5 +1,12 @@
 import type { FastifyInstance } from 'fastify';
-import { getEnabledSymbols, getLatestSymbolState, getRecentCandles, getRecentSignals, getSymbolTimeseries } from '@crypto-signal/db';
+import {
+  getEnabledSymbols,
+  getLatestSymbolState,
+  getRecentCandles,
+  getRecentSignals,
+  getSignalVerdicts,
+  getSymbolTimeseries,
+} from '@crypto-signal/db';
 import { computeBollingerBands, type BollingerBands } from '@crypto-signal/indicators';
 import type { Timeframe } from '@crypto-signal/shared';
 import type { ApiDeps } from '../deps.js';
@@ -32,11 +39,15 @@ export function registerSymbolRoute(app: FastifyInstance, deps: ApiDeps): void {
     }
     const limit = Math.min(1000, Number(req.query.limit ?? 200));
 
-    const [latest, series, signals, recentCandles] = await Promise.all([
+    const [latest, series, signals, recentCandles, verdicts] = await Promise.all([
       getLatestSymbolState(deps.pool, symbol, timeframe),
       getSymbolTimeseries(deps.pool, symbol, timeframe, limit),
       getRecentSignals(deps.pool, { symbol, timeframe, limit: 20 }),
       getRecentCandles(deps.pool, symbol, 'futures', timeframe, BOLLINGER_PERIOD),
+      // Same conclusions the signals list carries, so a type flagged as
+      // worse than the baseline is flagged wherever the signal is shown
+      // rather than only on the page that happens to fetch them.
+      getSignalVerdicts(deps.pool).catch(() => []),
     ]);
 
     const priceLevels: BollingerBands | null = computeBollingerBands(
@@ -44,6 +55,6 @@ export function registerSymbolRoute(app: FastifyInstance, deps: ApiDeps): void {
       BOLLINGER_PERIOD,
     );
 
-    return { symbol, timeframe, latest: latest ?? null, series, signals, priceLevels };
+    return { symbol, timeframe, latest: latest ?? null, series, signals, priceLevels, verdicts };
   });
 }

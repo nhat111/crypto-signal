@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareToBaseline, criticalZ, normalQuantile, samplesNeeded } from './edge';
+import { compareToBaseline, criticalZ, normalQuantile, samplesNeeded } from './edge.js';
 
 // The live baseline at the time this was written: 51% over 10.736 windows.
 const BASE = 51;

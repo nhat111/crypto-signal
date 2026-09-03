@@ -103,15 +103,19 @@ export default function OverviewPage() {
 
       <section>
         <div className="mb-3 flex items-baseline justify-between">
-          <h2 className="text-lg font-bold text-slate-100">Recent Signals</h2>
+          <h2 className="text-lg font-bold text-slate-100">Tín hiệu gần đây</h2>
           <a href="/signals" className="text-xs font-medium text-sky-400 hover:text-sky-300">
-            View all →
+            Xem tất cả →
           </a>
         </div>
         {signals.loading && !signals.data ? (
-          <LoadingPanel label="Loading signals…" />
+          <LoadingPanel label="Đang tải tín hiệu…" />
         ) : (
-          <SignalList signals={signals.data?.signals ?? []} emptyLabel="No signals fired yet." />
+          <SignalList
+            signals={signals.data?.signals ?? []}
+            verdicts={signals.data?.verdicts}
+            emptyLabel="Chưa có tín hiệu nào."
+          />
         )}
       </section>
     </div>

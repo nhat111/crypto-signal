@@ -1,5 +1,12 @@
 import type { FastifyInstance } from 'fastify';
-import { getBaselinePerformance, getSignalPerformance, isDataSource, type DataSource } from '@crypto-signal/db';
+import {
+  getBaselinePerformance,
+  getSignalPerformance,
+  isDataSource,
+  judgeSignalTypes,
+  verdictSamplesNeeded,
+  type DataSource,
+} from '@crypto-signal/db';
 import { ALL_SIGNAL_TYPES, type SignalType } from '@crypto-signal/signal-engine';
 import type { ApiDeps } from '../deps.js';
 
@@ -49,7 +56,31 @@ export function registerPerformanceRoute(app: FastifyInstance, deps: ApiDeps): v
       ),
       getBaselinePerformance(deps.pool, horizon as Horizon, source),
     ]);
-    return { horizon, source: req.query.source ?? 'live', results, baseline };
+
+    // The verdict is decided here rather than in each client, because the
+    // confidence interval widens with how many types are judged together
+    // and only this side knows that count. Two clients computing it
+    // independently is two chances to get the family size wrong.
+    const verdicts = judgeSignalTypes(results, baseline, Date.now());
+    const byType = new Map(verdicts.map((v) => [v.signalType, v]));
+    const enriched = results.map((r) => {
+      const v = byType.get(r.signalType);
+      return {
+        ...r,
+        verdict: v?.verdict ?? null,
+        deltaPp: v?.deltaPp ?? null,
+        marginPp: v?.marginPp ?? null,
+        samplesNeeded: v ? verdictSamplesNeeded(v) : null,
+      };
+    });
+
+    return {
+      horizon,
+      source: req.query.source ?? 'live',
+      results: enriched,
+      baseline,
+      comparisons: verdicts.length,
+    };
   });
 
   app.get<{ Params: { signalType: string }; Querystring: PerformanceQuery }>('/api/performance/:signalType', async (req, reply) => {

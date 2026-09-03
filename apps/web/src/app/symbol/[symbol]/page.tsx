@@ -67,12 +67,13 @@ export default function SymbolDetailPage() {
 
           <section>
             <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-400">
-              Signals ({timeframe})
+              Tín hiệu (khung {timeframe})
             </h2>
             <SignalList
               signals={detail.data.signals}
+              verdicts={detail.data.verdicts}
               showSymbol={false}
-              emptyLabel={`No signals for ${symbol} on ${timeframe} yet.`}
+              emptyLabel={`Chưa có tín hiệu nào cho ${symbol} ở khung ${timeframe}.`}
             />
           </section>
         </>

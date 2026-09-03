@@ -5,6 +5,8 @@ export * from './metrics.js';
 export * from './liquidations.js';
 export * from './signals.js';
 export * from './outcomes.js';
+export * from './edge.js';
+export * from './verdicts.js';
 export * from './botUsers.js';
 export * from './symbols.js';
 export * from './queries.js';

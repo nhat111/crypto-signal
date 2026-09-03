@@ -1,6 +1,7 @@
 import type { Logger } from '@crypto-signal/shared';
 import type { Signal } from '@crypto-signal/signal-engine';
 import type { HealthResult, RiskResult } from '@crypto-signal/health-engine';
+import { verdictWarning, type SignalVerdict } from '@crypto-signal/db';
 
 /**
  * Sends the proactive alert push directly to Telegram's Bot API. This is
@@ -45,7 +46,26 @@ const SEVERITY_EMOJI: Record<Signal['severity'], string> = {
   EXTREME: '🚨',
 };
 
-export function formatAlertMessage(signal: Signal, health: HealthResult | null, risk: RiskResult): string {
+/**
+ * The alert, plus what the recorded outcomes say about this type.
+ *
+ * An alert's default reading is "this is worth paying attention to", so a
+ * type the evidence says is *reliably worse than doing nothing* cannot be
+ * sent looking like every other type — that is the system measuring
+ * something and then not telling the person it measured it for.
+ *
+ * Only the negative verdict is carried. A "beats the baseline" line
+ * attached to a live signal reads as a recommendation to trade, which this
+ * project does not make; someone who wants the full evidence can open
+ * /performance, and the warning line says where it came from.
+ */
+export function formatAlertMessage(
+  signal: Signal,
+  health: HealthResult | null,
+  risk: RiskResult,
+  verdict?: SignalVerdict,
+): string {
+  const warning = verdictWarning(verdict);
   const lines = [
     `${SEVERITY_EMOJI[signal.severity]} <b>MARKET HEALTH ALERT</b>`,
     '',
@@ -61,5 +81,6 @@ export function formatAlertMessage(signal: Signal, health: HealthResult | null, 
     '<b>Why:</b>',
     ...signal.reasons.map((r, i) => `${i + 1}. ${r}`),
   ];
+  if (warning) lines.push('', `⚠️ <b>${warning}</b>`);
   return lines.join('\n');
 }

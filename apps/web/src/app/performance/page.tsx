@@ -18,10 +18,10 @@ export default function PerformancePage() {
   const fetcher = useCallback(() => getPerformance(horizon, source), [horizon, source]);
   const performance = usePolling(fetcher, POLL_MS, [horizon, source]);
   const isBootstrapping = performance.loading && !performance.data;
-  // Only the cards that actually render a verdict belong to the family; the
-  // "not enough data" ones make no claim, so counting them would penalise
-  // the rest for nothing.
-  const comparisons = performance.data?.results.filter((r) => r.sufficientData).length ?? 1;
+  // Reported by the API, which is where the comparison is made. Only cards
+  // that actually render a verdict belong to the family; the "not enough
+  // data" ones make no claim, so counting them would penalise the rest.
+  const comparisons = performance.data?.comparisons ?? 0;
 
   return (
     <div className="space-y-4">
@@ -88,12 +88,7 @@ export default function PerformancePage() {
           )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {performance.data?.results.map((result) => (
-              <PerformanceCard
-                key={result.signalType}
-                result={result}
-                baseline={performance.data!.baseline}
-                comparisons={comparisons}
-              />
+              <PerformanceCard key={result.signalType} result={result} baseline={performance.data!.baseline} />
             ))}
           </div>
         </>
