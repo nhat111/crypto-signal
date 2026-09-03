@@ -42,22 +42,24 @@ export function BaselinePanel({ baseline }: BaselinePanelProps) {
           value={baseline.medianMovePct === null ? '—' : formatPct(baseline.medianMovePct)}
         />
         <Cell
-          label={`Đủ bù phí (long)`}
-          value={baseline.netPositiveMovePct === null ? '—' : `${baseline.netPositiveMovePct.toFixed(0)}%`}
+          label="Đủ bù phí (long)"
+          value={typeof baseline.netPositiveMovePct === 'number' ? `${baseline.netPositiveMovePct.toFixed(0)}%` : '—'}
         />
         <Cell
-          label={`Đủ bù phí (short)`}
-          value={baseline.netNegativeMovePct === null ? '—' : `${baseline.netNegativeMovePct.toFixed(0)}%`}
+          label="Đủ bù phí (short)"
+          value={typeof baseline.netNegativeMovePct === 'number' ? `${baseline.netNegativeMovePct.toFixed(0)}%` : '—'}
         />
       </div>
 
       <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
         Đo từ mọi nến 5m trong khoảng trên, đúng cách mà kết quả tín hiệu được đo. Một loại tín hiệu chỉ nói lên
         điều gì đó nếu nó vượt được các con số này — bằng chúng nghĩa là nó không chọn lọc được gì.{' '}
-        <span className="text-slate-400">
-          Hai ô cuối tính theo phí khứ hồi ~{baseline.costPct.toFixed(2).replace('.', ',')}%: tỉ lệ cửa sổ mà giá
-          đi đủ xa để bù chi phí vào lệnh.
-        </span>
+        {typeof baseline.costPct === 'number' && (
+          <span className="text-slate-400">
+            Hai ô cuối tính theo phí khứ hồi ~{baseline.costPct.toFixed(2).replace('.', ',')}%: tỉ lệ cửa sổ mà
+            giá đi đủ xa để bù chi phí vào lệnh.
+          </span>
+        )}
       </p>
     </div>
   );

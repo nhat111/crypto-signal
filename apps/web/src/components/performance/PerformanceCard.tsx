@@ -137,6 +137,12 @@ function AfterCost({ result, baseline }: { result: PerformanceResult; baseline: 
   const baseUp = baseline.netPositiveMovePct;
   const baseDown = baseline.netNegativeMovePct;
 
+  // The web app deploys separately from the API, so for a few minutes it
+  // can be talking to a build that predates these fields. Rendering a
+  // block less is a fine outcome; `undefined.toFixed()` would take the
+  // whole page down, and it would happen exactly during a deploy.
+  if (typeof up !== 'number' || typeof down !== 'number' || typeof cost !== 'number') return null;
+
   return (
     <div className="mt-2 rounded border border-slate-800/70 bg-slate-950/40 px-3 py-2">
       <p className="text-[10px] uppercase tracking-wide text-slate-500">
