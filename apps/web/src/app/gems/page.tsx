@@ -121,6 +121,12 @@ function GemPerformancePanel({ data, loading, error }: PerformancePanelProps) {
           hint="Tỉ lệ token được đưa lên rồi thanh khoản tụt xuống dưới 20% so với lúc quét."
         />
       </dl>
+      <p className="text-[11px] leading-relaxed text-slate-500">
+        Bốn ô trên tính trên những token <span className="font-semibold text-slate-400">đủ điểm để báo động</span>{' '}
+        — tức &ldquo;khi scanner thật sự gọi tên một cái gì đó thì sau đó ra sao&rdquo;. Bảng bên dưới thì tính
+        trên <span className="font-semibold text-slate-400">mọi token qua được vòng lọc</span>, vì không có nhóm
+        điểm thấp thì không so được điểm cao với cái gì.
+      </p>
       <ScoreEdgePanel edge={data.scoreEdge} />
     </div>
   );
@@ -156,10 +162,21 @@ function ScoreEdgePanel({ edge }: { edge?: import('@/lib/types').GemScoreEdge })
       </p>
 
       {verdict === null ? (
-        <p className="mt-1 text-sm">
-          Chưa so được. Cần ít nhất 20 kết quả ở <span className="font-semibold">cả hai đầu</span> thang điểm
-          (dưới 50 và từ 70 trở lên) thì mới trả lời được câu này.
-        </p>
+        <div className="mt-1 space-y-1.5 text-sm">
+          <p>
+            Chưa so được. Cần ít nhất 20 kết quả ở <span className="font-semibold">cả hai đầu</span> thang điểm
+            (dưới 50 và từ 70 trở lên) thì mới trả lời được câu này.
+          </p>
+          {/* The most likely reason the low bands are empty, said out loud
+              rather than left as a shrug: for a long time outcomes were
+              only recorded above the alert threshold, so there is simply no
+              history of low-scoring tokens to compare against. */}
+          <p className="text-[11px] leading-relaxed opacity-80">
+            Nếu bậc thấp đang là 0 mẫu: trước đây hệ thống chỉ theo dõi kết quả của token đủ điểm để báo động,
+            nên không có đối chứng nào cả. Từ bản này trở đi mọi token qua được vòng lọc đều được theo dõi — bậc
+            thấp sẽ đầy dần, và cần khoảng một tuần cho mốc 7d.
+          </p>
+        </div>
       ) : verdict.verdict === 'beats' ? (
         <p className="mt-1 text-sm">
           <span className="font-bold">Có.</span> Token điểm cao đi lên nhiều hơn token điểm thấp{' '}

@@ -1,4 +1,7 @@
 export * from './pool.js';
+// Exported so tests in other workspaces can reach a real database too — the
+// gem outcome writer lives in apps/worker but what it writes is read here.
+export * from './testPool.js';
 export * from './provenance.js';
 export * from './candles.js';
 export * from './metrics.js';

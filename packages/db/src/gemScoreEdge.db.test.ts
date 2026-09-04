@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
-import { createTestPool, hasTestDatabase } from './testPool.js';
-import { GEM_ROUND_TRIP_COST_PCT, getGemScoreEdge } from './gems.js';
+import { GEM_TABLES_LOCK, createTestPool, hasTestDatabase, lockTestTables } from './testPool.js';
+import { GEM_ROUND_TRIP_COST_PCT, getGemPerformance, getGemScoreEdge } from './gems.js';
 
 /**
  * Whether a higher Gem Score actually precedes better outcomes.
@@ -30,14 +30,20 @@ describe.skipIf(!hasTestDatabase)('gem score edge against real Postgres', () => 
     );
   }
 
+  let releaseLock: () => Promise<void>;
+
   beforeAll(async () => {
     pool = createTestPool();
+    // These tables are cleared between cases, and another suite in a
+    // different workspace clears them too.
+    releaseLock = await lockTestTables(pool, GEM_TABLES_LOCK);
   });
   beforeEach(async () => {
     await pool.query('DELETE FROM gem_outcomes');
     await pool.query('DELETE FROM gem_scans');
   });
   afterAll(async () => {
+    await releaseLock();
     await pool.end();
   });
 
@@ -104,5 +110,29 @@ describe.skipIf(!hasTestDatabase)('gem score edge against real Postgres', () => 
     expect(at7d?.liquidityCollapsePct).toBe(25);
     // 24h has no liquidity measurement, so claiming one would be inventing it.
     expect(at24h?.liquidityCollapsePct).toBeNull();
+  });
+
+  it('separates "what the scanner called" from "everything it looked at"', async () => {
+    // The bug this pair of behaviours exists for: outcomes used to be
+    // written only above the alert threshold, so every row scored 70+ and
+    // the band table had nothing to compare against. Widening the rows had
+    // to not quietly change what the headline number means.
+    for (let i = 0; i < 30; i += 1) await scan(80, 50); // alert-worthy
+    for (let i = 0; i < 30; i += 1) await scan(40, -50); // eligible, never alerted
+
+    const headline = await getGemPerformance(pool, '24h', 70);
+    const everything = await getGemPerformance(pool, '24h');
+
+    expect(headline.sampleCount).toBe(30);
+    expect(headline.positiveMovePct).toBe(100);
+    // Without the filter the low-scoring rows drag it to a coin flip, which
+    // is a true statement about a different question.
+    expect(everything.sampleCount).toBe(60);
+    expect(everything.positiveMovePct).toBe(50);
+
+    // And the band table sees both ends, which is the entire point.
+    const { bands } = await getGemScoreEdge(pool, '24h');
+    expect(bands.find((b) => b.key === 'low')?.sampleCount).toBe(30);
+    expect(bands.find((b) => b.key === 'high')?.sampleCount).toBe(30);
   });
 });

@@ -72,7 +72,8 @@ export async function runGemScanCycle(deps: GemScanDeps): Promise<void> {
   }
 }
 
-async function persistAndMaybeAlert(deps: GemScanDeps, gem: ScoredGem, scannedAt: number): Promise<void> {
+/** Exported as a test seam: the outcome row it writes is what the whole gem performance surface is computed from. */
+export async function persistAndMaybeAlert(deps: GemScanDeps, gem: ScoredGem, scannedAt: number): Promise<void> {
   const { pool, logger, gemConfig } = deps;
   const { pair, evaluation } = gem;
 
@@ -80,14 +81,27 @@ async function persistAndMaybeAlert(deps: GemScanDeps, gem: ScoredGem, scannedAt
   const scanId = await insertGemScan(pool, { pair, evaluation, safety: gem.safety, scannedAt });
 
   const score = evaluation.score ?? 0;
-  if (score < gemConfig.alert.minScore) return;
 
-  // Outcome rows exist only for tokens the scanner actually called, so the
-  // performance page answers "when this flagged something, what happened?"
-  // rather than being diluted by every routine rescan.
+  // Every eligible scan gets an outcome row, not only the ones scoring high
+  // enough to alert on.
+  //
+  // Tracking only the alerted ones seemed right — the performance page was
+  // meant to answer "when this flagged something, what happened?" — but it
+  // quietly made the more important question unanswerable. With outcomes
+  // recorded only above the alert threshold, every row in the table scored
+  // 70+, so there was nothing to compare a high score against and no way to
+  // tell whether the score predicted anything at all. The first real
+  // reading of the score-band table showed exactly that: 55 rows, all of
+  // them in one band.
+  //
+  // The headline still answers the original question — the performance
+  // query filters by the alert threshold — while these extra rows are what
+  // make the band comparison possible.
   if (pair.priceUsd !== null) {
     await ensureGemOutcome(pool, scanId, pair.priceUsd, pair.liquidityUsd);
   }
+
+  if (score < gemConfig.alert.minScore) return;
 
   const lastAlert = await getLastGemAlert(pool, pair.chainId, pair.baseToken.address);
   const cooldownMs = gemConfig.alert.cooldownHours * 60 * 60 * 1000;

@@ -177,10 +177,21 @@ Check items as they land; each phase's commit message references the phase.
       bottom one the same way a signal is judged against its baseline
       (`getGemScoreEdge`). A "win" is counted against a ~3% DEX round-trip
       cost, not against zero, because on a $50K pool a +1% move is a loss.
+- [x] Record an outcome for every eligible scan, not only those above the
+      alert threshold. Tracking only alerted scans meant every recorded row
+      scored 70+, so the band comparison had nothing to compare against —
+      55 production rows, all in one band. The headline still filters by
+      the alert threshold so it keeps meaning "when the scanner called
+      something".
 - [ ] Tune weights against recorded outcomes — current values are starting
       points with no track record behind them. Do this only once the band
       comparison above says the score predicts something; tuning a score
       that predicts nothing just overfits it.
+- [ ] A market baseline for gems: what a token that *failed* the filters did
+      over the same window. The band comparison answers "does the score
+      rank correctly"; it cannot answer "was any of this worth trading
+      versus the small-cap market", which needs outcomes for rejected
+      candidates.
 
 ## Known limitations (carried forward, not silently hidden)
 - [x] CI builds the production bundles and boots the Telegram one against

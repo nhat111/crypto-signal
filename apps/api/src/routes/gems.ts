@@ -41,7 +41,10 @@ export function registerGemRoutes(app: FastifyInstance, deps: ApiDeps): void {
     // the score have anything to do with it" — and reading the first
     // without the second is how a scanner with no edge keeps its job.
     const [performance, scoreEdge] = await Promise.all([
-      getGemPerformance(deps.pool, horizon),
+      // The headline keeps meaning "when the scanner called something";
+      // the band table below it deliberately counts everything eligible,
+      // because that is the only way to have something to compare against.
+      getGemPerformance(deps.pool, horizon, deps.gemConfig?.alert.minScore),
       getGemScoreEdge(deps.pool, horizon),
     ]);
     return { ...performance, scoreEdge };

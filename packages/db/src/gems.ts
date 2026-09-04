@@ -358,13 +358,33 @@ const MIN_GEM_SAMPLES = 20;
  * `sufficientData: false` and the UI must say so rather than showing
  * percentages — the same rule the market-health performance page follows.
  */
-export async function getGemPerformance(pool: Pool, horizon: GemHorizon): Promise<GemPerformance> {
+export async function getGemPerformance(
+  pool: Pool,
+  horizon: GemHorizon,
+  /**
+   * Only count scans that scored high enough to be alerted on.
+   *
+   * Outcomes are now recorded for every eligible scan, because without the
+   * low-scoring ones there is nothing to compare a high score against. But
+   * this figure has always meant "when the scanner actually called
+   * something, what happened?", and letting the extra rows in would change
+   * that meaning silently — the number would drift as the alert threshold
+   * moved, with nothing on the page saying so.
+   *
+   * Undefined counts everything, which is the honest default when the
+   * caller has no scanner config to read a threshold from.
+   */
+  alertMinScore?: number,
+): Promise<GemPerformance> {
   const moveCol = HORIZON_MOVE_COLUMN[horizon];
 
   const { rows } = await pool.query(
     `SELECT o.${moveCol} AS move, o.liquidity_at_scan_usd, o.liquidity_after_7d_usd
      FROM gem_outcomes o
-     WHERE o.${moveCol} IS NOT NULL`,
+     JOIN gem_scans s ON s.scan_id = o.scan_id
+     WHERE o.${moveCol} IS NOT NULL
+       ${alertMinScore === undefined ? '' : 'AND s.gem_score >= $1'}`,
+    alertMinScore === undefined ? [] : [alertMinScore],
   );
 
   const moves = rows.map((r) => Number(r.move)).sort((a, b) => a - b);
