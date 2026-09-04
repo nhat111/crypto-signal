@@ -23,6 +23,12 @@ const envSchema = z.object({
   NEXT_PUBLIC_API_BASE_URL: z.string().default('http://localhost:4000'),
 
   TELEGRAM_BOT_TOKEN: z.string().default(''),
+  // Telegram's own host by default. Overridable because the failure that
+  // matters here — the bundler renaming a class node-fetch matches by name
+  // — only happens inside the polling loop, which cannot be reached unless
+  // something answers getMe first. Also what a self-hosted Bot API server
+  // would need.
+  TELEGRAM_API_ROOT: z.string().default('https://api.telegram.org'),
   TELEGRAM_ALERT_CHAT_IDS: z.string().default(''),
 
   SYMBOLS: z.string().default('BTCUSDT,ETHUSDT,SOLUSDT'),
@@ -108,6 +114,7 @@ export interface AppConfig {
   apiHost: string;
   apiBaseUrl: string;
   telegramBotToken: string;
+  telegramApiRoot: string;
   telegramAlertChatIds: string[];
   symbols: string[];
   /** Symbols tracked in reduced (Futures-only, no Spot) mode — disjoint from `symbols`. */
@@ -181,6 +188,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     apiHost: parsed.API_HOST,
     apiBaseUrl: parsed.NEXT_PUBLIC_API_BASE_URL,
     telegramBotToken: parsed.TELEGRAM_BOT_TOKEN,
+    telegramApiRoot: parsed.TELEGRAM_API_ROOT,
     telegramAlertChatIds: parsed.TELEGRAM_ALERT_CHAT_IDS.split(',').map((s) => s.trim()).filter(Boolean),
     symbols: parsed.SYMBOLS.split(',').map((s) => s.trim()).filter(Boolean),
     futuresOnlySymbols: parsed.FUTURES_ONLY_SYMBOLS.split(',').map((s) => s.trim()).filter(Boolean),

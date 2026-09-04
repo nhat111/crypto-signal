@@ -27,7 +27,7 @@ async function main(): Promise<void> {
   }
 
   const api = new ApiClient(config.apiBaseUrl);
-  const bot = new Telegraf(config.telegramBotToken);
+  const bot = new Telegraf(config.telegramBotToken, { telegram: { apiRoot: config.telegramApiRoot } });
 
   // Telegraf needs every command registered before launch, so the symbol
   // list is read once here from the API (which reads it from the database,

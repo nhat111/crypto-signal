@@ -176,10 +176,11 @@ Check items as they land; each phase's commit message references the phase.
       points with no track record behind them.
 
 ## Known limitations (carried forward, not silently hidden)
-- [ ] Nothing in CI builds the production bundles. `tsx` does not bundle, so
-      a bundler-only failure (see `--keep-names` in the Dockerfiles) is
-      green everywhere locally and dead in production. The flag now has a
-      static guard; the general case still needs a smoke build.
+- [x] CI builds the production bundles and boots the Telegram one against
+      stub services (`scripts/bundle-smoke.mjs`), because `tsx` does not
+      bundle and a bundler-only failure was green everywhere else while
+      production crash-looped. Verified against the real bug: removing
+      `--keep-names` fails the job.
 - [ ] Liquidation history cannot be backfilled on a cold start (exchange
       limitation, see ASSUMPTIONS §1/§6) — 24h rolling average anomaly needs
       ~24h of collector uptime before it's meaningful.

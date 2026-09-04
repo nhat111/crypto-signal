@@ -56,3 +56,11 @@ jobs:
       # Last, because it is the slowest and the least likely to be the
       # thing that broke.
       - run: npm run build
+
+      # Everything above runs through tsx or tsc, neither of which bundles.
+      # That gap cost a day: the Telegram service crash-looped in production
+      # on an esbuild rename while every check here stayed green. This
+      # builds what the Dockerfiles build and boots it against stub
+      # services, so the bundle is exercised rather than merely produced.
+      - name: Smoke-test the production bundles
+        run: node scripts/bundle-smoke.mjs
