@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
 import { GEM_TABLES_LOCK, createTestPool, hasTestDatabase, lockTestTables } from './testPool.js';
-import { GEM_ROUND_TRIP_COST_PCT, getGemPerformance, getGemScoreEdge } from './gems.js';
+import { GEM_ROUND_TRIP_COST_PCT, getGemComponentEdges, getGemPerformance, getGemScoreEdge } from './gems.js';
 
 /**
  * Whether a higher Gem Score actually precedes better outcomes.
@@ -14,13 +14,18 @@ import { GEM_ROUND_TRIP_COST_PCT, getGemPerformance, getGemScoreEdge } from './g
 describe.skipIf(!hasTestDatabase)('gem score edge against real Postgres', () => {
   let pool: Pool;
 
-  async function scan(score: number, movePct: number | null, liq?: { at: number; after: number }): Promise<void> {
+  async function scan(
+    score: number,
+    movePct: number | null,
+    liq?: { at: number; after: number },
+    components: Record<string, number> = {},
+  ): Promise<void> {
     const { rows } = await pool.query(
       `INSERT INTO gem_scans
          (chain_id, token_address, scanned_at, gem_score, gem_components, risk_score, risk_components, reasons)
-       VALUES ('solana', 'tok' || floor(random() * 1e12)::text, now(), $1, '{}'::jsonb, 10, '{}'::jsonb, '[]'::jsonb)
+       VALUES ('solana', 'tok' || floor(random() * 1e12)::text, now(), $1, $2::jsonb, 10, '{}'::jsonb, '[]'::jsonb)
        RETURNING scan_id`,
-      [score],
+      [score, JSON.stringify(components)],
     );
     await pool.query(
       `INSERT INTO gem_outcomes
@@ -134,5 +139,70 @@ describe.skipIf(!hasTestDatabase)('gem score edge against real Postgres', () => 
     const { bands } = await getGemScoreEdge(pool, '24h');
     expect(bands.find((b) => b.key === 'low')?.sampleCount).toBe(30);
     expect(bands.find((b) => b.key === 'high')?.sampleCount).toBe(30);
+  });
+
+  it('finds the one component that ranks backwards inside a score that looks like noise', async () => {
+    // The reason this exists. A weighted average can have one component
+    // pointing the wrong way and four pointing the right way, and come out
+    // looking like it predicts nothing at all. The total says "no edge";
+    // only the parts say where to fix it.
+    for (let i = 0; i < 60; i += 1) {
+      const wentUp = i < 30;
+      await scan(60, wentUp ? 25 : -25, undefined, {
+        // Backwards on purpose: old tokens do worse here.
+        survival: wentUp ? 10 : 90,
+        // Correct: real volume goes with better outcomes.
+        volumeConviction: wentUp ? 90 : 10,
+        // Inert: identical for everyone, so it can rank nothing.
+        liquidityQuality: 100,
+      });
+    }
+
+    const edges = await getGemComponentEdges(pool, '24h');
+    const survival = edges.find((e) => e.key === 'survival');
+    const volume = edges.find((e) => e.key === 'volumeConviction');
+    const liquidity = edges.find((e) => e.key === 'liquidityQuality');
+
+    expect(survival?.verdict?.verdict).toBe('worse');
+    expect(volume?.verdict?.verdict).toBe('beats');
+    // Inert is not the same as wrong, and the fix is different.
+    expect(liquidity?.degenerate).toBe(true);
+    expect(liquidity?.verdict).toBeNull();
+
+    // Meanwhile the total score says nothing, because the two cancel.
+    expect((await getGemScoreEdge(pool, '24h')).verdict).toBeNull();
+  });
+
+  it('reports every component even when none has been scored yet', async () => {
+    // A missing component is a gap in the record, not a zero.
+    await scan(80, 10, undefined, {});
+    const edges = await getGemComponentEdges(pool, '24h');
+    expect(edges).toHaveLength(5);
+    expect(edges.every((e) => e.verdict === null && !e.degenerate)).toBe(true);
+  });
+
+  it('carries the weight, so a finding can be read against how much it counts', async () => {
+    const edges = await getGemComponentEdges(pool, '24h');
+    expect(edges.find((e) => e.key === 'survival')?.weight).toBe(20);
+    expect(edges.reduce((sum, e) => sum + e.weight, 0)).toBe(100);
+  });
+
+  it('widens the interval because five components are judged at once', async () => {
+    // A gap that would clear a lone 95% test has to clear a wider one here:
+    // run five comparisons off one screen and one of them looks
+    // significant by luck. 70% against 50% on sixty samples each sits
+    // deliberately between the two thresholds.
+    for (let i = 0; i < 60; i += 1) {
+      await scan(60, i < 42 ? 20 : -20, undefined, { buyPressure: 90 });
+    }
+    for (let i = 0; i < 60; i += 1) {
+      await scan(60, i < 30 ? 20 : -20, undefined, { buyPressure: 10 });
+    }
+
+    const buyPressure = (await getGemComponentEdges(pool, '24h')).find((e) => e.key === 'buyPressure');
+    expect(buyPressure?.verdict?.deltaPp).toBeCloseTo(20, 5);
+    expect(buyPressure?.verdict?.verdict).toBe('indistinguishable');
+    // And the margin is the reason, not a thin sample.
+    expect(buyPressure?.verdict?.marginPp as number).toBeGreaterThan(20);
   });
 });

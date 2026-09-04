@@ -128,6 +128,7 @@ function GemPerformancePanel({ data, loading, error }: PerformancePanelProps) {
         điểm thấp thì không so được điểm cao với cái gì.
       </p>
       <ScoreEdgePanel edge={data.scoreEdge} />
+      <ComponentEdgePanel edges={data.componentEdges} />
     </div>
   );
 }
@@ -256,5 +257,111 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
       <dt className="text-[11px] text-slate-500">{label}</dt>
       <dd className="text-base font-bold tabular-nums text-slate-100">{value}</dd>
     </div>
+  );
+}
+
+/**
+ * Which of the five bets the Gem Score makes actually pays.
+ *
+ * The table above answers "is the score worth trusting". This answers "and
+ * if not, which number is wrong" — a distinction that matters because the
+ * weights shipped as guesses and fixing a component that ranks backwards
+ * costs one line, while inventing a new strategy costs weeks.
+ *
+ * Three outcomes get different words on purpose. A component that ranks
+ * correctly is working. One that ranks backwards is worse than useless: it
+ * is actively pulling the score the wrong way and its weight should
+ * probably flip. One that barely varies is neither — it is inert, carrying
+ * weight while ranking nothing, and the fix there is to make it
+ * discriminate rather than to change its sign.
+ */
+function ComponentEdgePanel({ edges }: { edges?: import('@/lib/types').GemComponentEdge[] }) {
+  if (!edges || edges.length === 0) return null;
+
+  const decided = edges.filter((e) => e.verdict !== null).length;
+
+  return (
+    <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        Trong 5 tiêu chí, cái nào đang đúng?
+      </p>
+      <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+        Điểm Gem là trung bình có trọng số của 5 tiêu chí. Một tiêu chí xếp hạng{' '}
+        <span className="font-semibold text-slate-400">ngược</span> có thể triệt tiêu bốn tiêu chí đúng, khiến tổng
+        điểm trông như vô dụng. Bảng trên nói có nên tin tổng điểm; bảng này nói phải sửa số nào.
+      </p>
+
+      <div className="mt-3 space-y-2">
+        {edges.map((edge) => (
+          <div key={edge.key} className="rounded border border-slate-800/70 bg-slate-950/60 px-2.5 py-2">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <p className="text-sm font-medium text-slate-200">
+                {edge.label}{' '}
+                <span className="text-[11px] font-normal text-slate-500">trọng số {edge.weight}%</span>
+              </p>
+              <ComponentVerdict edge={edge} />
+            </div>
+            <p className="mt-1 text-[11px] tabular-nums text-slate-500">
+              {edge.bands
+                .map((b) => `${b.label}: ${b.sampleCount} mẫu${b.sufficientData && b.positiveMovePct !== null ? ` · ${b.positiveMovePct}% lên` : ''}`)
+                .join('  ·  ')}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {decided === 0 && (
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+          Chưa tiêu chí nào đủ mẫu ở cả hai đầu để kết luận. Cần khoảng 20 kết quả ở nhóm điểm thấp và 20 ở nhóm
+          điểm cao của <span className="font-semibold text-slate-400">từng</span> tiêu chí.
+        </p>
+      )}
+      {decided > 0 && (
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+          Khoảng sai số đã nới theo <span className="font-semibold text-slate-400">5 phép so sánh cùng lúc</span> —
+          chạy đủ nhiều phép kiểm định thì kiểu gì cũng có một cái trông như có ý nghĩa do ngẫu nhiên.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ComponentVerdict({ edge }: { edge: import('@/lib/types').GemComponentEdge }) {
+  if (edge.degenerate) {
+    return (
+      <span className="rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+        không phân loại được
+      </span>
+    );
+  }
+  if (edge.verdict === null) {
+    return <span className="text-[11px] text-slate-600">chưa đủ mẫu</span>;
+  }
+  if (edge.verdict.verdict === 'beats') {
+    return (
+      <span className="text-[11px] font-semibold text-emerald-400 tabular-nums">
+        đúng hướng · +{edge.verdict.deltaPp.toFixed(0)}pp
+        {edge.verdict.marginPp !== null && (
+          <span className="font-normal text-slate-500"> (±{edge.verdict.marginPp.toFixed(0)})</span>
+        )}
+      </span>
+    );
+  }
+  if (edge.verdict.verdict === 'worse') {
+    return (
+      <span className="text-[11px] font-semibold text-rose-400 tabular-nums">
+        NGƯỢC HƯỚNG · {edge.verdict.deltaPp.toFixed(0)}pp
+        {edge.verdict.marginPp !== null && (
+          <span className="font-normal text-slate-500"> (±{edge.verdict.marginPp.toFixed(0)})</span>
+        )}
+      </span>
+    );
+  }
+  return (
+    <span className="text-[11px] text-slate-500 tabular-nums">
+      chưa rõ · {edge.verdict.deltaPp >= 0 ? '+' : ''}
+      {edge.verdict.deltaPp.toFixed(0)}pp
+      {edge.verdict.marginPp !== null && ` (±${edge.verdict.marginPp.toFixed(0)})`}
+    </span>
   );
 }

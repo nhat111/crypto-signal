@@ -183,10 +183,16 @@ Check items as they land; each phase's commit message references the phase.
       55 production rows, all in one band. The headline still filters by
       the alert threshold so it keeps meaning "when the scanner called
       something".
-- [ ] Tune weights against recorded outcomes — current values are starting
-      points with no track record behind them. Do this only once the band
-      comparison above says the score predicts something; tuning a score
-      that predicts nothing just overfits it.
+- [x] Per-component outcome analysis (`getGemComponentEdges`): each of the
+      five scoring components is banded and judged separately, so a
+      component ranking backwards is visible even when it cancels out
+      against the others and leaves the total looking like noise. Reads
+      `gem_components`, stored since the scanner shipped, so it looks back
+      over the whole history. Distinguishes "wrong" from "inert" — a
+      component that scores nearly every token identically carries weight
+      while ranking nothing, and needs a different fix.
+- [ ] Tune weights once the component table names a specific one. Current
+      values are guesses; tuning a score that predicts nothing overfits it.
 - [ ] A market baseline for gems: what a token that *failed* the filters did
       over the same window. The band comparison answers "does the score
       rank correctly"; it cannot answer "was any of this worth trading

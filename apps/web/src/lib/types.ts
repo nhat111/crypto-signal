@@ -338,6 +338,7 @@ export interface GemPerformance {
   sufficientData: boolean;
   /** Optional because an API predating it sends nothing — absent is not the same as "no edge". */
   scoreEdge?: GemScoreEdge;
+  componentEdges?: GemComponentEdge[];
 }
 
 export interface GemScoreBand {
@@ -352,6 +353,24 @@ export interface GemScoreBand {
   netPositiveMovePct: number | null;
   liquidityCollapsePct: number | null;
   sufficientData: boolean;
+}
+
+/**
+ * Whether each individual bet the score makes pays off.
+ *
+ * A weighted average can have one component ranking backwards and four
+ * ranking correctly, and come out looking like it predicts nothing. The
+ * total says whether to trust the score; this says which number to change.
+ */
+export interface GemComponentEdge {
+  key: string;
+  label: string;
+  /** Its share of the Gem Score, so a finding can be weighed against how much it counts today. */
+  weight: number;
+  bands: GemScoreBand[];
+  verdict: GemScoreEdge['verdict'];
+  /** Nearly every scan lands in one band: the component varies too little to rank anything. */
+  degenerate: boolean;
 }
 
 /**

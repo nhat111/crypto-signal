@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { getGemByAddress, getGemPerformance, getGemScoreEdge, getLatestGems, type GemHorizon } from '@crypto-signal/db';
+import { getGemByAddress, getGemComponentEdges, getGemPerformance, getGemScoreEdge, getLatestGems, type GemHorizon } from '@crypto-signal/db';
 import type { ApiDeps } from '../deps.js';
 
 interface GemsQuery {
@@ -40,13 +40,17 @@ export function registerGemRoutes(app: FastifyInstance, deps: ApiDeps): void {
     // two answer one question together — "did anything happen" and "did
     // the score have anything to do with it" — and reading the first
     // without the second is how a scanner with no edge keeps its job.
-    const [performance, scoreEdge] = await Promise.all([
+    const [performance, scoreEdge, componentEdges] = await Promise.all([
       // The headline keeps meaning "when the scanner called something";
-      // the band table below it deliberately counts everything eligible,
+      // the tables below it deliberately count everything eligible,
       // because that is the only way to have something to compare against.
       getGemPerformance(deps.pool, horizon, deps.gemConfig?.alert.minScore),
       getGemScoreEdge(deps.pool, horizon),
+      // Which of the five bets the score makes actually pay. The total can
+      // look like noise while two components cancel each other out, and
+      // only this says which one to change.
+      getGemComponentEdges(deps.pool, horizon),
     ]);
-    return { ...performance, scoreEdge };
+    return { ...performance, scoreEdge, componentEdges };
   });
 }

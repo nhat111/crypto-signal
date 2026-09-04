@@ -518,10 +518,26 @@ export async function getGemScoreEdge(pool: Pool, horizon: GemHorizon): Promise<
       WHERE o.${moveCol} IS NOT NULL`,
   );
 
-  const bands: GemScoreBand[] = GEM_SCORE_BANDS.map((band) => {
+  const bands = bandOutcomes(rows, (r) => Number(r.score), horizon);
+  return { horizon, costPct: GEM_ROUND_TRIP_COST_PCT, bands, verdict: judgeBands(bands, 1) };
+}
+
+interface BandableRow {
+  move: unknown;
+  liq_at_scan: unknown;
+  liq_after: unknown;
+}
+
+/** Splits outcomes into the fixed bands by whatever value the caller ranks on. */
+function bandOutcomes<T extends BandableRow>(
+  rows: T[],
+  valueOf: (row: T) => number | null,
+  horizon: GemHorizon,
+): GemScoreBand[] {
+  return GEM_SCORE_BANDS.map((band) => {
     const inBand = rows.filter((r) => {
-      const score = Number(r.score);
-      return score >= band.min && score <= band.max;
+      const value = valueOf(r);
+      return value !== null && value >= band.min && value <= band.max;
     });
     const moves = inBand.map((r) => Number(r.move));
     const sampleCount = moves.length;
@@ -563,23 +579,117 @@ export async function getGemScoreEdge(pool: Pool, horizon: GemHorizon): Promise<
       sufficientData: sampleCount >= MIN_GEM_SAMPLES,
     };
   });
+}
 
+/** Top band against bottom band, or null while either end is too thin to say anything. */
+function judgeBands(bands: GemScoreBand[], comparisons: number): GemScoreEdge['verdict'] {
   const low = bands.find((b) => b.key === 'low');
   const high = bands.find((b) => b.key === 'high');
+  if (!low?.sufficientData || !high?.sufficientData) return null;
+  if (low.positiveMovePct === null || high.positiveMovePct === null) return null;
 
-  let verdict: GemScoreEdge['verdict'] = null;
-  if (low?.sufficientData && high?.sufficientData && low.positiveMovePct !== null && high.positiveMovePct !== null) {
-    // One comparison, made once: the bands were fixed in advance and only
-    // the two ends are compared, so there is no family to correct for.
-    const compared = compareToBaseline(high.positiveMovePct, high.sampleCount, low.positiveMovePct, low.sampleCount, 1);
-    verdict = {
-      ...compared,
-      samplesNeeded:
-        compared.verdict === 'indistinguishable'
-          ? samplesNeeded(high.positiveMovePct, low.positiveMovePct, low.sampleCount, 1)
-          : null,
-    };
-  }
-
-  return { horizon, costPct: GEM_ROUND_TRIP_COST_PCT, bands, verdict };
+  const compared = compareToBaseline(
+    high.positiveMovePct,
+    high.sampleCount,
+    low.positiveMovePct,
+    low.sampleCount,
+    comparisons,
+  );
+  return {
+    ...compared,
+    samplesNeeded:
+      compared.verdict === 'indistinguishable'
+        ? samplesNeeded(high.positiveMovePct, low.positiveMovePct, low.sampleCount, comparisons)
+        : null,
+  };
 }
+
+/**
+ * The five things the Gem Score is a weighted average of, named where a
+ * reader will see them.
+ *
+ * Keys match `gem_components`, which every scan has stored since the
+ * scanner shipped — so this looks backwards over the whole history rather
+ * than starting from today.
+ */
+export const GEM_COMPONENTS = [
+  { key: 'liquidityQuality', label: 'Chất lượng thanh khoản', weight: 25 },
+  { key: 'volumeConviction', label: 'Volume thuyết phục', weight: 25 },
+  { key: 'buyPressure', label: 'Áp lực mua', weight: 20 },
+  { key: 'survival', label: 'Sống sót (tuổi)', weight: 20 },
+  { key: 'momentumStructure', label: 'Cấu trúc đà', weight: 10 },
+] as const;
+
+/**
+ * Above this share in one band, a component is not ranking anything.
+ *
+ * `survival` returns a flat 100 for every token past the ideal age, so
+ * almost every scan can score identically on it while still carrying 20%
+ * of the weight. A component like that cannot be right or wrong — it is
+ * inert, which is a different problem from being wrong and has a
+ * different fix.
+ */
+const DEGENERATE_SHARE = 0.95;
+
+export interface GemComponentEdge {
+  key: string;
+  label: string;
+  /** Its share of the Gem Score, so a finding can be weighed against how much it currently counts. */
+  weight: number;
+  bands: GemScoreBand[];
+  verdict: GemScoreEdge['verdict'];
+  /** True when nearly every scan lands in one band: the component varies too little to rank anything. */
+  degenerate: boolean;
+}
+
+/**
+ * Which of the five bets the score is making actually pay.
+ *
+ * The score-band table says whether the total predicts anything. It cannot
+ * say *which part* is carrying it, or which part is pulling the other way
+ * — and with a weighted average, one component with the wrong sign can
+ * cancel out four right ones and leave the total looking like noise.
+ *
+ * This is the cheapest possible route to a better scanner: the weights
+ * shipped as guesses, and the fix for a component that ranks backwards is
+ * to change one number, not to invent a new strategy.
+ */
+export async function getGemComponentEdges(pool: Pool, horizon: GemHorizon): Promise<GemComponentEdge[]> {
+  const moveCol = HORIZON_MOVE_COLUMN[horizon];
+
+  const { rows } = await pool.query(
+    `SELECT s.gem_components AS components,
+            o.${moveCol} AS move,
+            o.liquidity_at_scan_usd AS liq_at_scan,
+            o.liquidity_after_7d_usd AS liq_after
+       FROM gem_outcomes o
+       JOIN gem_scans s ON s.scan_id = o.scan_id
+      WHERE o.${moveCol} IS NOT NULL`,
+  );
+
+  // Five tests off one screen, so each is judged against a wider interval
+  // than it would be alone — the same correction the performance page
+  // makes, for the same reason: run enough comparisons and one of them
+  // looks significant by luck.
+  const comparisons = GEM_COMPONENTS.length;
+
+  return GEM_COMPONENTS.map(({ key, label, weight }) => {
+    const valueOf = (r: (typeof rows)[number]): number | null => {
+      const raw = (r.components as Record<string, unknown> | null)?.[key];
+      return typeof raw === 'number' ? raw : null;
+    };
+    const bands = bandOutcomes(rows, valueOf, horizon);
+    const scored = rows.filter((r) => valueOf(r) !== null).length;
+    const largestBand = Math.max(...bands.map((b) => b.sampleCount));
+
+    return {
+      key,
+      label,
+      weight,
+      bands,
+      verdict: judgeBands(bands, comparisons),
+      degenerate: scored > 0 && largestBand / scored >= DEGENERATE_SHARE,
+    };
+  });
+}
+
