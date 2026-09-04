@@ -1,4 +1,18 @@
 /**
+ * Shapes the API returns, mirrored here because the web app deliberately
+ * has no workspace dependencies.
+ *
+ * RULE: a field added to an API response must be declared OPTIONAL here.
+ *
+ * The web app deploys to Vercel and the API to Railway, separately and in
+ * whichever order finishes first, so for a stretch after every release the
+ * browser runs new code against the old payload. A field declared required
+ * that the server has not started sending yet is not a type error, it is a
+ * crash: `verdict.comparedBands.high` took the whole Gems page down that
+ * way. Declared optional, the compiler forces the guard and the page
+ * renders one line less instead.
+ */
+/**
  * Types mirroring API_CONTRACT.md exactly. Do not add fields the API
  * doesn't document — this file is the single source of truth for the
  * shapes this app is allowed to assume exist.
@@ -392,9 +406,17 @@ export interface GemScoreEdge {
     verdict: EdgeVerdict;
     deltaPp: number;
     marginPp: number | null;
-    samplesNeeded: number | null;
-    /** Which two bands were compared — the outermost pair with enough samples, not always the extremes. */
-    comparedBands: { low: string; high: string };
+    samplesNeeded?: number | null;
+    /**
+     * Which two bands were compared — the outermost pair with enough
+     * samples, not always the extremes.
+     *
+     * Optional because an API deployed before this field existed sends a
+     * verdict without it, and the web app ships separately: on a split
+     * deploy the browser has the new code and the server has the old
+     * payload. Reading straight through it crashed the page.
+     */
+    comparedBands?: { low: string; high: string };
   } | null;
 }
 

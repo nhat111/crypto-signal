@@ -215,6 +215,11 @@ Check items as they land; each phase's commit message references the phase.
       candidates.
 
 ## Known limitations (carried forward, not silently hidden)
+- [ ] Nothing renders the web pages against an older API payload. Web and
+      API deploy separately, so new client code meets an old response on
+      every release; a required-but-missing field crashed /gems outright.
+      The types now carry the rule (fields must be optional) but nothing
+      enforces it — a page smoke test against a stubbed old payload would.
 - [x] CI builds the production bundles and boots the Telegram one against
       stub services (`scripts/bundle-smoke.mjs`), because `tsx` does not
       bundle and a bundler-only failure was green everywhere else while
