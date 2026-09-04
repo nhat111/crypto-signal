@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import { compareToBaseline, samplesNeeded, type EdgeVerdict } from './edge.js';
 import type { GemPair, SafetyReport } from '@crypto-signal/gem-scanner';
 import type { GemEvaluation } from '@crypto-signal/gem-scanner';
 
@@ -407,4 +408,158 @@ export async function pruneOldGemScans(pool: Pool, olderThanDays = 30): Promise<
     [olderThanDays],
   );
   return rowCount ?? 0;
+}
+
+/**
+ * Round-trip cost of actually taking one of these, in percent.
+ *
+ * Far larger than the 0,1% used for Binance futures, and the difference
+ * decides everything here. A swap on a Solana AMM pays a fee each way,
+ * moves the price against itself in a pool this thin, and pays a priority
+ * fee to land. Three percent is a conservative round number, not a
+ * measurement — it is reported alongside every figure derived from it so
+ * a reader who trades tighter or wider can adjust.
+ *
+ * It matters because the scanner surfaces tokens whose median outcome is
+ * nowhere near it. Counting a +1% move as a win is counting a loss.
+ */
+export const GEM_ROUND_TRIP_COST_PCT = 3;
+
+/**
+ * Score bands, fixed in advance.
+ *
+ * Deliberately not terciles of whatever happened to be scanned: cut points
+ * chosen after seeing the data are how a scoring model with no signal gets
+ * declared useful. Round numbers on a 0–100 scale, decided before looking,
+ * and left alone.
+ */
+export const GEM_SCORE_BANDS = [
+  { key: 'low', label: 'Dưới 50', min: 0, max: 49 },
+  { key: 'mid', label: '50 – 69', min: 50, max: 69 },
+  { key: 'high', label: '70 trở lên', min: 70, max: 100 },
+] as const;
+
+export interface GemScoreBand {
+  key: string;
+  label: string;
+  min: number;
+  max: number;
+  sampleCount: number;
+  positiveMovePct: number | null;
+  medianMovePct: number | null;
+  /** Share that moved further up than the round-trip cost — the only "win" that pays. */
+  netPositiveMovePct: number | null;
+  /** 7d only: share whose liquidity fell below a fifth of what it was. */
+  liquidityCollapsePct: number | null;
+  sufficientData: boolean;
+}
+
+export interface GemScoreEdge {
+  horizon: GemHorizon;
+  costPct: number;
+  bands: GemScoreBand[];
+  /**
+   * Whether the top band beat the bottom one, judged the same way the
+   * market-health page judges a signal against its baseline.
+   *
+   * Null when either end lacks the samples to say anything. This is the
+   * whole point of the surface: if a high score does not do better than a
+   * low one, the score is decoration, and every number built on top of it
+   * — including the alerts — is decoration too.
+   */
+  verdict: { verdict: EdgeVerdict; deltaPp: number; marginPp: number | null; samplesNeeded: number | null } | null;
+}
+
+/**
+ * Does a higher Gem Score actually precede better outcomes?
+ *
+ * Nothing answered this before. The scanner reported a score and a hit
+ * rate, and the weights behind the score were, in the words of the TODO
+ * that shipped with them, "starting points with no track record". So the
+ * score could have been noise for months without anything saying so — and
+ * unlike the futures signals, a wrong answer here is acted on with real
+ * money in an illiquid market.
+ *
+ * The bands are compared against each other rather than against a market
+ * baseline because the question is about the *score*, not about small-caps
+ * as an asset: every row here already passed the same liquidity, age and
+ * safety gates, so what differs between bands is the score and little else.
+ */
+export async function getGemScoreEdge(pool: Pool, horizon: GemHorizon): Promise<GemScoreEdge> {
+  const moveCol = HORIZON_MOVE_COLUMN[horizon];
+
+  const { rows } = await pool.query(
+    `SELECT s.gem_score AS score,
+            o.${moveCol} AS move,
+            o.liquidity_at_scan_usd AS liq_at_scan,
+            o.liquidity_after_7d_usd AS liq_after
+       FROM gem_outcomes o
+       JOIN gem_scans s ON s.scan_id = o.scan_id
+      WHERE o.${moveCol} IS NOT NULL`,
+  );
+
+  const bands: GemScoreBand[] = GEM_SCORE_BANDS.map((band) => {
+    const inBand = rows.filter((r) => {
+      const score = Number(r.score);
+      return score >= band.min && score <= band.max;
+    });
+    const moves = inBand.map((r) => Number(r.move));
+    const sampleCount = moves.length;
+
+    if (sampleCount === 0) {
+      return {
+        ...band,
+        sampleCount: 0,
+        positiveMovePct: null,
+        medianMovePct: null,
+        netPositiveMovePct: null,
+        liquidityCollapsePct: null,
+        sufficientData: false,
+      };
+    }
+
+    const sorted = [...moves].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    const median =
+      sorted.length % 2 === 0 ? ((sorted[mid - 1] as number) + (sorted[mid] as number)) / 2 : (sorted[mid] as number);
+
+    let liquidityCollapsePct: number | null = null;
+    if (horizon === '7d') {
+      const withLiquidity = inBand.filter((r) => r.liq_at_scan !== null && r.liq_after !== null);
+      if (withLiquidity.length > 0) {
+        const collapsed = withLiquidity.filter((r) => Number(r.liq_after) < Number(r.liq_at_scan) * 0.2).length;
+        liquidityCollapsePct = Math.round((collapsed / withLiquidity.length) * 1000) / 10;
+      }
+    }
+
+    return {
+      ...band,
+      sampleCount,
+      positiveMovePct: Math.round((moves.filter((m) => m > 0).length / sampleCount) * 1000) / 10,
+      medianMovePct: Math.round(median * 100) / 100,
+      netPositiveMovePct:
+        Math.round((moves.filter((m) => m > GEM_ROUND_TRIP_COST_PCT).length / sampleCount) * 1000) / 10,
+      liquidityCollapsePct,
+      sufficientData: sampleCount >= MIN_GEM_SAMPLES,
+    };
+  });
+
+  const low = bands.find((b) => b.key === 'low');
+  const high = bands.find((b) => b.key === 'high');
+
+  let verdict: GemScoreEdge['verdict'] = null;
+  if (low?.sufficientData && high?.sufficientData && low.positiveMovePct !== null && high.positiveMovePct !== null) {
+    // One comparison, made once: the bands were fixed in advance and only
+    // the two ends are compared, so there is no family to correct for.
+    const compared = compareToBaseline(high.positiveMovePct, high.sampleCount, low.positiveMovePct, low.sampleCount, 1);
+    verdict = {
+      ...compared,
+      samplesNeeded:
+        compared.verdict === 'indistinguishable'
+          ? samplesNeeded(high.positiveMovePct, low.positiveMovePct, low.sampleCount, 1)
+          : null,
+    };
+  }
+
+  return { horizon, costPct: GEM_ROUND_TRIP_COST_PCT, bands, verdict };
 }

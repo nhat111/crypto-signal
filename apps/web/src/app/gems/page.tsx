@@ -90,33 +90,146 @@ interface PerformancePanelProps {
  * that admits it doesn't know yet.
  */
 function GemPerformancePanel({ data, loading, error }: PerformancePanelProps) {
-  if (loading && !data) return <p className="text-xs text-slate-500">Loading…</p>;
+  if (loading && !data) return <p className="text-xs text-slate-500">Đang tải…</p>;
   if (error && !data) return <p className="text-xs text-rose-400">{error}</p>;
   if (!data) return null;
 
   if (!data.sufficientData) {
     return (
       <div className="rounded-lg border border-dashed border-slate-700 bg-slate-950/50 p-3">
-        <p className="text-sm font-semibold text-slate-300">Not enough data yet ({data.sampleCount}/20 outcomes)</p>
+        <p className="text-sm font-semibold text-slate-300">
+          Chưa đủ dữ liệu ({data.sampleCount}/20 kết quả)
+        </p>
         <p className="mt-1 text-xs text-slate-500">
-          Results appear once at least 20 surfaced tokens have a recorded {data.horizon} outcome. Until then this
-          scanner has no track record — treat every candidate accordingly.
+          Số liệu chỉ hiện khi có ít nhất 20 token đã được ghi nhận kết quả sau {data.horizon}. Trước đó, scanner
+          này <span className="font-semibold text-slate-400">chưa có thành tích nào</span> — hãy đối xử với mọi ứng
+          viên đúng như vậy.
         </p>
       </div>
     );
   }
 
   return (
-    <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <Stat label="Samples" value={String(data.sampleCount)} />
-      <Stat label="Moved up" value={data.positiveMovePct === null ? '—' : `${data.positiveMovePct}%`} />
-      <Stat label="Median move" value={data.medianMovePct === null ? '—' : `${data.medianMovePct}%`} />
-      <Stat
-        label="Liquidity collapsed"
-        value={data.liquidityCollapsePct === null ? '—' : `${data.liquidityCollapsePct}%`}
-        hint="Share of surfaced tokens whose liquidity fell below 20% of what it was at scan time."
-      />
-    </dl>
+    <div className="space-y-4">
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Số mẫu" value={String(data.sampleCount)} />
+        <Stat label="Đi lên" value={data.positiveMovePct === null ? '—' : `${data.positiveMovePct}%`} />
+        <Stat label="Trung vị" value={data.medianMovePct === null ? '—' : `${data.medianMovePct}%`} />
+        <Stat
+          label="Cạn thanh khoản"
+          value={data.liquidityCollapsePct === null ? '—' : `${data.liquidityCollapsePct}%`}
+          hint="Tỉ lệ token được đưa lên rồi thanh khoản tụt xuống dưới 20% so với lúc quét."
+        />
+      </dl>
+      <ScoreEdgePanel edge={data.scoreEdge} />
+    </div>
+  );
+}
+
+/**
+ * The question the scanner could not answer about itself: does a higher
+ * Gem Score actually precede better outcomes?
+ *
+ * Put directly under the headline numbers because those numbers are
+ * unreadable without it. "60% đi lên" in a week when everything went up
+ * says nothing about the score — only the gap between a high-scoring token
+ * and a low-scoring one does, and if that gap is not there then the score
+ * is decoration and so is every alert built on it.
+ */
+function ScoreEdgePanel({ edge }: { edge?: import('@/lib/types').GemScoreEdge }) {
+  // Absent means an API that predates this, which is not the same as "no
+  // edge" — saying the latter would be inventing a finding.
+  if (!edge) return null;
+
+  const verdict = edge.verdict;
+  const tone =
+    verdict?.verdict === 'beats'
+      ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-200/90'
+      : verdict?.verdict === 'worse'
+        ? 'border-rose-500/30 bg-rose-500/5 text-rose-200/90'
+        : 'border-slate-700 bg-slate-950/50 text-slate-400';
+
+  return (
+    <div className={`rounded-lg border p-3 ${tone}`}>
+      <p className="text-[11px] font-semibold uppercase tracking-wide opacity-70">
+        Điểm Gem có tác dụng không?
+      </p>
+
+      {verdict === null ? (
+        <p className="mt-1 text-sm">
+          Chưa so được. Cần ít nhất 20 kết quả ở <span className="font-semibold">cả hai đầu</span> thang điểm
+          (dưới 50 và từ 70 trở lên) thì mới trả lời được câu này.
+        </p>
+      ) : verdict.verdict === 'beats' ? (
+        <p className="mt-1 text-sm">
+          <span className="font-bold">Có.</span> Token điểm cao đi lên nhiều hơn token điểm thấp{' '}
+          <span className="font-bold tabular-nums">{verdict.deltaPp.toFixed(0)}pp</span>
+          {verdict.marginPp !== null && <span className="opacity-70"> (±{verdict.marginPp.toFixed(0)}pp)</span>} — đủ
+          lớn so với sai số.
+        </p>
+      ) : verdict.verdict === 'worse' ? (
+        <p className="mt-1 text-sm">
+          <span className="font-bold">Ngược lại.</span> Token điểm cao còn đi{' '}
+          <span className="font-bold">kém hơn</span> token điểm thấp {Math.abs(verdict.deltaPp).toFixed(0)}pp
+          {verdict.marginPp !== null && <span className="opacity-70"> (±{verdict.marginPp.toFixed(0)}pp)</span>}.
+          Trọng số chấm điểm đang sai hướng.
+        </p>
+      ) : (
+        <p className="mt-1 text-sm">
+          <span className="font-bold">Chưa chứng minh được.</span> Chênh lệch{' '}
+          {verdict.deltaPp >= 0 ? '+' : ''}
+          {verdict.deltaPp.toFixed(0)}pp còn nhỏ hơn sai số
+          {verdict.marginPp !== null && ` ±${verdict.marginPp.toFixed(0)}pp`}.
+          {verdict.samplesNeeded !== null
+            ? ` Cần khoảng ${verdict.samplesNeeded.toLocaleString('vi-VN')} mẫu ở bậc điểm cao để nói chắc.`
+            : ' Với lượng mẫu ở bậc thấp hiện tại thì thêm bao nhiêu token điểm cao cũng không đủ — cần thêm dữ liệu ở cả hai đầu.'}{' '}
+          Tới lúc đó, điểm số <span className="font-semibold">chưa được coi là lý do để vào lệnh</span>.
+        </p>
+      )}
+
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-[30rem] text-left text-xs">
+          <thead className="text-[10px] uppercase tracking-wide text-slate-500">
+            <tr>
+              <th className="pb-1 font-semibold">Bậc điểm</th>
+              <th className="pb-1 text-right font-semibold">Mẫu</th>
+              <th className="pb-1 text-right font-semibold">Đi lên</th>
+              <th className="pb-1 text-right font-semibold">Đủ bù phí</th>
+              <th className="pb-1 text-right font-semibold">Trung vị</th>
+              <th className="pb-1 text-right font-semibold">Cạn TK</th>
+            </tr>
+          </thead>
+          <tbody className="text-slate-300">
+            {edge.bands.map((band) => (
+              <tr key={band.key} className="border-t border-slate-800/70">
+                <td className="py-1.5 font-medium">{band.label}</td>
+                <td className="py-1.5 text-right tabular-nums">{band.sampleCount}</td>
+                <td className="py-1.5 text-right tabular-nums">
+                  {band.sufficientData && band.positiveMovePct !== null ? `${band.positiveMovePct}%` : '—'}
+                </td>
+                <td className="py-1.5 text-right font-semibold tabular-nums">
+                  {band.sufficientData && band.netPositiveMovePct !== null ? `${band.netPositiveMovePct}%` : '—'}
+                </td>
+                <td className="py-1.5 text-right tabular-nums">
+                  {band.sufficientData && band.medianMovePct !== null ? `${band.medianMovePct}%` : '—'}
+                </td>
+                <td className="py-1.5 text-right tabular-nums">
+                  {band.liquidityCollapsePct === null ? '—' : `${band.liquidityCollapsePct}%`}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+        <span className="font-semibold text-slate-400">Đủ bù phí</span> = tỉ lệ lần giá đi lên{' '}
+        <span className="font-semibold">quá {edge.costPct}%</span>, tức mức phí khứ hồi ước tính trên DEX (phí swap
+        hai chiều + trượt giá trên pool mỏng + phí ưu tiên). Cột &ldquo;Đi lên&rdquo; đếm cả những lần nhích 1% —
+        đúng hướng nhưng vào lệnh là lỗ. Con số {edge.costPct}% là <span className="font-semibold">giả định</span>,
+        không phải đo đạc; ai vào lệnh chặt hoặc rộng hơn thì tự chỉnh trong đầu.
+      </p>
+    </div>
   );
 }
 

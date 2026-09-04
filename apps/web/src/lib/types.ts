@@ -336,6 +336,43 @@ export interface GemPerformance {
   medianMovePct: number | null;
   liquidityCollapsePct: number | null;
   sufficientData: boolean;
+  /** Optional because an API predating it sends nothing — absent is not the same as "no edge". */
+  scoreEdge?: GemScoreEdge;
+}
+
+export interface GemScoreBand {
+  key: string;
+  label: string;
+  min: number;
+  max: number;
+  sampleCount: number;
+  positiveMovePct: number | null;
+  medianMovePct: number | null;
+  /** Share that moved up further than a round trip costs — the only win that pays. */
+  netPositiveMovePct: number | null;
+  liquidityCollapsePct: number | null;
+  sufficientData: boolean;
+}
+
+/**
+ * Whether a higher Gem Score precedes better outcomes at all.
+ *
+ * The scanner's weights shipped as starting points with no track record,
+ * so until this existed the score could have been predicting nothing for
+ * months with nothing to say so — and unlike the futures signals, this one
+ * gets acted on with real money in an illiquid market.
+ */
+export interface GemScoreEdge {
+  horizon: GemHorizon;
+  costPct: number;
+  bands: GemScoreBand[];
+  /** Null while either end of the scale lacks the samples to be judged. */
+  verdict: {
+    verdict: EdgeVerdict;
+    deltaPp: number;
+    marginPp: number | null;
+    samplesNeeded: number | null;
+  } | null;
 }
 
 /* ---------- Operator status ---------- */

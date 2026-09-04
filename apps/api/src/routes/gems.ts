@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { getGemByAddress, getGemPerformance, getLatestGems, type GemHorizon } from '@crypto-signal/db';
+import { getGemByAddress, getGemPerformance, getGemScoreEdge, getLatestGems, type GemHorizon } from '@crypto-signal/db';
 import type { ApiDeps } from '../deps.js';
 
 interface GemsQuery {
@@ -36,6 +36,14 @@ export function registerGemRoutes(app: FastifyInstance, deps: ApiDeps): void {
     if (!VALID_HORIZONS.includes(horizon)) {
       return reply.code(400).send({ error: `horizon must be one of ${VALID_HORIZONS.join(', ')}` });
     }
-    return getGemPerformance(deps.pool, horizon);
+    // The score edge rides along rather than getting its own request: the
+    // two answer one question together — "did anything happen" and "did
+    // the score have anything to do with it" — and reading the first
+    // without the second is how a scanner with no edge keeps its job.
+    const [performance, scoreEdge] = await Promise.all([
+      getGemPerformance(deps.pool, horizon),
+      getGemScoreEdge(deps.pool, horizon),
+    ]);
+    return { ...performance, scoreEdge };
   });
 }

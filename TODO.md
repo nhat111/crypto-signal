@@ -172,8 +172,15 @@ Check items as they land; each phase's commit message references the phase.
 - [ ] EVM safety source (GoPlus-style honeypot simulation) — needed before
       HyperEVM tokens should be surfaced as anything but unverified.
 - [ ] Holder-growth and social signals.
+- [x] Answer whether the score works at all before tuning it: outcomes are
+      split into fixed score bands and the top band is judged against the
+      bottom one the same way a signal is judged against its baseline
+      (`getGemScoreEdge`). A "win" is counted against a ~3% DEX round-trip
+      cost, not against zero, because on a $50K pool a +1% move is a loss.
 - [ ] Tune weights against recorded outcomes — current values are starting
-      points with no track record behind them.
+      points with no track record behind them. Do this only once the band
+      comparison above says the score predicts something; tuning a score
+      that predicts nothing just overfits it.
 
 ## Known limitations (carried forward, not silently hidden)
 - [x] CI builds the production bundles and boots the Telegram one against
