@@ -57,6 +57,37 @@ async function main(): Promise<void> {
     await ctx.reply(helpText, { parse_mode: 'HTML' });
   });
 
+  /**
+   * The chat's own id, which is needed to arm health alerts
+   * (TELEGRAM_ALERT_CHAT_IDS) and is otherwise surprisingly hard to get.
+   *
+   * The usual answers do not work here. `getUpdates` returns nothing while
+   * this bot is running, because long polling has already consumed the
+   * update. Reading `bot_users` needs a SQL console, which is exactly what
+   * the operator does not have on a phone at the moment something is
+   * broken. A stranger's userinfo bot gives a *user* id, which silently
+   * differs from the chat id in a group — the one case where getting it
+   * wrong means the alerts go nowhere and nobody finds out.
+   *
+   * So the bot answers the question about itself.
+   */
+  bot.command('id', async (ctx) => {
+    const chatId = String(ctx.chat.id);
+    const isGroup = ctx.chat.type !== 'private';
+    await ctx.reply(
+      [
+        `<b>Chat ID:</b> <code>${chatId}</code>`,
+        '',
+        isGroup
+          ? 'Đây là id của <b>nhóm này</b> (số âm là bình thường). Muốn nhận cảnh báo ở đây thì dùng đúng số này, không phải id cá nhân.'
+          : 'Đây là id chat riêng giữa bro và bot.',
+        '',
+        'Đặt vào biến <code>TELEGRAM_ALERT_CHAT_IDS</code> của service <b>worker</b> để bật cảnh báo sự cố hệ thống. Nhiều kênh thì ngăn cách bằng dấu phẩy.',
+      ].join('\n'),
+      { parse_mode: 'HTML' },
+    );
+  });
+
   bot.command('status', async (ctx) => {
     try {
       const overview = await api.getOverview();
@@ -272,6 +303,7 @@ async function main(): Promise<void> {
       { command: 'journal', description: 'Your trade log + P&L summary' },
       { command: 'flow', description: 'Stablecoin supply / macro flow' },
       { command: 'alerts', description: 'Toggle alerts for this chat' },
+      { command: 'id', description: 'Chat ID của chat này (để bật cảnh báo)' },
       { command: 'help', description: 'Show help' },
     ]);
   } catch (err) {

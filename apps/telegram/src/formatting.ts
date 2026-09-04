@@ -277,6 +277,7 @@ export function buildHelpText(symbols: string[]): string {
     '/journal — your trade log + win rate / P&L summary',
     '/flow — stablecoin supply: money entering or leaving crypto',
     '/alerts on|off — toggle alert push to this chat',
+    '/id — chat id của chat này (cần để bật cảnh báo sự cố hệ thống)',
     '/help — this message',
     '',
     '<i>Symbols listed on Binance Futures but not Spot show Health: N/A — the score compares spot demand against futures, which needs both.</i>',
