@@ -391,6 +391,8 @@ export interface GemScoreEdge {
     deltaPp: number;
     marginPp: number | null;
     samplesNeeded: number | null;
+    /** Which two bands were compared — the outermost pair with enough samples, not always the extremes. */
+    comparedBands: { low: string; high: string };
   } | null;
 }
 

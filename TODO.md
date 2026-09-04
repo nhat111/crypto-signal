@@ -193,6 +193,10 @@ Check items as they land; each phase's commit message references the phase.
       while ranking nothing, and needs a different fix.
 - [ ] Tune weights once the component table names a specific one. Current
       values are guesses; tuning a score that predicts nothing overfits it.
+      First production reading (55 outcomes, 7d): `survival` scored 55/55
+      identically and `liquidityQuality` 53/55 — 45% of the weight ranking
+      nothing at all — while `momentumStructure`, the lowest weight at 10%,
+      separated 4% from 33% between its bottom two bands.
 - [ ] A market baseline for gems: what a token that *failed* the filters did
       over the same window. The band comparison answers "does the score
       rank correctly"; it cannot answer "was any of this worth trading

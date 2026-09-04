@@ -205,4 +205,36 @@ describe.skipIf(!hasTestDatabase)('gem score edge against real Postgres', () => 
     // And the margin is the reason, not a thin sample.
     expect(buyPressure?.verdict?.marginPp as number).toBeGreaterThan(20);
   });
+
+  it('compares the middle band when the top one is too thin, and says so', async () => {
+    // The shape the first production reading actually had: 25 scans low,
+    // 21 middle, 9 high. Insisting on the top band threw away a gap that
+    // was sitting between the two bands with data.
+    for (let i = 0; i < 25; i += 1) await scan(20, i < 1 ? 20 : -20, undefined, { momentumStructure: 30 });
+    for (let i = 0; i < 21; i += 1) await scan(60, i < 7 ? 20 : -20, undefined, { momentumStructure: 60 });
+    for (let i = 0; i < 9; i += 1) await scan(80, 20, undefined, { momentumStructure: 90 });
+
+    const momentum = (await getGemComponentEdges(pool, '24h')).find((e) => e.key === 'momentumStructure');
+    expect(momentum?.verdict?.verdict).toBe('beats');
+    // The claim is about the pair that was measured, not the extremes.
+    expect(momentum?.verdict?.comparedBands).toEqual({ low: 'Dưới 50', high: '50 – 69' });
+  });
+
+  it('still prefers the true extremes when both ends have samples', async () => {
+    // The rule is mechanical, not opportunistic: the outermost qualifying
+    // pair, never whichever pairing happens to look best.
+    for (let i = 0; i < 25; i += 1) await scan(20, -20, undefined, { buyPressure: 30 });
+    for (let i = 0; i < 25; i += 1) await scan(60, -20, undefined, { buyPressure: 60 });
+    for (let i = 0; i < 25; i += 1) await scan(80, 20, undefined, { buyPressure: 90 });
+
+    const buyPressure = (await getGemComponentEdges(pool, '24h')).find((e) => e.key === 'buyPressure');
+    expect(buyPressure?.verdict?.comparedBands).toEqual({ low: 'Dưới 50', high: '70 trở lên' });
+  });
+
+  it('says nothing when only one band has enough samples', async () => {
+    for (let i = 0; i < 40; i += 1) await scan(80, 20, undefined, { survival: 100 });
+    const survival = (await getGemComponentEdges(pool, '24h')).find((e) => e.key === 'survival');
+    expect(survival?.verdict).toBeNull();
+    expect(survival?.degenerate).toBe(true);
+  });
 });

@@ -180,15 +180,17 @@ function ScoreEdgePanel({ edge }: { edge?: import('@/lib/types').GemScoreEdge })
         </div>
       ) : verdict.verdict === 'beats' ? (
         <p className="mt-1 text-sm">
-          <span className="font-bold">Có.</span> Token điểm cao đi lên nhiều hơn token điểm thấp{' '}
+          <span className="font-bold">Có.</span> Token nhóm {verdict.comparedBands.high} đi lên nhiều hơn nhóm{' '}
+          {verdict.comparedBands.low}{' '}
           <span className="font-bold tabular-nums">{verdict.deltaPp.toFixed(0)}pp</span>
           {verdict.marginPp !== null && <span className="opacity-70"> (±{verdict.marginPp.toFixed(0)}pp)</span>} — đủ
           lớn so với sai số.
         </p>
       ) : verdict.verdict === 'worse' ? (
         <p className="mt-1 text-sm">
-          <span className="font-bold">Ngược lại.</span> Token điểm cao còn đi{' '}
-          <span className="font-bold">kém hơn</span> token điểm thấp {Math.abs(verdict.deltaPp).toFixed(0)}pp
+          <span className="font-bold">Ngược lại.</span> Token nhóm {verdict.comparedBands.high} còn đi{' '}
+          <span className="font-bold">kém hơn</span> nhóm {verdict.comparedBands.low}{' '}
+          {Math.abs(verdict.deltaPp).toFixed(0)}pp
           {verdict.marginPp !== null && <span className="opacity-70"> (±{verdict.marginPp.toFixed(0)}pp)</span>}.
           Trọng số chấm điểm đang sai hướng.
         </p>
@@ -301,6 +303,11 @@ function ComponentEdgePanel({ edges }: { edges?: import('@/lib/types').GemCompon
               </p>
               <ComponentVerdict edge={edge} />
             </div>
+            {edge.verdict !== null && (
+              <p className="mt-0.5 text-[10px] text-slate-600">
+                so {edge.verdict.comparedBands.low} với {edge.verdict.comparedBands.high}
+              </p>
+            )}
             <p className="mt-1 text-[11px] tabular-nums text-slate-500">
               {edge.bands
                 .map((b) => `${b.label}: ${b.sampleCount} mẫu${b.sufficientData && b.positiveMovePct !== null ? ` · ${b.positiveMovePct}% lên` : ''}`)

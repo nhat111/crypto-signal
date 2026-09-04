@@ -487,7 +487,14 @@ export interface GemScoreEdge {
    * low one, the score is decoration, and every number built on top of it
    * — including the alerts — is decoration too.
    */
-  verdict: { verdict: EdgeVerdict; deltaPp: number; marginPp: number | null; samplesNeeded: number | null } | null;
+  verdict: {
+    verdict: EdgeVerdict;
+    deltaPp: number;
+    marginPp: number | null;
+    samplesNeeded: number | null;
+    /** Which two bands were actually compared — the outermost pair with enough samples, not always the extremes. */
+    comparedBands: { low: string; high: string };
+  } | null;
 }
 
 /**
@@ -581,11 +588,28 @@ function bandOutcomes<T extends BandableRow>(
   });
 }
 
-/** Top band against bottom band, or null while either end is too thin to say anything. */
+/**
+ * The highest band with enough samples against the lowest band with enough
+ * samples, or null when fewer than two bands qualify.
+ *
+ * Not simply top-against-bottom. Real distributions are lopsided: the first
+ * production reading had 25 scans in the bottom momentum band, 21 in the
+ * middle and 9 at the top, so insisting on the top band threw away a 29pp
+ * gap that was sitting in plain sight between the two bands that did have
+ * data.
+ *
+ * The rule is fixed and mechanical — always the outermost pair that
+ * qualifies — so it cannot be steered toward whichever pairing shows the
+ * biggest difference. Which bands were used is returned, because "the
+ * middle beat the bottom" is a weaker claim than "the top beat the bottom"
+ * and a reader must be able to tell them apart.
+ */
 function judgeBands(bands: GemScoreBand[], comparisons: number): GemScoreEdge['verdict'] {
-  const low = bands.find((b) => b.key === 'low');
-  const high = bands.find((b) => b.key === 'high');
-  if (!low?.sufficientData || !high?.sufficientData) return null;
+  const usable = bands.filter((b) => b.sufficientData && b.positiveMovePct !== null);
+  if (usable.length < 2) return null;
+
+  const low = usable[0] as GemScoreBand;
+  const high = usable[usable.length - 1] as GemScoreBand;
   if (low.positiveMovePct === null || high.positiveMovePct === null) return null;
 
   const compared = compareToBaseline(
@@ -601,6 +625,7 @@ function judgeBands(bands: GemScoreBand[], comparisons: number): GemScoreEdge['v
       compared.verdict === 'indistinguishable'
         ? samplesNeeded(high.positiveMovePct, low.positiveMovePct, low.sampleCount, comparisons)
         : null,
+    comparedBands: { low: low.label, high: high.label },
   };
 }
 
