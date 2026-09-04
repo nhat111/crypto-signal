@@ -1,6 +1,6 @@
 import type { Pool } from 'pg';
 import { compareToBaseline, samplesNeeded, type EdgeVerdict } from './edge.js';
-import type { GemPair, SafetyReport } from '@crypto-signal/gem-scanner';
+import { GEM_SCORING_VERSION, type GemPair, type SafetyReport } from '@crypto-signal/gem-scanner';
 import type { GemEvaluation } from '@crypto-signal/gem-scanner';
 
 export interface PersistGemScanInput {
@@ -44,9 +44,11 @@ export async function insertGemScan(pool: Pool, input: PersistGemScanInput): Pro
     `INSERT INTO gem_scans
       (chain_id, token_address, scanned_at, gem_score, gem_components, risk_score, risk_components, reasons,
        price_usd, liquidity_usd, volume_24h_usd, fdv_usd, price_change_24h_pct, buys_24h, sells_24h, age_days,
-       safety_verdict, safety_flags, top_holder_pct, lp_locked)
-     VALUES ($1,$2,to_timestamp($3/1000.0),$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
-     ON CONFLICT (chain_id, token_address, scanned_at) DO UPDATE SET gem_score = EXCLUDED.gem_score
+       safety_verdict, safety_flags, top_holder_pct, lp_locked, scoring_version)
+     VALUES ($1,$2,to_timestamp($3/1000.0),$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+     ON CONFLICT (chain_id, token_address, scanned_at) DO UPDATE SET
+       gem_score = EXCLUDED.gem_score,
+       scoring_version = EXCLUDED.scoring_version
      RETURNING scan_id`,
     [
       pair.chainId,
@@ -69,6 +71,7 @@ export async function insertGemScan(pool: Pool, input: PersistGemScanInput): Pro
       safety ? JSON.stringify(safety.flags) : null,
       safety?.topHolderPct ?? null,
       safety?.lpLocked ?? null,
+      GEM_SCORING_VERSION,
     ],
   );
 
@@ -638,11 +641,14 @@ function judgeBands(bands: GemScoreBand[], comparisons: number): GemScoreEdge['v
  * than starting from today.
  */
 export const GEM_COMPONENTS = [
-  { key: 'liquidityQuality', label: 'Chất lượng thanh khoản', weight: 25 },
-  { key: 'volumeConviction', label: 'Volume thuyết phục', weight: 25 },
-  { key: 'buyPressure', label: 'Áp lực mua', weight: 20 },
-  { key: 'survival', label: 'Sống sót (tuổi)', weight: 20 },
-  { key: 'momentumStructure', label: 'Cấu trúc đà', weight: 10 },
+  { key: 'liquidityQuality', label: 'Chất lượng thanh khoản', weight: 25, since: 1 },
+  { key: 'volumeConviction', label: 'Volume thuyết phục', weight: 25, since: 1 },
+  { key: 'buyPressure', label: 'Áp lực mua', weight: 20, since: 1 },
+  // Rewritten in v2: the old formula returned a flat 100 past the ideal age
+  // and ranked nothing, so scans older than that carry a different number
+  // under the same name and must not be counted here.
+  { key: 'survival', label: 'Sống sót (tuổi)', weight: 20, since: 2 },
+  { key: 'momentumStructure', label: 'Cấu trúc đà', weight: 10, since: 1 },
 ] as const;
 
 /**
@@ -665,6 +671,12 @@ export interface GemComponentEdge {
   verdict: GemScoreEdge['verdict'];
   /** True when nearly every scan lands in one band: the component varies too little to rank anything. */
   degenerate: boolean;
+  /**
+   * Set when this component's formula changed and older scans were dropped
+   * from its measurement, so a reader can tell "no history" from "no
+   * effect". Null when the whole history counts.
+   */
+  measuredSinceVersion: number | null;
 }
 
 /**
@@ -684,6 +696,7 @@ export async function getGemComponentEdges(pool: Pool, horizon: GemHorizon): Pro
 
   const { rows } = await pool.query(
     `SELECT s.gem_components AS components,
+            s.scoring_version AS version,
             o.${moveCol} AS move,
             o.liquidity_at_scan_usd AS liq_at_scan,
             o.liquidity_after_7d_usd AS liq_after
@@ -698,13 +711,18 @@ export async function getGemComponentEdges(pool: Pool, horizon: GemHorizon): Pro
   // looks significant by luck.
   const comparisons = GEM_COMPONENTS.length;
 
-  return GEM_COMPONENTS.map(({ key, label, weight }) => {
+  return GEM_COMPONENTS.map(({ key, label, weight, since }) => {
+    // Scans written before this component's formula changed hold a
+    // different number under the same name. Counting them would compare
+    // two definitions and call the result a finding.
+    const comparable = since <= 1 ? rows : rows.filter((r) => Number(r.version ?? 1) >= since);
+
     const valueOf = (r: (typeof rows)[number]): number | null => {
       const raw = (r.components as Record<string, unknown> | null)?.[key];
       return typeof raw === 'number' ? raw : null;
     };
-    const bands = bandOutcomes(rows, valueOf, horizon);
-    const scored = rows.filter((r) => valueOf(r) !== null).length;
+    const bands = bandOutcomes(comparable, valueOf, horizon);
+    const scored = comparable.filter((r) => valueOf(r) !== null).length;
     const largestBand = Math.max(...bands.map((b) => b.sampleCount));
 
     return {
@@ -714,6 +732,7 @@ export async function getGemComponentEdges(pool: Pool, horizon: GemHorizon): Pro
       bands,
       verdict: judgeBands(bands, comparisons),
       degenerate: scored > 0 && largestBand / scored >= DEGENERATE_SHARE,
+      measuredSinceVersion: since > 1 ? since : null,
     };
   });
 }

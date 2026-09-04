@@ -371,6 +371,8 @@ export interface GemComponentEdge {
   verdict: GemScoreEdge['verdict'];
   /** Nearly every scan lands in one band: the component varies too little to rank anything. */
   degenerate: boolean;
+  /** Set when the formula changed and older scans were dropped: "no history yet" rather than "no effect". */
+  measuredSinceVersion?: number | null;
 }
 
 /**

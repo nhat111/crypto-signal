@@ -33,6 +33,11 @@ export const gemEnvSchema = z.object({
   GEM_IDEAL_VOLUME_TO_LIQUIDITY: numeric(1.5),
   GEM_MAX_HEALTHY_VOLUME_TO_LIQUIDITY: numeric(10),
   GEM_IDEAL_AGE_DAYS: numeric(60),
+  // Past this, a small-cap that still has not taken off is far more likely
+  // to be quietly dead than undiscovered. Needed because the survival
+  // score used to saturate at the ideal age and score every older token
+  // identically — see survivalScore.
+  GEM_STALE_AGE_DAYS: numeric(365),
   GEM_VERTICAL_PUMP_24H_PCT: numeric(100),
   /** Hard eligibility cutoff — separate from the soft momentum penalty above. A token already up this much in 24h isn't an undiscovered gem, it's a trade the whole market already found; no combination of other components should be able to outscore that. */
   GEM_EXTREME_PUMP_24H_PCT: numeric(300),
@@ -68,6 +73,7 @@ export interface GemThresholds {
   idealVolumeToLiquidity: number;
   maxHealthyVolumeToLiquidity: number;
   idealAgeDays: number;
+  staleAgeDays: number;
   verticalPump24hPct: number;
   extremePump24hPct: number;
 }
@@ -89,6 +95,19 @@ export interface GemRiskWeights {
   ageRisk: number;
   pumpExhaustion: number;
 }
+
+/**
+ * Bumped whenever any component formula changes.
+ *
+ * Written onto every scan so the per-component analysis can measure a
+ * component only over scans that used the formula in force now. Without
+ * it, a formula change silently mixes two definitions of the same number
+ * in one comparison.
+ *
+ * 2: survivalScore stopped saturating at the ideal age (it scored 55 of 55
+ *    production scans identically) and became a window that decays again.
+ */
+export const GEM_SCORING_VERSION = 2;
 
 export const GEM_SCORE_WEIGHTS: GemScoreWeights = {
   liquidityQuality: 25,
@@ -151,6 +170,7 @@ export function loadGemConfig(env: NodeJS.ProcessEnv = process.env): GemConfig {
       idealVolumeToLiquidity: parsed.GEM_IDEAL_VOLUME_TO_LIQUIDITY,
       maxHealthyVolumeToLiquidity: parsed.GEM_MAX_HEALTHY_VOLUME_TO_LIQUIDITY,
       idealAgeDays: parsed.GEM_IDEAL_AGE_DAYS,
+      staleAgeDays: parsed.GEM_STALE_AGE_DAYS,
       verticalPump24hPct: parsed.GEM_VERTICAL_PUMP_24H_PCT,
       extremePump24hPct: parsed.GEM_EXTREME_PUMP_24H_PCT,
     },

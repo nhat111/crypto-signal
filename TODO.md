@@ -191,12 +191,23 @@ Check items as they land; each phase's commit message references the phase.
       over the whole history. Distinguishes "wrong" from "inert" — a
       component that scores nearly every token identically carries weight
       while ranking nothing, and needs a different fix.
+- [x] `survivalScore` rewritten: it saturated at the ideal age and scored
+      55 of 55 production scans identically, so a fifth of the weight was a
+      constant. Now a window that decays past the ideal age, same log shape
+      as `liquidityQualityScore`. Hypothesis, not a finding — the component
+      table judges it in a few weeks.
+- [x] `gem_scans.scoring_version` (migration 016) so a formula change does
+      not silently mix two definitions of the same component. Scoped per
+      component: only the one that changed loses its history.
+- [ ] `liquidityQuality` is nearly as inert — 53 of 55 scans in one band.
+      Same problem, probably the same fix (the band is too wide for what
+      the filter already admits). Left until the survival change has been
+      measured, so the two are not confounded.
 - [ ] Tune weights once the component table names a specific one. Current
       values are guesses; tuning a score that predicts nothing overfits it.
-      First production reading (55 outcomes, 7d): `survival` scored 55/55
-      identically and `liquidityQuality` 53/55 — 45% of the weight ranking
-      nothing at all — while `momentumStructure`, the lowest weight at 10%,
-      separated 4% from 33% between its bottom two bands.
+      First production reading (55 outcomes, 7d): `momentumStructure`, the
+      lowest weight at 10%, separated 4% from 33% between its bottom two
+      bands.
 - [ ] A market baseline for gems: what a token that *failed* the filters did
       over the same window. The band comparison answers "does the score
       rank correctly"; it cannot answer "was any of this worth trading

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { GEM_RISK_WEIGHTS, GEM_SCORE_WEIGHTS, type GemThresholds } from './config.js';
-import { buyPressureScore, checkEligibility, evaluateGem, momentumStructureScore, volumeConvictionScore } from './scoring.js';
+import {
+  buyPressureScore,
+  checkEligibility,
+  evaluateGem,
+  momentumStructureScore,
+  survivalScore,
+  volumeConvictionScore,
+} from './scoring.js';
 import type { GemPair, SafetyReport } from './types.js';
 
 const thresholds: GemThresholds = {
@@ -12,6 +19,7 @@ const thresholds: GemThresholds = {
   idealVolumeToLiquidity: 1.5,
   maxHealthyVolumeToLiquidity: 10,
   idealAgeDays: 60,
+  staleAgeDays: 365,
   verticalPump24hPct: 100,
   extremePump24hPct: 300,
 };
@@ -196,3 +204,55 @@ describe('gem score and risk score are independent', () => {
     expect(evaluate(pair(), safety()).reasons.join(' ')).toContain('not a recommendation');
   });
 });
+
+describe('survival (age)', () => {
+  const ages = [10, 14, 21, 30, 45, 60, 90, 120, 180, 270];
+
+  it('ranks something — the old version scored every surviving token the same', () => {
+    // The defect this replaced, stated as a property rather than a number:
+    // 55 production scans out of 55 landed in one band because everything
+    // past the ideal age returned exactly 100. A component that cannot
+    // separate the population it sees carries weight and ranks nothing.
+    const scores = new Set(ages.map((d) => survivalScore(d, thresholds)));
+    expect(scores.size).toBeGreaterThan(5);
+  });
+
+  it('peaks at the ideal age rather than climbing forever', () => {
+    expect(survivalScore(thresholds.idealAgeDays, thresholds)).toBe(100);
+    // The specific failure: older used to mean better, without limit.
+    expect(survivalScore(365 * 2, thresholds)).toBeLessThan(survivalScore(60, thresholds));
+    expect(survivalScore(270, thresholds)).toBeLessThan(survivalScore(90, thresholds));
+  });
+
+  it('rises to the peak and falls after it, without a step in between', () => {
+    const rising = [10, 21, 30, 45, 60];
+    for (let i = 1; i < rising.length; i += 1) {
+      expect(survivalScore(rising[i] as number, thresholds)).toBeGreaterThan(
+        survivalScore(rising[i - 1] as number, thresholds),
+      );
+    }
+    const falling = [60, 90, 180, 270];
+    for (let i = 1; i < falling.length; i += 1) {
+      expect(survivalScore(falling[i] as number, thresholds)).toBeLessThan(
+        survivalScore(falling[i - 1] as number, thresholds),
+      );
+    }
+  });
+
+  it('scores a token too new or long dead at the floor, not at zero', () => {
+    // Zero would be indistinguishable from "no age data", which is a
+    // different statement — one is measured, the other is missing.
+    expect(survivalScore(thresholds.minAgeDays, thresholds)).toBe(20);
+    expect(survivalScore(thresholds.staleAgeDays + 1, thresholds)).toBe(20);
+    expect(survivalScore(null, thresholds)).toBe(0);
+  });
+
+  it('survives a misconfigured window instead of dividing by zero', () => {
+    const broken = { ...thresholds, idealAgeDays: 5, staleAgeDays: 3 };
+    const score = survivalScore(30, broken);
+    expect(Number.isFinite(score)).toBe(true);
+    expect(score).toBeGreaterThanOrEqual(0);
+    expect(score).toBeLessThanOrEqual(100);
+  });
+});
+

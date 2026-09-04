@@ -19,13 +19,14 @@ describe.skipIf(!hasTestDatabase)('gem score edge against real Postgres', () => 
     movePct: number | null,
     liq?: { at: number; after: number },
     components: Record<string, number> = {},
+    scoringVersion = 2,
   ): Promise<void> {
     const { rows } = await pool.query(
       `INSERT INTO gem_scans
-         (chain_id, token_address, scanned_at, gem_score, gem_components, risk_score, risk_components, reasons)
-       VALUES ('solana', 'tok' || floor(random() * 1e12)::text, now(), $1, $2::jsonb, 10, '{}'::jsonb, '[]'::jsonb)
+         (chain_id, token_address, scanned_at, gem_score, gem_components, risk_score, risk_components, reasons, scoring_version)
+       VALUES ('solana', 'tok' || floor(random() * 1e12)::text, now(), $1, $2::jsonb, 10, '{}'::jsonb, '[]'::jsonb, $3)
        RETURNING scan_id`,
-      [score, JSON.stringify(components)],
+      [score, JSON.stringify(components), scoringVersion],
     );
     await pool.query(
       `INSERT INTO gem_outcomes
@@ -236,5 +237,31 @@ describe.skipIf(!hasTestDatabase)('gem score edge against real Postgres', () => 
     const survival = (await getGemComponentEdges(pool, '24h')).find((e) => e.key === 'survival');
     expect(survival?.verdict).toBeNull();
     expect(survival?.degenerate).toBe(true);
+  });
+
+  it('ignores scans written before a component formula changed', async () => {
+    // `survival` was rewritten in v2. Scans from v1 hold a flat 100 under
+    // the same name, so counting them would compare two different
+    // definitions and call the result a finding.
+    for (let i = 0; i < 40; i += 1) await scan(80, 20, undefined, { survival: 100 }, 1);
+    for (let i = 0; i < 25; i += 1) await scan(20, -20, undefined, { survival: 30 }, 2);
+    for (let i = 0; i < 25; i += 1) await scan(80, 20, undefined, { survival: 90 }, 2);
+
+    const edges = await getGemComponentEdges(pool, '24h');
+    const survival = edges.find((e) => e.key === 'survival');
+
+    // The 40 old rows are gone: 50 comparable scans, evenly split.
+    expect(survival?.bands.reduce((n, b) => n + b.sampleCount, 0)).toBe(50);
+    expect(survival?.verdict?.verdict).toBe('beats');
+    expect(survival?.measuredSinceVersion).toBe(2);
+  });
+
+  it('keeps the whole history for a component whose formula did not change', async () => {
+    for (let i = 0; i < 30; i += 1) await scan(80, 20, undefined, { buyPressure: 90 }, 1);
+    for (let i = 0; i < 30; i += 1) await scan(20, -20, undefined, { buyPressure: 20 }, 2);
+
+    const buyPressure = (await getGemComponentEdges(pool, '24h')).find((e) => e.key === 'buyPressure');
+    expect(buyPressure?.bands.reduce((n, b) => n + b.sampleCount, 0)).toBe(60);
+    expect(buyPressure?.measuredSinceVersion).toBeNull();
   });
 });

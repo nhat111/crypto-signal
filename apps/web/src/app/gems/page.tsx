@@ -308,6 +308,14 @@ function ComponentEdgePanel({ edges }: { edges?: import('@/lib/types').GemCompon
                 so {edge.verdict.comparedBands.low} với {edge.verdict.comparedBands.high}
               </p>
             )}
+            {/* Otherwise an empty table after a formula change reads as
+                "this does nothing", when it means "this has no history
+                yet" — opposite conclusions, same blank row. */}
+            {edge.measuredSinceVersion != null && (
+              <p className="mt-0.5 text-[10px] text-sky-400/70">
+                công thức vừa đổi — chỉ tính các lần quét từ bản mới, lịch sử cũ không so được
+              </p>
+            )}
             <p className="mt-1 text-[11px] tabular-nums text-slate-500">
               {edge.bands
                 .map((b) => `${b.label}: ${b.sampleCount} mẫu${b.sufficientData && b.positiveMovePct !== null ? ` · ${b.positiveMovePct}% lên` : ''}`)

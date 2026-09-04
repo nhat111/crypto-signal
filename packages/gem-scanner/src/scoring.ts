@@ -152,10 +152,43 @@ export function buyPressureScore(pair: GemPair): number {
 }
 
 /** Age as evidence of survival — the whole premise of scanning for tokens that already lasted, rather than fresh pools. */
+/**
+ * Age as a window, not a ladder.
+ *
+ * This used to climb to 100 at the ideal age and stay there, which meant
+ * every token past 60 days scored identically — and since the filter
+ * already demands a minimum age, that was nearly all of them. The first
+ * production measurement was unambiguous: 55 scans out of 55 landed in the
+ * same band. A fifth of the score was a constant, ranking nothing while
+ * still inflating every total past the alert threshold.
+ *
+ * A constant is not a conservative choice. It cost real discrimination:
+ * with 20 free points on every token, a 70-point alert bar was really a
+ * 50-point one.
+ *
+ * So the curve now falls away again past the ideal age, on the same log
+ * scale and the same shape as `liquidityQualityScore` — the gap between
+ * two weeks and two months means far more than between two years and
+ * three. The thesis it encodes is "old enough not to be a launch snipe,
+ * young enough that the move has not already happened", which is a
+ * hypothesis rather than a finding: the per-component table will judge it
+ * within a few weeks, which is exactly what that table is for.
+ */
 export function survivalScore(ageDays: number | null, thresholds: GemThresholds): number {
   if (ageDays === null) return 0;
-  if (ageDays >= thresholds.idealAgeDays) return 100;
-  return Math.round(clamp((ageDays / thresholds.idealAgeDays) * 100, 0, 100));
+
+  const { minAgeDays: min, idealAgeDays: ideal, staleAgeDays: stale } = thresholds;
+  if (ageDays <= min || ageDays >= stale) return 20;
+
+  // Guard a misconfiguration rather than dividing by zero or going negative.
+  if (!(min < ideal && ideal < stale)) return 50;
+
+  const lnAge = Math.log(ageDays);
+  const lnIdeal = Math.log(ideal);
+  const span = ageDays < ideal ? lnIdeal - Math.log(min) : Math.log(stale) - lnIdeal;
+  const distanceFromIdeal = Math.abs(lnAge - lnIdeal) / span; // 0 at the ideal age, 1 at either edge
+
+  return Math.round(clamp(100 - distanceFromIdeal * 60, 0, 100));
 }
 
 /**
