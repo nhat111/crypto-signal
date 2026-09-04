@@ -35,6 +35,19 @@ const envSchema = z.object({
   /** Futures-only symbols (no Binance Spot listing) — see ASSUMPTIONS.md §15. Tracked with a reduced indicator/signal set. */
   FUTURES_ONLY_SYMBOLS: z.string().default(''),
   TIMEFRAMES: z.string().default('5m,15m,1h,4h'),
+  /**
+   * The timeframe the bot answers on when nobody names one.
+   *
+   * 4h rather than 15m. A spot buyer holds for days, and a 15-minute health
+   * reading flips several times inside one of their decisions — it is the
+   * noisiest frame collected, answering a question they are not asking.
+   *
+   * It also matches OUTCOME horizon the performance page and the signal
+   * verdicts are measured at, so what the bot reports and the evidence
+   * about whether that reading has ever been worth anything are finally on
+   * the same clock.
+   */
+  TELEGRAM_DEFAULT_TIMEFRAME: z.string().default('4h'),
 
   BINANCE_SPOT_REST_BASE: z.string().default('https://api.binance.com'),
   BINANCE_SPOT_WS_BASE: z.string().default('wss://stream.binance.com:9443'),
@@ -115,6 +128,7 @@ export interface AppConfig {
   apiBaseUrl: string;
   telegramBotToken: string;
   telegramApiRoot: string;
+  telegramDefaultTimeframe: Timeframe;
   telegramAlertChatIds: string[];
   symbols: string[];
   /** Symbols tracked in reduced (Futures-only, no Spot) mode — disjoint from `symbols`. */
@@ -172,12 +186,29 @@ function assertSumsTo100(name: string, values: number[]): void {
   }
 }
 
+/**
+ * The timeframe the bot answers on when nobody names one.
+ *
+ * Falls back to the longest frame actually collected rather than to the
+ * configured one: a default nobody collects filters every row out, and an
+ * empty /status reads as a dead collector rather than as a typo in an env
+ * var — a wrong diagnosis being the expensive kind of wrong here.
+ *
+ * Pure and exported so it can be tested without reaching into the config
+ * cache, which exists for the whole process lifetime by design.
+ */
+export function pickDefaultTimeframe(configured: string, collected: Timeframe[]): Timeframe {
+  if (collected.includes(configured as Timeframe)) return configured as Timeframe;
+  return collected[collected.length - 1] as Timeframe;
+}
+
 let cached: AppConfig | undefined;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   if (cached) return cached;
 
   const parsed = envSchema.parse(env);
+  const timeframes = parsed.TIMEFRAMES.split(',').map((s) => s.trim()).filter(Boolean) as Timeframe[];
 
   assertSumsTo100('health', Object.values(HEALTH_WEIGHTS));
   assertSumsTo100('risk', Object.values(RISK_WEIGHTS));
@@ -192,7 +223,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     telegramAlertChatIds: parsed.TELEGRAM_ALERT_CHAT_IDS.split(',').map((s) => s.trim()).filter(Boolean),
     symbols: parsed.SYMBOLS.split(',').map((s) => s.trim()).filter(Boolean),
     futuresOnlySymbols: parsed.FUTURES_ONLY_SYMBOLS.split(',').map((s) => s.trim()).filter(Boolean),
-    timeframes: parsed.TIMEFRAMES.split(',').map((s) => s.trim()).filter(Boolean) as Timeframe[],
+    timeframes,
+    telegramDefaultTimeframe: pickDefaultTimeframe(parsed.TELEGRAM_DEFAULT_TIMEFRAME, timeframes),
     binance: {
       spotRestBase: parsed.BINANCE_SPOT_REST_BASE,
       spotWsBase: parsed.BINANCE_SPOT_WS_BASE,

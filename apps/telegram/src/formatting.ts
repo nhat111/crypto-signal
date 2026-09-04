@@ -264,9 +264,9 @@ export function buildHelpText(symbols: string[]): string {
   return [
     '<b>Market Health Monitor</b>',
     '',
-    '/status — quick health overview (15m)',
+    '/status [khung] — sức khỏe thị trường, mặc định khung dài (vd: /status 1h)',
     '/market — full heatmap across timeframes',
-    `${symbolCommands} — symbol detail`,
+    `${symbolCommands} [khung] — chi tiết một mã (vd: /btc 1h)`,
     '/signals — recent signals',
     '/gems — small-cap candidates from DEX data',
     '/watch SYMBOL — track a position you bought, get a sell alert here',

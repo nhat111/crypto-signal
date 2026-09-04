@@ -16,6 +16,7 @@ import {
   formatWatchList,
 } from './formatting.js';
 import type { TradeSide } from './apiClient.js';
+import { parseTimeframeArg, type TimeframeChoice } from './timeframeArg.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -46,6 +47,9 @@ async function main(): Promise<void> {
     }
     await next();
   });
+
+  const timeframeFrom = (ctx: { message?: { text?: string } }): TimeframeChoice =>
+    parseTimeframeArg(ctx.message?.text, config.timeframes, config.telegramDefaultTimeframe);
 
   const helpText = buildHelpText(symbols);
 
@@ -90,8 +94,13 @@ async function main(): Promise<void> {
 
   bot.command('status', async (ctx) => {
     try {
+      const picked = timeframeFrom(ctx);
+      if ('error' in picked) {
+        await ctx.reply(picked.error);
+        return;
+      }
       const overview = await api.getOverview();
-      await ctx.reply(formatOverview(overview.rows, '15m'), { parse_mode: 'HTML' });
+      await ctx.reply(formatOverview(overview.rows, picked.timeframe), { parse_mode: 'HTML' });
     } catch (err) {
       logger.error({ err }, '/status failed');
       await ctx.reply('Could not load market status right now — try again shortly.');
@@ -112,7 +121,12 @@ async function main(): Promise<void> {
     const command = commandNameFor(symbol);
     bot.command(command, async (ctx) => {
       try {
-        const detail = await api.getSymbol(symbol, '15m');
+        const picked = timeframeFrom(ctx);
+        if ('error' in picked) {
+          await ctx.reply(picked.error);
+          return;
+        }
+        const detail = await api.getSymbol(symbol, picked.timeframe);
         if (!detail.latest) {
           await ctx.reply(`No data yet for ${symbol} — the collector may still be warming up.`);
           return;
@@ -290,7 +304,7 @@ async function main(): Promise<void> {
   // is discoverable without reading /help.
   try {
     await bot.telegram.setMyCommands([
-      { command: 'status', description: 'Health overview (15m)' },
+      { command: 'status', description: `Sức khỏe thị trường (mặc định ${config.telegramDefaultTimeframe})` },
       { command: 'market', description: 'Heatmap across timeframes' },
       ...symbols.map((symbol) => ({ command: commandNameFor(symbol), description: `${symbol} detail` })),
       { command: 'signals', description: 'Recent signals' },
