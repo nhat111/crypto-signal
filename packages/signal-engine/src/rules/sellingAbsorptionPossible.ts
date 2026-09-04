@@ -1,5 +1,5 @@
 import type { RuleContext, Signal } from '../types.js';
-import { buildSignal, pct } from './ruleHelpers.js';
+import { buildSignal, pct, skew } from './ruleHelpers.js';
 
 /**
  * Spec §7 Pattern C / §37 Scenario 5: spot selling but price holds. "Không
@@ -22,12 +22,11 @@ export function sellingAbsorptionPossible(ctx: RuleContext): Signal | null {
     signalType: 'SELLING_ABSORPTION_POSSIBLE',
     baseSeverity: 'LOW',
     reasons: [
-      `Spot CVD skew ${s.spot.cvdSkewRatio.toFixed(3)} — spot is net selling`,
-      `Price change only ${pct(s.price.changePct)} — did not fall proportionally`,
+      skew(s.spot.cvdSkewRatio, 'Mua đứt (tiền thật) đang bán ra'),
+      `Nhưng giá chỉ ${pct(s.price.changePct)} — không rơi tương ứng với lượng bán đó`,
       volumeConfirms
-        ? `Spot volume is ${s.spot.volumeAnomaly} — real supply is being met with demand`
-        : 'No volume confirmation yet — treat as a low-confidence possibility, not a conclusion.',
-      'Interpretation: possible absorption of sell pressure. Not a confirmed bullish call — needs confirmation on the next candles.',
+        ? 'Khối lượng giao dịch cao hơn thường lệ — lượng bán thật đang được ai đó mua hết'
+        : 'Khối lượng chưa xác nhận — coi là khả năng độ tin cậy thấp, chưa phải kết luận',
     ],
     metrics: {
       spotCvdSkewRatio: s.spot.cvdSkewRatio,

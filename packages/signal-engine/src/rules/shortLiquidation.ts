@@ -1,5 +1,5 @@
 import type { RuleContext, Signal } from '../types.js';
-import { buildSignal, pct } from './ruleHelpers.js';
+import { buildSignal, num, pct, usd } from './ruleHelpers.js';
 
 /** Mirror of longLiquidation: price up, OI down, liquidation spike skewed to the short side (side === 'BUY' orders). */
 export function shortLiquidation(ctx: RuleContext): Signal | null {
@@ -20,10 +20,10 @@ export function shortLiquidation(ctx: RuleContext): Signal | null {
     baseSeverity: 'HIGH',
     severitySteps: extreme ? 1 : 0,
     reasons: [
-      `Price ${pct(s.price.changePct)}`,
-      `Open interest ${pct(s.futures.oiChangePct)} — positions closing`,
-      `Short liquidations $${s.futures.liquidation.shortLiquidationUsd.toFixed(0)} vs long liquidations $${s.futures.liquidation.longLiquidationUsd.toFixed(0)}`,
-      `Liquidation anomaly ratio ${s.futures.liquidationAnomalyRatio.toFixed(2)}x rolling 24h average (threshold ${t.liquidationSpikeMult}x)`,
+      `Giá ${pct(s.price.changePct)}`,
+      `Tổng tiền đang đặt cược ${pct(s.futures.oiChangePct)} — lệnh đang bị đóng`,
+      `Bên cược giá xuống bị ép đóng ${usd(s.futures.liquidation.shortLiquidationUsd)}, bên cược giá lên ${usd(s.futures.liquidation.longLiquidationUsd)}`,
+      `Gấp ${num(s.futures.liquidationAnomalyRatio)} lần mức trung bình 24h (tính là bất thường từ ${num(t.liquidationSpikeMult)} lần)`,
     ],
     metrics: {
       priceChangePct: s.price.changePct,

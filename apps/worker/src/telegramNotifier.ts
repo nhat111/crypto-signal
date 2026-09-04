@@ -1,5 +1,5 @@
 import type { Logger } from '@crypto-signal/shared';
-import type { Signal } from '@crypto-signal/signal-engine';
+import { SIGNAL_MEANING, type Signal } from '@crypto-signal/signal-engine';
 import type { HealthResult, RiskResult } from '@crypto-signal/health-engine';
 import { verdictWarning, type SignalVerdict } from '@crypto-signal/db';
 
@@ -66,6 +66,7 @@ export function formatAlertMessage(
   verdict?: SignalVerdict,
 ): string {
   const warning = verdictWarning(verdict);
+  const meaning = SIGNAL_MEANING[signal.signalType];
   const lines = [
     `${SEVERITY_EMOJI[signal.severity]} <b>MARKET HEALTH ALERT</b>`,
     '',
@@ -78,7 +79,14 @@ export function formatAlertMessage(
     health ? `Health: ${health.score}/100 (${health.status.replace('_', ' ')})` : 'Health: N/A (futures-only symbol)',
     `Leverage Risk: ${risk.score}/100`,
     '',
-    '<b>Why:</b>',
+    // The plain sentence before the evidence, not after it. The reasons
+    // are precise and unreadable to anyone who does not already know what
+    // a CVD skew is; an alert that opens with numbers has lost the reader
+    // by line two.
+    `<b>Nghĩa là:</b> ${meaning.plain}`,
+    `<i>${meaning.caveat}</i>`,
+    '',
+    '<b>Căn cứ:</b>',
     ...signal.reasons.map((r, i) => `${i + 1}. ${r}`),
   ];
   if (warning) lines.push('', `⚠️ <b>${warning}</b>`);

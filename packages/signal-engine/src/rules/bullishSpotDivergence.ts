@@ -1,5 +1,5 @@
 import type { RuleContext, Signal } from '../types.js';
-import { buildSignal, pct } from './ruleHelpers.js';
+import { buildSignal, pct, skew } from './ruleHelpers.js';
 
 /** Spec §7 Pattern D: price down while spot is actively buying. */
 export function bullishSpotDivergence(ctx: RuleContext): Signal | null {
@@ -18,12 +18,11 @@ export function bullishSpotDivergence(ctx: RuleContext): Signal | null {
     signalType: 'BULLISH_SPOT_DIVERGENCE',
     baseSeverity: 'MEDIUM',
     reasons: [
-      `Price ${pct(s.price.changePct)}`,
-      `Spot CVD skew ${s.spot.cvdSkewRatio.toFixed(3)} — spot is net buying despite the price drop`,
+      `Giá ${pct(s.price.changePct)}`,
+      skew(s.spot.cvdSkewRatio, 'Mua đứt (tiền thật) vẫn mua vào dù giá giảm'),
       futuresAgrees
-        ? `Futures CVD skew ${s.futures.cvdSkewRatio.toFixed(3)} — futures agrees`
-        : `Futures CVD skew ${s.futures.cvdSkewRatio.toFixed(3)} — futures does not yet agree`,
-      'Interpretation: spot demand is diverging from price action. Worth watching, not a guaranteed reversal.',
+        ? skew(s.futures.cvdSkewRatio, 'Tiền vay cũng cùng chiều')
+        : skew(s.futures.cvdSkewRatio, 'Tiền vay thì chưa cùng chiều'),
     ],
     metrics: {
       priceChangePct: s.price.changePct,

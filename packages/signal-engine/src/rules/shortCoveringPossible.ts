@@ -1,5 +1,5 @@
 import type { RuleContext, Signal } from '../types.js';
-import { buildSignal, pct } from './ruleHelpers.js';
+import { buildSignal, pct, skew } from './ruleHelpers.js';
 
 /**
  * Spec §37 Scenario 3 + §8's price/OI table: price up + OI down. Explicitly
@@ -20,9 +20,8 @@ export function shortCoveringPossible(ctx: RuleContext): Signal | null {
     signalType: 'SHORT_COVERING_POSSIBLE',
     baseSeverity: 'LOW',
     reasons: [
-      `Price ${pct(s.price.changePct)} while open interest ${pct(s.futures.oiChangePct)}`,
-      `Futures CVD skew ${s.futures.cvdSkewRatio.toFixed(3)} — futures buying pressure`,
-      'Interpretation: this pattern is consistent with short positions closing (buying to cover), not necessarily new bullish conviction. Not a confirmed bullish signal.',
+      `Giá ${pct(s.price.changePct)} trong khi tổng tiền đang đặt cược ${pct(s.futures.oiChangePct)} — lệnh đang được đóng lại, không phải mở mới`,
+      skew(s.futures.cvdSkewRatio, 'Bên tiền vay đang mua'),
     ],
     metrics: {
       priceChangePct: s.price.changePct,

@@ -1,4 +1,5 @@
 export * from './types.js';
+export * from './meanings.js';
 export * from './confidence.js';
 export * from './severity.js';
 export * from './engine.js';

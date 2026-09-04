@@ -61,6 +61,23 @@ describe('formatAlertMessage', () => {
     expect(formatAlertMessage(SIGNAL, HEALTH, RISK)).not.toContain('mức nền');
   });
 
+  it('leads with the plain sentence, then the evidence', () => {
+    // An alert that opens with "Spot CVD skew 0.178" has lost its reader
+    // by line two. The sentence comes first; the numbers back it up.
+    const text = formatAlertMessage(SIGNAL, HEALTH, RISK);
+    const meaning = text.indexOf('Nghĩa là:');
+    const evidence = text.indexOf('Căn cứ:');
+    expect(meaning).toBeGreaterThan(-1);
+    expect(evidence).toBeGreaterThan(meaning);
+    expect(text).toContain('lực bán ra thật');
+  });
+
+  it('carries what the signal does NOT mean, not just what it does', () => {
+    // Every one of these patterns gets read as a buy instruction. The
+    // caveat is the correction, so it must survive into the alert.
+    expect(formatAlertMessage(SIGNAL, HEALTH, RISK)).toContain('chưa phải kết luận');
+  });
+
   it('still carries the signal itself when a warning is attached', () => {
     // A warning that displaced the reasons would be a regression, not a
     // feature: the explainability is the product.

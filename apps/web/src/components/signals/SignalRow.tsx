@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { SeverityBadge } from '@/components/SeverityBadge';
 import { SignalTypeBadge } from '@/components/SignalTypeBadge';
 import { SEVERITY_COLORS } from '@/lib/severity';
+import { SIGNAL_MEANING, evidenceReasons } from '@/lib/signalMeaning';
 import type { Signal } from '@/lib/types';
 import { cx, formatDateTime } from '@/lib/format';
 
@@ -18,8 +19,18 @@ interface SignalRowProps {
 }
 
 /**
- * One signal, reasons always visible inline (never behind a click/tooltip) —
- * this is the product's explainability, per the task's product intent.
+ * One signal: what it means, then the evidence for it.
+ *
+ * The evidence stays visible inline, never behind a click — that is the
+ * product's explainability, per the task's product intent. But it used to
+ * be the *only* thing on the card, and it opens with lines like "Spot CVD
+ * skew 0.178", which is precise and says nothing at all to the person
+ * this dashboard was built for. Precision that cannot be read is not
+ * explanation; it only proves the engine was not guessing.
+ *
+ * So the plain sentence leads and the numbers support it. The order is
+ * the whole fix: a reader who stops after one line now stops having
+ * understood something.
  */
 export function SignalRow({ signal, showSymbol = true, flagged = false }: SignalRowProps) {
   const colors = SEVERITY_COLORS[signal.severity];
@@ -56,16 +67,52 @@ export function SignalRow({ signal, showSymbol = true, flagged = false }: Signal
         <span className="ml-auto text-[11px] text-slate-500">{formatDateTime(signal.timestamp)}</span>
       </div>
 
-      {signal.reasons.length > 0 && (
-        <ul className="mt-1.5 space-y-0.5 pl-1 text-xs text-slate-400">
-          {signal.reasons.map((reason, i) => (
-            <li key={i} className="flex gap-1.5">
-              <span className="text-slate-600">–</span>
-              <span>{reason}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <Meaning signalType={signal.signalType} />
+      <Evidence reasons={signal.reasons} />
     </li>
+  );
+}
+
+/** The one sentence somebody could repeat to a friend, and the one thing it does not say. */
+function Meaning({ signalType }: { signalType: Signal['signalType'] }) {
+  const meaning = SIGNAL_MEANING[signalType];
+  if (!meaning) return null;
+
+  return (
+    <div className="mt-2 rounded border border-slate-800 bg-slate-950/40 px-2.5 py-2">
+      <p className="text-[13px] leading-relaxed text-slate-200">{meaning.plain}</p>
+      {/* The caveat is not decoration. Every one of these patterns gets read
+          as a buy or sell instruction, and none of them is one — so what
+          the signal does not say travels with it, at the same size as
+          what it does. */}
+      <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{meaning.caveat}</p>
+    </div>
+  );
+}
+
+/**
+ * The numbers that made the rule fire.
+ *
+ * Subordinate to the sentence above rather than hidden below it: someone
+ * checking whether the engine is honest must be able to see exactly what
+ * it measured, without a click. Someone who just wants to know what
+ * happened should not have to read it first.
+ */
+function Evidence({ reasons }: { reasons: string[] }) {
+  const lines = evidenceReasons(reasons);
+  if (lines.length === 0) return null;
+
+  return (
+    <div className="mt-2">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-600">Căn cứ</p>
+      <ul className="mt-1 space-y-0.5 pl-1 text-[11px] leading-relaxed text-slate-500">
+        {lines.map((reason, i) => (
+          <li key={i} className="flex gap-1.5">
+            <span className="text-slate-700">–</span>
+            <span>{reason}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

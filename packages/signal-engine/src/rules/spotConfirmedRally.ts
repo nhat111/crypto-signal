@@ -1,5 +1,5 @@
 import type { RuleContext, Signal } from '../types.js';
-import { buildSignal, pct } from './ruleHelpers.js';
+import { buildSignal, num, pct, skew } from './ruleHelpers.js';
 
 /** Spec §7 Pattern B / §3 Phase 3 item 1's opposite case — "market khỏe hơn". */
 export function spotConfirmedRally(ctx: RuleContext): Signal | null {
@@ -19,12 +19,11 @@ export function spotConfirmedRally(ctx: RuleContext): Signal | null {
     signalType: 'SPOT_CONFIRMED_RALLY',
     baseSeverity: 'INFO',
     reasons: [
-      `Price ${pct(s.price.changePct)} (>= ${t.priceChangePct}% threshold)`,
-      `Spot CVD skew ${s.spot.cvdSkewRatio.toFixed(3)} — spot is net buying`,
-      `Futures CVD skew ${s.futures.cvdSkewRatio.toFixed(3)} — futures agrees`,
-      `Open interest ${pct(s.futures.oiChangePct)} — moderate, not overheated`,
-      `Funding neutral (${s.futures.fundingRatePct.toFixed(4)}%)`,
-      'Interpretation: real spot demand is confirming this move, not leverage alone.',
+      `Giá ${pct(s.price.changePct)} (ngưỡng để tính là ${num(t.priceChangePct)}%)`,
+      skew(s.spot.cvdSkewRatio, 'Mua đứt (tiền thật)'),
+      skew(s.futures.cvdSkewRatio, 'Tiền vay cũng cùng chiều'),
+      `Tổng tiền đang đặt cược ${pct(s.futures.oiChangePct)} — tăng vừa phải, chưa quá nóng`,
+      `Phí giữ lệnh ở mức bình thường (${num(s.futures.fundingRatePct, 4)}%)`,
     ],
     metrics: {
       priceChangePct: s.price.changePct,

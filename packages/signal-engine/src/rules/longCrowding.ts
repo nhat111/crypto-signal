@@ -1,5 +1,5 @@
 import type { RuleContext, Signal } from '../types.js';
-import { buildSignal, pct } from './ruleHelpers.js';
+import { buildSignal, num, pct } from './ruleHelpers.js';
 
 /** Funding persistently positive while OI keeps rising — many longs piled in, raising squeeze risk if price reverses. */
 export function longCrowding(ctx: RuleContext): Signal | null {
@@ -17,9 +17,8 @@ export function longCrowding(ctx: RuleContext): Signal | null {
     signalType: 'LONG_CROWDING',
     baseSeverity: extreme ? 'HIGH' : 'MEDIUM',
     reasons: [
-      `Funding is ${s.futures.fundingBias.replace('_', ' ')} at ${s.futures.fundingRatePct.toFixed(4)}% (elevated >= ${t.fundingElevatedPct}%, extreme >= ${t.fundingExtremePct}%)`,
-      `Open interest ${pct(s.futures.oiChangePct)} — leveraged long exposure still growing`,
-      'Interpretation: long positioning looks crowded. Risk framing: elevated long-squeeze risk if price reverses, not a prediction that it will.',
+      `Phí giữ lệnh ${num(s.futures.fundingRatePct, 4)}% — bên đặt cược giá lên đang phải trả phí cho bên kia (cao bất thường từ ${num(t.fundingElevatedPct, 4)}%, cực đoan từ ${num(t.fundingExtremePct, 4)}%)`,
+      `Tổng tiền đang đặt cược ${pct(s.futures.oiChangePct)} — vẫn đang có thêm người vào cược giá lên`,
     ],
     metrics: {
       fundingRatePct: s.futures.fundingRatePct,

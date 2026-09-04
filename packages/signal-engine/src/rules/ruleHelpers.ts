@@ -48,6 +48,36 @@ export function buildSignal(params: BuildSignalParams): Signal {
   };
 }
 
+/**
+ * Percentages, Vietnamese decimal comma. These strings are read by people,
+ * not parsed by anything — `metrics` carries the machine-readable copy.
+ */
 export function pct(n: number): string {
-  return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`;
+  return `${n >= 0 ? '+' : ''}${n.toFixed(2).replace('.', ',')}%`;
+}
+
+export function num(n: number, digits = 2): string {
+  return n.toFixed(digits).replace('.', ',');
+}
+
+/**
+ * CVD skew as a sentence rather than a bare ratio.
+ *
+ * The stored figure is (mua chủ động − bán chủ động) / tổng khối lượng, so
+ * it is already a share of volume and reads naturally as a percentage. A
+ * reader who does not know what "skew 0,178" is can still act on "mua
+ * nhiều hơn bán 17,8% khối lượng"; the raw ratio stays in brackets so the
+ * number on screen still matches the number in `metrics`.
+ */
+export function skew(ratio: number, who: string): string {
+  const share = num(Math.abs(ratio) * 100, 1);
+  const side = ratio >= 0 ? 'mua nhiều hơn bán' : 'bán nhiều hơn mua';
+  return `${who}: ${side} ${share}% khối lượng (chỉ số ${num(ratio, 3)})`;
+}
+
+/** Money, grouped the way it is read out loud rather than as fifteen digits. */
+export function usd(n: number): string {
+  if (n >= 1_000_000) return `${num(n / 1_000_000, 1)} triệu đô`;
+  if (n >= 1_000) return `${num(n / 1_000, 0)} nghìn đô`;
+  return `${num(n, 0)} đô`;
 }

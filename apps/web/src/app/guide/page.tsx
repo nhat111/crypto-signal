@@ -217,8 +217,27 @@ export default function GuidePage() {
                 <Term key="c">Chip &ldquo;kém hơn mức nền&rdquo;</Term>,
                 'Loại tín hiệu này đã được đo và kết luận là đi kém hơn cả khi không làm gì. Chi tiết ở banner vàng đầu danh sách, và ở mục Trang Performance bên dưới.',
               ],
+              [
+                <Term key="d">Khối chữ ở giữa</Term>,
+                'Chuyện gì đang xảy ra, nói bằng lời thường. Dòng mờ ngay dưới nó là thứ tín hiệu này KHÔNG nói — đọc luôn dòng đó.',
+              ],
+              [
+                <Term key="e">Mục &ldquo;Căn cứ&rdquo;</Term>,
+                'Các con số làm quy tắc bật lên. Đây là phần để kiểm tra máy có bịa không, không phải phần phải đọc trước.',
+              ],
             ]}
           />
+          <p>
+            Đọc theo thứ tự: tên loại → khối chữ ở giữa → dòng mờ &ldquo;không có nghĩa là&rdquo;. Dừng ở đó cũng
+            được. Mục <Term>Căn cứ</Term> chỉ cần khi bro muốn soi kỹ.
+          </p>
+          <Warning>
+            <p>
+              Tín hiệu nổ <Term>trước</Term> ngày mình Việt hoá phần này vẫn còn dòng căn cứ bằng tiếng Anh — chúng
+              được ghi cứng vào lúc nổ nên không sửa lại được. Khối chữ giải nghĩa ở giữa thì{' '}
+              <Term>luôn có</Term>, kể cả với tín hiệu cũ.
+            </p>
+          </Warning>
           <Warning>
             <p>
               Độ tin cậy 78 <Term>không</Term> nghĩa là &ldquo;78% đúng&rdquo;. Nó chỉ nghĩa là tín hiệu này rõ ràng,

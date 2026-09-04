@@ -1,5 +1,5 @@
 import type { RuleContext, Signal } from '../types.js';
-import { buildSignal, pct } from './ruleHelpers.js';
+import { buildSignal, num, pct } from './ruleHelpers.js';
 
 /** Mirror of longCrowding: funding persistently negative while OI keeps rising — shorts piling in. */
 export function shortCrowding(ctx: RuleContext): Signal | null {
@@ -17,9 +17,8 @@ export function shortCrowding(ctx: RuleContext): Signal | null {
     signalType: 'SHORT_CROWDING',
     baseSeverity: extreme ? 'HIGH' : 'MEDIUM',
     reasons: [
-      `Funding is ${s.futures.fundingBias.replace('_', ' ')} at ${s.futures.fundingRatePct.toFixed(4)}% (elevated <= -${t.fundingElevatedPct}%, extreme <= -${t.fundingExtremePct}%)`,
-      `Open interest ${pct(s.futures.oiChangePct)} — leveraged short exposure still growing`,
-      'Interpretation: short positioning looks crowded. Risk framing: elevated short-squeeze risk if price reverses, not a prediction that it will.',
+      `Phí giữ lệnh ${num(s.futures.fundingRatePct, 4)}% — bên đặt cược giá xuống đang phải trả phí cho bên kia (cao bất thường từ -${num(t.fundingElevatedPct, 4)}%, cực đoan từ -${num(t.fundingExtremePct, 4)}%)`,
+      `Tổng tiền đang đặt cược ${pct(s.futures.oiChangePct)} — vẫn đang có thêm người vào cược giá xuống`,
     ],
     metrics: {
       fundingRatePct: s.futures.fundingRatePct,

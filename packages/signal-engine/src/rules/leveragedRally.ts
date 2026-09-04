@@ -1,5 +1,5 @@
 import type { RuleContext, Signal } from '../types.js';
-import { buildSignal, pct } from './ruleHelpers.js';
+import { buildSignal, num, pct, skew } from './ruleHelpers.js';
 
 /**
  * Spec §7 Pattern A. Price up, spot selling, futures buying, OI expanding —
@@ -29,14 +29,13 @@ export function leveragedRally(ctx: RuleContext): Signal | null {
     baseSeverity: 'MEDIUM',
     severitySteps: (fundingElevated ? 1 : 0) + (fundingExtreme ? 1 : 0),
     reasons: [
-      `Price ${pct(s.price.changePct)} (>= ${t.priceChangePct}% threshold)`,
-      `Spot CVD skew ${s.spot.cvdSkewRatio.toFixed(3)} — spot is net selling`,
-      `Futures CVD skew ${s.futures.cvdSkewRatio.toFixed(3)} — futures is net buying`,
-      `Open interest ${pct(s.futures.oiChangePct)} — new leveraged positioning entering`,
+      `Giá ${pct(s.price.changePct)} (ngưỡng để tính là ${num(t.priceChangePct)}%)`,
+      skew(s.spot.cvdSkewRatio, 'Mua đứt (tiền thật) đang bán ra'),
+      skew(s.futures.cvdSkewRatio, 'Tiền vay đang mua vào'),
+      `Tổng tiền đang đặt cược ${pct(s.futures.oiChangePct)} — tiền vay mới đang vào`,
       fundingElevated
-        ? `Funding is ${s.futures.fundingBias.replace('_', ' ')} (${s.futures.fundingRatePct.toFixed(4)}%)`
-        : `Funding neutral (${s.futures.fundingRatePct.toFixed(4)}%)`,
-      'Interpretation: price is rising but spot buying does not confirm it — futures/leverage is doing the driving. This is not a call that the market will fall.',
+        ? `Phí giữ lệnh đang cao bất thường (${num(s.futures.fundingRatePct, 4)}%)`
+        : `Phí giữ lệnh ở mức bình thường (${num(s.futures.fundingRatePct, 4)}%)`,
     ],
     metrics: {
       priceChangePct: s.price.changePct,
