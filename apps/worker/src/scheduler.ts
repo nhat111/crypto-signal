@@ -188,7 +188,7 @@ export function startSchedulers(ctx: WorkerContext): () => void {
       spot: ctx.connectionStatus.spot,
       futures: ctx.connectionStatus.futures,
       liquidation: ctx.connectionStatus.liquidation,
-    }, ctx.symbolIngest).catch((err) => ctx.logger.error({ err }, 'worker heartbeat failed'));
+    }, ctx.symbolIngest, ctx.config.telegramAlertChatIds.length).catch((err) => ctx.logger.error({ err }, 'worker heartbeat failed'));
   };
   timers.push(setInterval(beat, HEARTBEAT_INTERVAL_MS));
   beat();
@@ -209,6 +209,19 @@ export function startSchedulers(ctx: WorkerContext): () => void {
       15 * 60_000,
     ),
   );
+
+  // Said once, loudly, at boot. An alerter with no recipients returns on
+  // its first line every fifteen minutes and writes nothing, so the only
+  // trace it leaves is the same silence a healthy night leaves. Whoever
+  // reads these logs should not have to know that to tell them apart.
+  if (ctx.config.telegramAlertChatIds.length === 0) {
+    ctx.logger.warn(
+      { env: 'TELEGRAM_ALERT_CHAT_IDS' },
+      'health alerts are OFF — no chat ids configured, so no alert will ever be sent and silence proves nothing',
+    );
+  } else {
+    ctx.logger.info({ chats: ctx.config.telegramAlertChatIds.length }, 'health alerts armed');
+  }
 
   void refreshHistoricalScores(ctx).catch((err) => ctx.logger.error({ err }, 'initial historical score refresh failed'));
   // On boot too: a fresh deploy would otherwise show no verdicts anywhere

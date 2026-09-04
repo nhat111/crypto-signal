@@ -114,6 +114,45 @@ function BuildCard({ data }: { data: StatusResponse }) {
 
 /* ---------------- worker ---------------- */
 
+/**
+ * Whether a quiet Telegram means anything.
+ *
+ * The health alerter is opt-in. With no chat ids it returns on its first
+ * line every fifteen minutes and writes nothing — so a night with no
+ * alerts looks exactly like a night with no problems, and the operator
+ * reads the silence as health. It is the failure this whole page exists
+ * to prevent, sitting inside the feature meant to prevent it.
+ *
+ * Stated here rather than only in the logs because the person asking "did
+ * it break last night?" is holding a phone, not tailing Railway.
+ */
+function AlertArming({ worker }: { worker: StatusWorkerRuntime | null }) {
+  // Undefined means the API predates the field, which is not the same as
+  // zero: claiming alerts are off when we simply cannot see would be its
+  // own invented observation.
+  if (worker === null || worker.alertChatCount === undefined) return null;
+
+  if (worker.alertChatCount === 0) {
+    return (
+      <div className="mt-2.5 rounded border border-amber-500/30 bg-amber-500/5 px-2.5 py-2 text-[11px] leading-relaxed text-amber-200/80">
+        <span className="font-semibold">Cảnh báo Telegram đang TẮT.</span> Chưa đặt{' '}
+        <code className="text-amber-200">TELEGRAM_ALERT_CHAT_IDS</code>, nên hệ thống sẽ không bao giờ nhắn khi có
+        sự cố — <span className="font-semibold">Telegram im lặng không chứng minh được điều gì</span>. Muốn dùng
+        im lặng làm bằng chứng thì phải bật nó lên.
+      </div>
+    );
+  }
+
+  return (
+    <Row
+      label="Cảnh báo Telegram"
+      value={`đang bật · ${worker.alertChatCount} kênh`}
+      tone="ok"
+    />
+  );
+}
+
+
 const CONNECTION_LABEL: Record<string, string> = {
   spot: 'Sàn thường (spot)',
   futures: 'Sàn đòn bẩy (futures)',
@@ -172,6 +211,7 @@ function WorkerCard({ worker }: { worker: StatusWorkerRuntime | null }) {
           ))}
         </>
       )}
+      <AlertArming worker={worker} />
       <p className="mt-2.5 text-[11px] leading-relaxed text-slate-500">
         Kết nối <span className="font-semibold text-slate-400">đang mở</span> mà symbol vẫn đứng ở thẻ dưới → lỗi nằm
         ở phần xử lý, không phải đường truyền. Kết nối <span className="font-semibold text-slate-400">đã đóng</span>{' '}

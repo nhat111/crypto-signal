@@ -43,4 +43,26 @@ describe.skipIf(!hasTestDatabase)('worker heartbeat against real Postgres', () =
     const row = await getWorkerRuntime(pool, RUNTIME_WORKER, Date.now() + 10 * 60_000);
     expect(row!.ageMs).toBeGreaterThan(9 * 60_000);
   });
+
+  it('reports how many chats it could alert, so silence can be interpreted', async () => {
+    // Without this, "no Telegram message last night" reads as "nothing
+    // broke" when it may only mean the alerter was never switched on.
+    await recordWorkerHeartbeat(pool, RUNTIME_WORKER, { spot: 'open', futures: 'open', liquidation: 'open' }, {}, 2);
+    expect((await getWorkerRuntime(pool))?.alertChatCount).toBe(2);
+  });
+
+  it('reports zero rather than nothing when the alerter is off', async () => {
+    // Zero is a fact the status page must be able to state out loud, not
+    // an absence it should skip over.
+    await recordWorkerHeartbeat(pool, RUNTIME_WORKER, { spot: 'open', futures: 'open', liquidation: 'open' }, {}, 0);
+    expect((await getWorkerRuntime(pool))?.alertChatCount).toBe(0);
+  });
+
+  it('does not carry a previous arming forward on the next beat', async () => {
+    // The count is republished every minute; a heartbeat that kept the old
+    // value would keep claiming alerts are armed after they were removed.
+    await recordWorkerHeartbeat(pool, RUNTIME_WORKER, { spot: 'open', futures: 'open', liquidation: 'open' }, {}, 3);
+    await recordWorkerHeartbeat(pool, RUNTIME_WORKER, { spot: 'open', futures: 'open', liquidation: 'open' }, {});
+    expect((await getWorkerRuntime(pool))?.alertChatCount).toBe(0);
+  });
 });

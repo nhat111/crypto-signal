@@ -416,6 +416,12 @@ export interface StatusWorkerRuntime {
   };
   /** Epoch millis of the last candle received per symbol, stamped before any processing. */
   symbolIngest: Record<string, number>;
+  /**
+   * How many chats the worker could send a health alert to. Zero means the
+   * alerter is off — which changes what a quiet night proves. Optional
+   * because an API predating the field sends nothing.
+   */
+  alertChatCount?: number;
 }
 
 export interface StatusJob {

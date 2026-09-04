@@ -31,6 +31,15 @@ export interface WorkerRuntime {
    * upstream of us.
    */
   symbolIngest: Record<string, number>;
+  /**
+   * How many chats the worker could send a health alert to.
+   *
+   * Zero means the alerter is switched off, and that changes what silence
+   * proves. Without this, "no alert last night" reads as "nothing broke"
+   * when it may only mean "nobody was listening" — the two are
+   * indistinguishable from outside, and only one of them is good news.
+   */
+  alertChatCount: number;
 }
 
 export const RUNTIME_WORKER = 'worker';
@@ -56,18 +65,20 @@ export async function recordWorkerHeartbeat(
   service: string,
   connections: { spot: string; futures: string; liquidation: string },
   symbolIngest: Record<string, number> = {},
+  alertChatCount = 0,
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO worker_runtime (service, last_heartbeat_at, spot_ws, futures_ws, liquidation_ws, symbol_ingest, updated_at)
-     VALUES ($1, now(), $2, $3, $4, $5::jsonb, now())
+    `INSERT INTO worker_runtime (service, last_heartbeat_at, spot_ws, futures_ws, liquidation_ws, symbol_ingest, alert_chat_count, updated_at)
+     VALUES ($1, now(), $2, $3, $4, $5::jsonb, $6, now())
      ON CONFLICT (service) DO UPDATE SET
        last_heartbeat_at = now(),
        spot_ws = EXCLUDED.spot_ws,
        futures_ws = EXCLUDED.futures_ws,
        liquidation_ws = EXCLUDED.liquidation_ws,
        symbol_ingest = EXCLUDED.symbol_ingest,
+       alert_chat_count = EXCLUDED.alert_chat_count,
        updated_at = now()`,
-    [service, connections.spot, connections.futures, connections.liquidation, JSON.stringify(symbolIngest)],
+    [service, connections.spot, connections.futures, connections.liquidation, JSON.stringify(symbolIngest), alertChatCount],
   );
 }
 
@@ -79,7 +90,7 @@ export async function getWorkerRuntime(
 ): Promise<WorkerRuntime | null> {
   const { rows } = await pool.query(
     `SELECT service, extract(epoch from last_heartbeat_at)*1000 AS beat_ms,
-            spot_ws, futures_ws, liquidation_ws, symbol_ingest
+            spot_ws, futures_ws, liquidation_ws, symbol_ingest, alert_chat_count
      FROM worker_runtime WHERE service = $1`,
     [service],
   );
@@ -97,5 +108,6 @@ export async function getWorkerRuntime(
       liquidation: String(row.liquidation_ws),
     },
     symbolIngest: (row.symbol_ingest ?? {}) as Record<string, number>,
+    alertChatCount: Number(row.alert_chat_count ?? 0),
   };
 }

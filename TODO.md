@@ -139,6 +139,12 @@ Check items as they land; each phase's commit message references the phase.
       each verified by hand once and then had no regression cover.
 - [x] Telegram health alerts from the worker — transitions only, opt-in via
       TELEGRAM_ALERT_CHAT_IDS.
+- [x] Say when those alerts are switched off. Opt-in meant the alerter
+      returned on its first line every 15 minutes and wrote nothing, so a
+      quiet night and an unarmed alerter left identical evidence. The
+      worker now publishes `alert_chat_count` with its heartbeat
+      (migration 015), warns once at boot, and /status says outright that
+      silence proves nothing while it reads zero.
 - [ ] Measure worker memory on Railway (api was 71 MB; worker never checked).
 
 ## Phase 15 — Docker

@@ -7,6 +7,7 @@ const runtime = (ageMs: number, connections: Record<string, string> = {}) => ({
   ageMs,
   connections: { spot: 'open', futures: 'open', liquidation: 'open', ...connections },
   symbolIngest: {},
+    alertChatCount: 0,
 });
 
 const STALE = 180_000;
