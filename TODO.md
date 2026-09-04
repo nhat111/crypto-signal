@@ -176,6 +176,10 @@ Check items as they land; each phase's commit message references the phase.
       points with no track record behind them.
 
 ## Known limitations (carried forward, not silently hidden)
+- [ ] Nothing in CI builds the production bundles. `tsx` does not bundle, so
+      a bundler-only failure (see `--keep-names` in the Dockerfiles) is
+      green everywhere locally and dead in production. The flag now has a
+      static guard; the general case still needs a smoke build.
 - [ ] Liquidation history cannot be backfilled on a cold start (exchange
       limitation, see ASSUMPTIONS §1/§6) — 24h rolling average anomaly needs
       ~24h of collector uptime before it's meaningful.
