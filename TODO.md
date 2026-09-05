@@ -146,6 +146,22 @@ Check items as they land; each phase's commit message references the phase.
       (migration 015), warns once at boot, and /status says outright that
       silence proves nothing while it reads zero.
 - [ ] Measure worker memory on Railway (api was 71 MB; worker never checked).
+- [x] Per-stream staleness on the Binance sockets. The connection-level
+      watchdog is reset by any traffic, so one symbol could go silent for
+      seventeen hours inside a socket the other three kept busy — the only
+      self-healing path was blind to the failure it existed for. Klines
+      only (liquidations are legitimately sparse), and it gives up after
+      three reconnects rather than gapping every symbol forever for one
+      that is never coming back.
+- [x] Seed `symbolIngest` from the previous run at boot. The heartbeat
+      overwrites the stored map wholesale, so every deploy erased the one
+      piece of evidence that identifies a stalled symbol — which is why
+      HYPE sat at "chưa rõ" for days.
+- [ ] HYPE itself: the fix makes the outage self-healing and, if it is
+      upstream, makes it *say so*. Whether HYPEUSDT is actually delisted
+      from the futures WS is still unverified — the sandbox cannot reach
+      Binance. Read the worker log for `quiet: ["hypeusdt@kline_..."]`
+      after this deploys.
 
 ## Phase 15 — Docker
 - [x] `docker-compose.yml`: postgres, redis, api, worker, web, telegram.

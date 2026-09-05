@@ -383,6 +383,25 @@ describe('a restarted worker is not a broken one', () => {
     expect(collectorSummary(allFresh).headline).toContain('đều tươi');
   });
 
+  it('is not fooled by an ingest time carried over from the previous process', () => {
+    // The worker now seeds its last-candle-seen map from the database at
+    // boot, so the evidence survives a deploy. That means a card can see a
+    // recent ingest stamp written by the *old* process while the new one
+    // has produced nothing yet — which would read as "candles arrive but
+    // nothing comes out", i.e. our bug, on a deploy that is merely young.
+    const status = classifySymbol(quiet('BTCUSDT', 17), now - 2 * MIN, now, 5 * MIN);
+    expect(status.ingest).toBe('warming-up');
+    expect(status.problem).toBe(false);
+  });
+
+  it('still blames the pipeline once the worker has had its window', () => {
+    // Same seeded stamp, older worker: now the reading is real and must
+    // not be excused.
+    const status = classifySymbol(quiet('BTCUSDT', 60), now - 2 * MIN, now, 90 * MIN);
+    expect(status.ingest).toBe('arriving-not-processed');
+    expect(status.problem).toBe(true);
+  });
+
   it('has wording for the warming state', () => {
     expect(INGEST_TEXT['warming-up'].length).toBeGreaterThan(10);
   });

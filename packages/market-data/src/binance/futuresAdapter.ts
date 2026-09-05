@@ -13,6 +13,7 @@ import type { ConnectionStatus, FuturesAdapter, KlineQuery, Unsubscribe } from '
 import { forceOrderToLiquidation, rawKlineToCandle, wsKlineToCandle, type ForceOrderPayload, type WsKlinePayload } from '../normalizer.js';
 import { BinanceRestClient } from './rest.js';
 import { CombinedStreamClient } from './ws.js';
+import { KLINE_STREAM_STALE_MS } from '../streamHealth.js';
 import { forceOrderStreamName, klineStreamName, timeframeFromKlineStream } from './stream-names.js';
 
 export interface BinanceFuturesAdapterOptions {
@@ -81,6 +82,10 @@ export class BinanceFuturesAdapter implements FuturesAdapter {
       streams,
       logger: this.opts.logger,
       onStatus,
+      // Klines are pushed continuously on every timeframe, so one symbol
+      // going quiet inside a busy socket is a fault the connection-level
+      // watchdog cannot see (see streamHealth.ts).
+      perStreamStaleMs: KLINE_STREAM_STALE_MS,
       onMessage: (streamName, data) => {
         const timeframe = timeframeFromKlineStream(streamName);
         if (!timeframe) return;

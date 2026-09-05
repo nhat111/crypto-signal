@@ -345,6 +345,47 @@ count that actually produces a verdict, rather than inverting the adjusted
 formula in closed form — a function that promises a sample size which then
 fails to deliver one is worse than a function that promises nothing.
 
+### A watchdog that could not see the failure it was for
+
+The WebSocket client had one staleness timer per *connection*, reset by any
+traffic on it. BTC, ETH, SOL and HYPE share a single futures socket, and
+BTC alone pushes something every couple of seconds — so the timer was fed
+continuously while HYPEUSDT delivered nothing for seventeen hours, and
+`/status` correctly reported every connection open the whole time. The only
+self-healing mechanism in the collector was structurally blind to a
+per-symbol outage inside a healthy socket.
+
+Staleness is now tracked per subscribed stream as well, and the log names
+which streams went quiet. It is **opt-in**, set for klines only: Binance
+pushes kline updates every second or two on every timeframe, but
+`@forceOrder` is genuinely sparse — nobody being liquidated is the normal
+state — and a per-stream timeout there would terminate a healthy socket on
+a fixed cycle forever.
+
+It also **gives up after three reconnects**. A reconnect rebuilds the whole
+socket, so every symbol on it takes a gap; doing that every five minutes
+because one symbol is delisted and never coming back would trade a silent
+one-symbol outage for a repeating all-symbol one. After three tries the
+conclusion is upstream, the socket is left alone, and the symbol reads as
+stale on `/status` — which is the honest answer.
+
+### The evidence was being erased on every deploy
+
+`symbolIngest` — the map that separates "no candle is arriving" (a
+connection fault) from "candles arrive and nothing comes out" (our bug) —
+lived only in worker memory, and the heartbeat overwrites the stored copy
+wholesale. So every restart replaced it with `{}`, and anyone looking at
+`/status` within fifteen minutes of a deploy saw "chưa rõ" for every
+symbol. That is why HYPEUSDT went days without a diagnosis: the
+instrumentation existed and was destroyed by the very deploys that
+prompted people to look.
+
+The worker now seeds the map from the last run at boot. Honest, because
+the question is "when did a candle for this symbol last arrive", and that
+does not reset because a process did. A seeded stamp can be newer than
+anything the current process has seen, so the collector card's warming-up
+rule is what keeps a young deploy from reading it as a pipeline fault.
+
 ## 17. Price-shock signals (`PRICE_SPIKE_UP` / `PRICE_SPIKE_DOWN`)
 
 Not from the spec. Added because every other rule describes *structure* —

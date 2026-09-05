@@ -1,6 +1,7 @@
 export * from './types.js';
 export * from './normalizer.js';
 export * from './backoff.js';
+export * from './streamHealth.js';
 export * from './binance/rest.js';
 export * from './binance/ws.js';
 export * from './binance/stream-names.js';

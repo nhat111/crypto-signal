@@ -1,7 +1,7 @@
 import pg from 'pg';
 import { createLogger, loadConfig, resolveBuildInfo } from '@crypto-signal/shared';
 import { BinanceFuturesAdapter, BinanceSpotAdapter } from '@crypto-signal/market-data';
-import { insertLiquidation, recordServiceBuild, SERVICE_WORKER } from '@crypto-signal/db';
+import { getWorkerRuntime, insertLiquidation, recordServiceBuild, SERVICE_WORKER } from '@crypto-signal/db';
 import { loadGemConfig } from '@crypto-signal/gem-scanner';
 import { buildStates, connectionStatusToState, type WorkerContext } from './context.js';
 import { CandlePairBuffer } from './state.js';
@@ -74,6 +74,22 @@ async function main(): Promise<void> {
   await recordServiceBuild(pool, SERVICE_WORKER, build).catch((err) =>
     logger.warn({ err }, 'could not record worker build — version will not show on /status'),
   );
+
+  // Carry the last-candle-seen times across the restart.
+  //
+  // This map is what tells "no candle is arriving" (a connection fault)
+  // apart from "candles arrive and nothing comes out" (our bug) — and it
+  // lived only in memory, so the heartbeat overwrote the stored copy with
+  // an empty object on every boot. Every deploy destroyed the one piece of
+  // evidence that identifies a stalled symbol, which is why HYPEUSDT sat
+  // at "chưa rõ" for days: nobody was ever looking more than a few minutes
+  // after a deploy.
+  //
+  // Seeding is honest here because the question is "when did a candle for
+  // this symbol last arrive", and that answer does not reset because a
+  // process did.
+  const previousRuntime = await getWorkerRuntime(pool).catch(() => null);
+  if (previousRuntime) Object.assign(ctx.symbolIngest, previousRuntime.symbolIngest);
 
   // Registration first: a symbol must be visible to the read side even if
   // its history backfill later fails.

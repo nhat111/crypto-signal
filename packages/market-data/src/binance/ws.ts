@@ -1,6 +1,7 @@
 import WebSocket from 'ws';
 import type { Logger } from '@crypto-signal/shared';
 import { computeBackoffDelay } from '../backoff.js';
+import { shouldForceReconnect, staleStreams } from '../streamHealth.js';
 import type { ConnectionStatus } from '../types.js';
 
 export interface CombinedStreamOptions {
@@ -19,6 +20,19 @@ export interface CombinedStreamOptions {
    * will kill healthy connections on sparse streams. See DEFAULT_STALE_TIMEOUT_MS.
    */
   staleTimeoutMs?: number;
+  /**
+   * Force a reconnect when an *individual* subscribed stream goes quiet,
+   * even though the connection as a whole is busy.
+   *
+   * The connection-level watchdog above cannot see this: four symbols
+   * share one socket, and any one of them chatting keeps the timer alive
+   * while another delivers nothing. That is how a symbol stayed silent
+   * for seventeen hours with every connection reporting "open".
+   *
+   * Only set this for streams that are continuously pushed (klines).
+   * Leave it unset for `@forceOrder`, where silence is the normal state.
+   */
+  perStreamStaleMs?: number;
 }
 
 /**
@@ -37,6 +51,9 @@ export interface CombinedStreamOptions {
  */
 const DEFAULT_STALE_TIMEOUT_MS = 10 * 60_000;
 
+/** How often the per-stream check runs. Cheap: a map lookup per subscribed stream. */
+const PER_STREAM_CHECK_INTERVAL_MS = 60_000;
+
 /**
  * Wraps a single Binance "combined stream" WebSocket connection
  * (`/stream?streams=a/b/c`) with automatic reconnect + exponential backoff
@@ -52,6 +69,10 @@ export class CombinedStreamClient {
   private closedByUser = false;
   private staleTimer: ReturnType<typeof setTimeout> | undefined;
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  private perStreamTimer: ReturnType<typeof setInterval> | undefined;
+  private perStreamReconnects = 0;
+  private gaveUpOnStreams = false;
+  private readonly lastSeenByStream = new Map<string, number>();
 
   constructor(private readonly opts: CombinedStreamOptions) {}
 
@@ -65,6 +86,7 @@ export class CombinedStreamClient {
     socket.on('open', () => {
       this.attempt = 0;
       this.armStaleWatch();
+      this.armPerStreamWatch();
       this.emitStatus({ state: 'open' });
       this.opts.logger.info({ stream: this.opts.name, streamCount: this.opts.streams.length }, 'binance ws open');
     });
@@ -73,6 +95,9 @@ export class CombinedStreamClient {
       this.armStaleWatch();
       try {
         const parsed = JSON.parse(raw.toString()) as { stream: string; data: unknown };
+        // Stamped per stream, not just per socket: this is the record that
+        // makes a single quiet symbol visible inside a busy connection.
+        this.lastSeenByStream.set(parsed.stream, Date.now());
         this.opts.onMessage(parsed.stream, parsed.data);
       } catch (err) {
         this.opts.logger.error({ err, stream: this.opts.name }, 'failed to parse binance ws message');
@@ -92,6 +117,7 @@ export class CombinedStreamClient {
     socket.on('close', (code, reasonBuf) => {
       const reason = reasonBuf.toString();
       this.clearStaleWatch();
+      this.clearPerStreamWatch();
       this.emitStatus({ state: 'closed', code, reason });
       if (!this.closedByUser) this.scheduleReconnect();
     });
@@ -100,6 +126,7 @@ export class CombinedStreamClient {
   close(): void {
     this.closedByUser = true;
     this.clearStaleWatch();
+    this.clearPerStreamWatch();
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.socket?.close();
   }
@@ -123,6 +150,59 @@ export class CombinedStreamClient {
 
   private clearStaleWatch(): void {
     if (this.staleTimer) clearTimeout(this.staleTimer);
+  }
+
+  /**
+   * Every stream starts its clock at connection time, so a socket that has
+   * just opened is never judged on silence it has not had time to break.
+   */
+  private armPerStreamWatch(): void {
+    this.clearPerStreamWatch();
+    const timeoutMs = this.opts.perStreamStaleMs ?? 0;
+    if (timeoutMs <= 0) return;
+
+    const openedAt = Date.now();
+    for (const stream of this.opts.streams) this.lastSeenByStream.set(stream, openedAt);
+
+    this.perStreamTimer = setInterval(() => {
+      const quiet = staleStreams(this.opts.streams, this.lastSeenByStream, Date.now(), timeoutMs);
+
+      if (quiet.length === 0) {
+        if (this.gaveUpOnStreams) {
+          this.opts.logger.info({ stream: this.opts.name }, 'binance ws streams delivering again');
+        }
+        this.perStreamReconnects = 0;
+        this.gaveUpOnStreams = false;
+        return;
+      }
+
+      if (!shouldForceReconnect(quiet, this.perStreamReconnects)) {
+        // Said once, not every minute: the symbol already reads as stale
+        // on /status, and a line per minute would bury the log it sits in.
+        if (!this.gaveUpOnStreams) {
+          this.gaveUpOnStreams = true;
+          this.opts.logger.error(
+            { stream: this.opts.name, quiet, attempts: this.perStreamReconnects },
+            'binance ws streams still silent after repeated reconnects — treating as an upstream outage and leaving the socket alone',
+          );
+        }
+        return;
+      }
+
+      this.perStreamReconnects += 1;
+      // Named, because "which symbol stopped" is the question this exists
+      // to answer and the reconnect alone would not answer it.
+      this.opts.logger.warn(
+        { stream: this.opts.name, quiet, timeoutMs, attempt: this.perStreamReconnects },
+        'binance ws streams silent while the connection is busy, forcing reconnect',
+      );
+      this.socket?.terminate();
+    }, PER_STREAM_CHECK_INTERVAL_MS);
+  }
+
+  private clearPerStreamWatch(): void {
+    if (this.perStreamTimer) clearInterval(this.perStreamTimer);
+    this.perStreamTimer = undefined;
   }
 
   private emitStatus(status: ConnectionStatus): void {
