@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   DIAGNOSIS_TEXT,
   INGEST_TEXT,
-  collectorVerdict,
+  classifySymbol,
+  collectorSummary,
   connectionVerdict,
   diagnoseFromCensus,
   diagnoseIngest,
@@ -12,12 +13,14 @@ import {
   jobsVerdict,
   outcomesVerdict,
   symbolVerdict,
+  isWarmingUp,
   versionVerdict,
+  workerUptimeMs,
   workerVerdict,
 } from './statusVerdicts';
 import type { OutcomeDiagnosis } from './statusVerdicts';
 import type { StatusStuckCensus } from './types';
-import type { StatusCollectorSymbol, StatusJob, StatusOutcomeHorizon, StatusVersion } from './types';
+import type { StatusCollectorSymbol, StatusJob, StatusOutcomeHorizon, StatusService, StatusVersion } from './types';
 
 const version = (commit: string | null): StatusVersion => ({
   commit,
@@ -27,9 +30,13 @@ const version = (commit: string | null): StatusVersion => ({
   schema: { latest: '010_job_health.sql', appliedAt: 0 },
 });
 
+const NOW = 1_800_000_000_000;
+
 const sym = (ageMinutes: number | null): StatusCollectorSymbol => ({
   symbol: 'BTCUSDT',
-  lastSnapshotAt: ageMinutes === null ? null : 1,
+  // Anchored to NOW rather than a token value: classifySymbol reads the
+  // timestamp, not just the pre-computed age.
+  lastSnapshotAt: ageMinutes === null ? null : NOW - ageMinutes * 60_000,
   ageMs: ageMinutes === null ? null : ageMinutes * 60_000,
 });
 
@@ -75,11 +82,11 @@ describe('collector freshness', () => {
   });
 
   it('turns the whole card red if any one symbol is stale', () => {
-    expect(collectorVerdict([sym(1), sym(1), sym(99)])).toBe('bad');
+    expect(collectorSummary([sym(1), sym(1), sym(99)].map((r) => classifySymbol(r, undefined, NOW, null))).verdict).toBe('bad');
   });
 
   it('is neutral before any symbol is registered', () => {
-    expect(collectorVerdict([])).toBe('idle');
+    expect(collectorSummary([]).verdict).toBe('idle');
   });
 });
 
@@ -253,3 +260,130 @@ describe('diagnoseFromCensus', () => {
     expect(diagnoseFromCensus(c, 0)).toBe('no-pricing-candles');
   });
 })
+
+
+describe('a restarted worker is not a broken one', () => {
+  const now = 1_800_000_000_000;
+  const MIN = 60_000;
+
+  /** A symbol whose last snapshot is `silentMinutes` old. */
+  const quiet = (symbol: string, silentMinutes: number): StatusCollectorSymbol => ({
+    symbol,
+    lastSnapshotAt: now - silentMinutes * MIN,
+    ageMs: silentMinutes * MIN,
+  });
+
+  const service = (name: string, startedMinutesAgo: number): StatusService => ({
+    service: name,
+    commit: 'abc1234',
+    commitSource: 'RAILWAY_GIT_COMMIT_SHA',
+    startedAt: now - startedMinutesAgo * MIN,
+  });
+
+  it('reads the uptime off the worker row, not whichever service came first', () => {
+    // The api restarts on its own schedule. Taking its clock would grant the
+    // grace period at the wrong moments and withhold it at the right ones.
+    expect(workerUptimeMs([service('api', 300), service('worker', 5)], now)).toBe(5 * MIN);
+    expect(workerUptimeMs([service('api', 300)], now)).toBeNull();
+    expect(workerUptimeMs([], now)).toBeNull();
+  });
+
+  it('does not call a symbol broken when no candle could have closed yet', () => {
+    // The real screenshot: worker up 5 minutes, last snapshot 17 minutes
+    // old, ingest map empty because the callback only fires on a close.
+    const status = classifySymbol(quiet('BTCUSDT', 17), undefined, now, 5 * MIN);
+    expect(status.problem).toBe(false);
+    expect(status.ingest).toBe('warming-up');
+    expect(status.verdict).toBe('idle');
+  });
+
+  it('keeps a long-dead symbol red through a restart', () => {
+    // The case the grace period must never swallow — HYPEUSDT had been
+    // silent 17 hours across several deploys. If a restart cleared it, the
+    // card would go green exactly when someone looks after deploying.
+    const status = classifySymbol(quiet('HYPEUSDT', 17 * 60), undefined, now, 5 * MIN);
+    expect(status.problem).toBe(true);
+    expect(status.ingest).toBe('unknown');
+    expect(status.verdict).toBe('bad');
+  });
+
+  it('stops granting the grace once the worker has had a full window', () => {
+    // 40 minutes up and still nothing: the restart no longer explains it.
+    const status = classifySymbol(quiet('BTCUSDT', 17), undefined, now, 40 * MIN);
+    expect(status.problem).toBe(true);
+    expect(status.ingest).toBe('unknown');
+  });
+
+  it('grants nothing when the worker has never reported its build', () => {
+    // No worker row means no uptime to reason from, and an unknown must not
+    // be read as an excuse.
+    expect(classifySymbol(quiet('BTCUSDT', 17), undefined, now, null).problem).toBe(true);
+  });
+
+  it('leaves a healthy symbol alone whatever the uptime', () => {
+    const fresh = quiet('BTCUSDT', 2);
+    for (const uptime of [1 * MIN, 5 * MIN, 600 * MIN, null]) {
+      const status = classifySymbol(fresh, now - MIN, now, uptime);
+      expect(status.ingest).toBe('flowing');
+      expect(status.problem).toBe(false);
+      expect(status.verdict).toBe('ok');
+    }
+  });
+
+  it('still names the broken half when the fault is real during a young boot', () => {
+    // Candles arriving but nothing produced, on a worker up 5 minutes but
+    // silent far longer than that: the pipeline diagnosis must survive.
+    const status = classifySymbol(quiet('SOLUSDT', 300), now - MIN, now, 5 * MIN);
+    expect(status.problem).toBe(true);
+    expect(status.ingest).toBe('arriving-not-processed');
+  });
+
+  it('bounds the grace at both ends', () => {
+    // Young worker + silence within one window of its life → warming.
+    expect(isWarmingUp(now - 19 * MIN, 5 * MIN, now)).toBe(true);
+    // Exactly on the bound is still explained by the restart.
+    expect(isWarmingUp(now - 20 * MIN, 5 * MIN, now)).toBe(true);
+    // Same worker, silence one minute past that bound → not warming.
+    expect(isWarmingUp(now - 21 * MIN, 5 * MIN, now)).toBe(false);
+    // Worker past one window plus the write margin → no grace at all,
+    // however long the symbol has been quiet.
+    expect(isWarmingUp(now - 16 * MIN, 16 * MIN, now)).toBe(false);
+    expect(isWarmingUp(now - 20 * MIN, 60 * MIN, now)).toBe(false);
+    // A minute under that bound it still holds — the margin is deliberate.
+    expect(isWarmingUp(now - 16 * MIN, 15 * MIN, now)).toBe(true);
+  });
+
+  it('admits it cannot tell when a young worker has never produced a snapshot', () => {
+    expect(isWarmingUp(null, 2 * MIN, now)).toBe(true);
+    expect(isWarmingUp(null, 60 * MIN, now)).toBe(false);
+  });
+
+  it('counts only real faults in the headline', () => {
+    // Three symbols on a worker up 5 minutes: one dead for 17 hours, two
+    // merely waiting for their first close. The card must name one problem,
+    // not three — the screenshot that started this said "4/4 symbol có vấn đề"
+    // on a healthy deploy.
+    const statuses = [
+      classifySymbol(quiet('BTCUSDT', 17), undefined, now, 5 * MIN),
+      classifySymbol(quiet('ETHUSDT', 17), undefined, now, 5 * MIN),
+      classifySymbol(quiet('HYPEUSDT', 17 * 60), undefined, now, 5 * MIN),
+    ];
+    const summary = collectorSummary(statuses);
+    expect(summary.verdict).toBe('bad');
+    expect(summary.headline).toContain('1/3');
+
+    const allWarming = statuses.slice(0, 2);
+    expect(collectorSummary(allWarming).verdict).toBe('idle');
+    expect(collectorSummary(allWarming).headline).toContain('2/2');
+
+    const allFresh = [quiet('BTCUSDT', 1), quiet('ETHUSDT', 1)].map((r) =>
+      classifySymbol(r, now - MIN, now, 5 * MIN),
+    );
+    expect(collectorSummary(allFresh).verdict).toBe('ok');
+    expect(collectorSummary(allFresh).headline).toContain('đều tươi');
+  });
+
+  it('has wording for the warming state', () => {
+    expect(INGEST_TEXT['warming-up'].length).toBeGreaterThan(10);
+  });
+});

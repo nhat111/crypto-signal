@@ -13,23 +13,21 @@ import type {
 } from '@/lib/types';
 import { ago, Row, StatusCard } from '@/components/status/StatusBlocks';
 import {
-  collectorVerdict,
+  classifySymbol,
+  collectorSummary,
   isHorizonStuck,
   isJobBroken,
   isJobFailing,
   jobsVerdict,
   outcomesVerdict,
-  symbolVerdict,
+  workerUptimeMs,
   diagnoseFromCensus,
   DIAGNOSIS_TEXT,
   workerVerdict,
   connectionVerdict,
   isHeartbeatStale,
-  diagnoseIngest,
   INGEST_TEXT,
   versionVerdict,
-  FAILURE_STREAK_WORTH_SHOWING,
-  STALE_SNAPSHOT_MS,
 } from '@/lib/statusVerdicts';
 import { LoadingPanel, StatePanel } from '@/components/StatePanel';
 
@@ -226,43 +224,43 @@ function WorkerCard({ worker }: { worker: StatusWorkerRuntime | null }) {
 function CollectorCard({ data }: { data: StatusResponse }) {
   const rows = data.collector;
   const now = data.serverTime;
-  const noData = rows.filter((r) => r.lastSnapshotAt === null).length;
-  const stale = rows.filter((r) => r.ageMs !== null && r.ageMs > STALE_SNAPSHOT_MS).length;
 
-  const verdict = collectorVerdict(rows);
-  const headline =
-    rows.length === 0
-      ? 'chưa có symbol nào'
-      : stale + noData === 0
-        ? `${rows.length} symbol đều tươi`
-        : `${stale + noData}/${rows.length} symbol có vấn đề`;
+  // A candle callback only fires when a candle *closes*, so for up to one
+  // window after a restart every symbol looks silent. Judging the rows
+  // against the worker's own age is what keeps a deploy from painting the
+  // card red — and what keeps a genuinely dead symbol red anyway.
+  const uptimeMs = workerUptimeMs(data.services, now);
+  const statuses = rows.map((r) => ({
+    row: r,
+    status: classifySymbol(r, data.worker?.symbolIngest[r.symbol], now, uptimeMs),
+  }));
+  const { verdict, headline } = collectorSummary(statuses.map((s) => s.status));
 
   return (
     <StatusCard title="Thu thập dữ liệu" verdict={verdict} headline={headline}>
-      {rows.map((r) => {
-        // Two clocks, deliberately. The snapshot time needs the whole
-        // pipeline to have worked; the ingest time is stamped the moment a
-        // candle arrives. A gap between them says which half is broken.
-        const verdict = diagnoseIngest(r.lastSnapshotAt, data.worker?.symbolIngest[r.symbol], now);
-        return (
-          <div key={r.symbol}>
-            <Row
-              label={r.symbol}
-              value={r.lastSnapshotAt === null ? 'chưa có dữ liệu' : ago(r.ageMs)}
-              tone={symbolVerdict(r)}
-            />
-            {verdict !== 'flowing' && (
-              <p className="-mt-0.5 pb-1.5 text-right text-[11px] leading-relaxed text-amber-300/80">
-                {INGEST_TEXT[verdict]}
-              </p>
-            )}
-          </div>
-        );
-      })}
+      {statuses.map(({ row: r, status }) => (
+        <div key={r.symbol}>
+          <Row
+            label={r.symbol}
+            value={r.lastSnapshotAt === null ? 'chưa có dữ liệu' : ago(r.ageMs)}
+            tone={status.verdict}
+          />
+          {status.ingest !== 'flowing' && (
+            <p
+              className={`-mt-0.5 pb-1.5 text-right text-[11px] leading-relaxed ${
+                status.problem ? 'text-amber-300/80' : 'text-slate-500'
+              }`}
+            >
+              {INGEST_TEXT[status.ingest]}
+            </p>
+          )}
+        </div>
+      ))}
       <p className="mt-2.5 text-[11px] leading-relaxed text-slate-500">
         Mỗi symbol phải có dữ liệu mới trong vòng 15 phút. Dòng chữ vàng bên dưới một symbol cho biết hỏng ở đâu:{' '}
         <span className="font-semibold text-slate-400">phía kết nối</span> (nến không tới) hay{' '}
-        <span className="font-semibold text-slate-400">phần xử lý</span> (nến tới mà không ra kết quả).
+        <span className="font-semibold text-slate-400">phần xử lý</span> (nến tới mà không ra kết quả). Ngay sau khi
+        worker khởi động lại, mọi symbol im lặng là bình thường — phải chờ cây nến 15m đầu tiên đóng.
       </p>
     </StatusCard>
   );

@@ -3,6 +3,7 @@ import type {
   StatusJob,
   StatusOutcomeHorizon,
   StatusPricingCoverage,
+  StatusService,
   StatusStuckCensus,
   StatusVersion,
   StatusWorkerRuntime,
@@ -30,12 +31,6 @@ export const FAILURE_STREAK_WORTH_SHOWING = 3;
  */
 export function versionVerdict(version: StatusVersion): Verdict {
   return version.commit === null ? 'idle' : 'ok';
-}
-
-export function collectorVerdict(rows: StatusCollectorSymbol[]): Verdict {
-  if (rows.length === 0) return 'idle';
-  const bad = rows.some((r) => r.lastSnapshotAt === null || (r.ageMs ?? 0) > STALE_SNAPSHOT_MS);
-  return bad ? 'bad' : 'ok';
 }
 
 export function symbolVerdict(row: StatusCollectorSymbol): Verdict {
@@ -191,7 +186,9 @@ export type IngestDiagnosis =
   /** Candles arrive but no snapshot follows — the fault is in our pipeline. */
   | 'arriving-not-processed'
   /** No ingest timestamp for this symbol at all: an old worker build, or it never subscribed. */
-  | 'unknown';
+  | 'unknown'
+  /** The worker restarted and no candle has closed since — nothing can be concluded yet. */
+  | 'warming-up';
 
 export function diagnoseIngest(
   lastSnapshotAt: number | null,
@@ -211,7 +208,73 @@ export const INGEST_TEXT: Record<IngestDiagnosis, string> = {
   'not-arriving': 'không nhận được nến — lỗi phía kết nối',
   'arriving-not-processed': 'vẫn nhận được nến nhưng không ra snapshot — lỗi ở phần xử lý',
   unknown: 'chưa rõ (worker chưa báo cáo nến của symbol này)',
+  'warming-up': 'worker vừa khởi động lại — đang chờ cây nến đóng đầu tiên',
 };
+
+/* ------------------------------------------------------------------ */
+/* A restarted worker is not a broken one                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * How long after a boot a silent symbol still proves nothing.
+ *
+ * The candle callback only fires when a candle *closes*, so a worker that
+ * booted a minute ago has legitimately stamped nothing and written no
+ * snapshot. Reporting that as "4/4 symbol có vấn đề" turns the card red on
+ * a healthy deploy, which is the failure this file's own rules warn about:
+ * a card that fires on healthy data teaches the reader to ignore it.
+ */
+export function workerUptimeMs(services: StatusService[], nowMs: number): number | null {
+  const worker = services.find((s) => s.service === 'worker');
+  return worker ? nowMs - worker.startedAt : null;
+}
+
+/**
+ * True while the restart alone explains the silence.
+ *
+ * The grace must not swallow a real outage, so it is bounded twice: the
+ * worker has to be younger than one stale window, *and* the symbol's
+ * silence has to be no longer than the worker's life plus that window. A
+ * symbol quiet for 17 hours stays red through every restart — which is
+ * exactly the case that made this card worth trusting in the first place.
+ */
+export function isWarmingUp(
+  lastSnapshotAt: number | null,
+  uptimeMs: number | null,
+  nowMs: number,
+  staleMs: number = STALE_SNAPSHOT_MS,
+): boolean {
+  // One candle window plus a minute for the snapshot to be written. Exactly
+  // `staleMs` would flash the card red for the seconds between the first
+  // candle closing and the row landing, on every single deploy.
+  if (uptimeMs === null || uptimeMs >= staleMs + 60_000) return false;
+  // Never any snapshot at all: on a worker this young that is genuinely
+  // unknowable, and claiming a fault would be inventing an observation.
+  if (lastSnapshotAt === null) return true;
+  return nowMs - lastSnapshotAt <= staleMs + uptimeMs;
+}
+
+/** One symbol's row: its tone, the note under it, and whether it counts as a fault. */
+export interface SymbolStatus {
+  verdict: Verdict;
+  ingest: IngestDiagnosis;
+  /** Feeds the card headline. Warming up is deliberately not a problem. */
+  problem: boolean;
+}
+
+export function classifySymbol(
+  row: StatusCollectorSymbol,
+  lastCandleAt: number | undefined,
+  nowMs: number,
+  uptimeMs: number | null,
+): SymbolStatus {
+  const ingest = diagnoseIngest(row.lastSnapshotAt, lastCandleAt, nowMs);
+  if (ingest === 'flowing') return { verdict: 'ok', ingest, problem: false };
+  if (isWarmingUp(row.lastSnapshotAt, uptimeMs, nowMs)) {
+    return { verdict: 'idle', ingest: 'warming-up', problem: false };
+  }
+  return { verdict: symbolVerdict(row), ingest, problem: true };
+}
 
 /**
  * The same question as `diagnoseStuckOutcomes`, answered from a count of
@@ -236,4 +299,31 @@ export function diagnoseFromCensus(census: StatusStuckCensus, resolvableNow: num
   // Whichever is larger is the one worth acting on: a backfill fixes the
   // first, only the collector fixes the second.
   return census.predateCandles >= census.insideCoverageNoCandle ? 'signals-predate-candles' : 'candle-gap';
+}
+
+/**
+ * The collector card's own verdict and headline, derived from the rows it
+ * already classified.
+ *
+ * Kept here rather than in the JSX because the counting is the part that
+ * can be quietly wrong: a headline that counts a warming symbol as a fault
+ * puts the card back to crying wolf after every deploy, and nothing in a
+ * component would catch that.
+ */
+export function collectorSummary(
+  statuses: SymbolStatus[],
+): { verdict: Verdict; headline: string } {
+  const total = statuses.length;
+  if (total === 0) return { verdict: 'idle', headline: 'chưa có symbol nào' };
+
+  const problems = statuses.filter((s) => s.problem).length;
+  if (problems > 0) return { verdict: 'bad', headline: `${problems}/${total} symbol có vấn đề` };
+
+  const warming = statuses.filter((s) => s.ingest === 'warming-up').length;
+  if (warming > 0) {
+    // Short on purpose: the headline sits beside the card title on a phone,
+    // and the reason is already spelled out on the row and in the footnote.
+    return { verdict: 'idle', headline: `${warming}/${total} chờ nến đầu tiên` };
+  }
+  return { verdict: 'ok', headline: `${total} symbol đều tươi` };
 }
