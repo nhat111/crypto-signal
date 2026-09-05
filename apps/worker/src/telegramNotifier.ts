@@ -12,9 +12,21 @@ import { verdictWarning, type SignalVerdict } from '@crypto-signal/db';
  * it just formats an already-computed Signal into text.
  */
 export class TelegramNotifier {
+  /**
+   * `apiRoot` exists so the alert path can be pointed at a stub.
+   *
+   * It used to be hardcoded, which meant CI could smoke-test the
+   * interactive bot end to end — that one already read TELEGRAM_API_ROOT —
+   * while the path that actually wakes somebody at 3am could only be
+   * tested by monkey-patching global fetch. The half that matters more was
+   * the half that could not be exercised the way production runs it.
+   *
+   * Same variable as the bot's, so a single override moves both.
+   */
   constructor(
     private readonly botToken: string,
     private readonly logger: Logger,
+    private readonly apiRoot: string = 'https://api.telegram.org',
   ) {}
 
   get enabled(): boolean {
@@ -34,7 +46,7 @@ export class TelegramNotifier {
   async send(chatId: string, text: string): Promise<SendResult> {
     if (!this.enabled) return { ok: false, reason: 'no bot token configured' };
     try {
-      const res = await fetch(`https://api.telegram.org/bot${this.botToken}/sendMessage`, {
+      const res = await fetch(`${this.apiRoot}/bot${this.botToken}/sendMessage`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),

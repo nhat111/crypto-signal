@@ -154,6 +154,12 @@ Check items as they land; each phase's commit message references the phase.
       worker now publishes `alert_chat_count` with its heartbeat
       (migration 015), warns once at boot, and /status says outright that
       silence proves nothing while it reads zero.
+- [x] `TelegramNotifier` reads `TELEGRAM_API_ROOT` like the bot already
+      did. It was hardcoded, so CI could smoke-test the interactive bot end
+      to end while the path that actually wakes somebody could only be
+      tested by monkey-patching global fetch — the half that matters more
+      was the half that could not be run the way production runs it.
+      `alertPath.test.ts` now drives it over a real socket.
 - [ ] Measure worker memory on Railway (api was 71 MB; worker never checked).
 - [x] Per-stream staleness on the Binance sockets. The connection-level
       watchdog is reset by any traffic, so one symbol could go silent for

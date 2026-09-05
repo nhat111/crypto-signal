@@ -36,7 +36,7 @@ async function main(): Promise<void> {
   );
 
   const pool = new pg.Pool({ connectionString: config.databaseUrl, max: 10 });
-  const notifier = new TelegramNotifier(config.telegramBotToken, logger);
+  const notifier = new TelegramNotifier(config.telegramBotToken, logger, config.telegramApiRoot);
 
   const spotAdapter = new BinanceSpotAdapter({
     restBase: config.binance.spotRestBase,
