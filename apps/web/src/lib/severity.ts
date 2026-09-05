@@ -68,7 +68,7 @@ export const SEVERITY_ORDER: Record<Severity, number> = {
   EXTREME: 4,
 };
 
-/** Short, readable label for each of the 9 signal types (spec §7/§15). */
+/** Short, readable label for each signal type (spec §7/§15). */
 export const SIGNAL_TYPE_LABEL: Record<SignalType, string> = {
   LEVERAGED_RALLY: 'Leveraged Rally',
   SPOT_CONFIRMED_RALLY: 'Spot-Confirmed Rally',
@@ -79,13 +79,15 @@ export const SIGNAL_TYPE_LABEL: Record<SignalType, string> = {
   SHORT_LIQUIDATION: 'Short Liquidation',
   LONG_CROWDING: 'Long Crowding',
   SHORT_CROWDING: 'Short Crowding',
+  PRICE_SPIKE_UP: 'Price Spike Up',
+  PRICE_SPIKE_DOWN: 'Price Spike Down',
 };
 
 /**
  * Groups signal types by what they imply about spot-vs-leverage demand, used
  * only for a small accent color on the signal-type chip — never for scoring.
  */
-export type SignalTone = 'caution' | 'confirming' | 'liquidation' | 'crowding';
+export type SignalTone = 'caution' | 'confirming' | 'liquidation' | 'crowding' | 'shock';
 
 export const SIGNAL_TYPE_TONE: Record<SignalType, SignalTone> = {
   LEVERAGED_RALLY: 'caution',
@@ -97,11 +99,28 @@ export const SIGNAL_TYPE_TONE: Record<SignalType, SignalTone> = {
   SHORT_LIQUIDATION: 'liquidation',
   LONG_CROWDING: 'crowding',
   SHORT_CROWDING: 'crowding',
+  PRICE_SPIKE_UP: 'shock',
+  PRICE_SPIKE_DOWN: 'shock',
 };
+
+/**
+ * The label, or a readable fallback for a type this build has never heard of.
+ *
+ * The web app and the worker deploy separately, so the worker can be
+ * emitting a signal type minutes before Vercel has the build that knows
+ * its name. Reading straight out of the map renders a blank chip in that
+ * window — which looks like a bug in the signal rather than in the
+ * deploy. Same rule as the optional fields in types.ts, applied to a
+ * lookup instead of a field.
+ */
+export function signalTypeLabel(signalType: string): string {
+  return SIGNAL_TYPE_LABEL[signalType as SignalType] ?? signalType.replace(/_/g, ' ');
+}
 
 export const SIGNAL_TONE_DOT: Record<SignalTone, string> = {
   caution: 'bg-orange-400',
   confirming: 'bg-emerald-400',
   liquidation: 'bg-red-400',
   crowding: 'bg-violet-400',
+  shock: 'bg-amber-400',
 };

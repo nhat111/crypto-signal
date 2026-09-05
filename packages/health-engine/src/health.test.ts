@@ -16,6 +16,8 @@ const thresholds: Thresholds = {
   volumeExtremeMult: 3,
   liquidationSpikeMult: 3,
   basisElevatedPct: 0.1,
+  priceShockAtrMult: 3,
+  priceShockMinMovePct: 1,
 };
 
 const healthWeights: HealthWeights = {
@@ -76,7 +78,7 @@ function baseSnapshot(overrides: {
     symbol: 'BTCUSDT',
     timeframe: '15m',
     timestamp: 899_999,
-    price: { open: 65000, high: 65500, low: 64500, close: 65100, changePct: overrides.priceChangePct ?? 0, atrPct, structureScore: Math.max(0, 100 - atrPct * 8) },
+    price: { open: 65000, high: 65500, low: 64500, close: 65100, changePct: overrides.priceChangePct ?? 0, atrPct, baselineAtrPct: null, structureScore: Math.max(0, 100 - atrPct * 8) },
     spot: { candle: candle({ market: 'spot' }), volume: 1000, cvdDelta: 0, cvdSkewRatio: overrides.spotCvdSkewRatio ?? 0, cvdCumulative: 0, volumeRatio: 1, volumeAnomaly: 'normal' },
     futures: {
       candle: candle(),

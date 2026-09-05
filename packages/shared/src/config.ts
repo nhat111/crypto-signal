@@ -75,6 +75,13 @@ const envSchema = z.object({
   THRESH_VOLUME_EXTREME_MULT: numeric(3),
   THRESH_LIQUIDATION_SPIKE_MULT: numeric(3),
   THRESH_BASIS_ELEVATED_PCT: numeric(0.1),
+  // How many times its own recent volatility a candle has to move before
+  // it counts as a shock. 3 is deliberately high: this alert exists to be
+  // rare, and one that fires on an ordinary Tuesday gets muted.
+  THRESH_PRICE_SHOCK_ATR_MULT: numeric(3),
+  // A floor so a dead-flat market cannot manufacture a shock out of noise:
+  // three times almost-nothing is still almost-nothing.
+  THRESH_PRICE_SHOCK_MIN_MOVE_PCT: numeric(1),
 
   ALERT_COOLDOWN_MINUTES: numeric(30),
   ALERT_CONFIDENCE_DELTA_RETRIGGER: numeric(15),
@@ -96,6 +103,8 @@ export interface Thresholds {
   volumeExtremeMult: number;
   liquidationSpikeMult: number;
   basisElevatedPct: number;
+  priceShockAtrMult: number;
+  priceShockMinMovePct: number;
 }
 
 /** Spec §13 example weights. Must sum to 100. */
@@ -267,6 +276,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       volumeExtremeMult: parsed.THRESH_VOLUME_EXTREME_MULT,
       liquidationSpikeMult: parsed.THRESH_LIQUIDATION_SPIKE_MULT,
       basisElevatedPct: parsed.THRESH_BASIS_ELEVATED_PCT,
+      priceShockAtrMult: parsed.THRESH_PRICE_SHOCK_ATR_MULT,
+      priceShockMinMovePct: parsed.THRESH_PRICE_SHOCK_MIN_MOVE_PCT,
     },
     healthWeights: HEALTH_WEIGHTS,
     riskWeights: RISK_WEIGHTS,

@@ -32,7 +32,14 @@ export type Severity = 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'EXTREME';
 
 export const SEVERITIES: readonly Severity[] = ['INFO', 'LOW', 'MEDIUM', 'HIGH', 'EXTREME'];
 
-/** Spec §7/§15 — exactly 9 signal types. */
+/**
+ * Spec §7/§15, plus the price-shock pair added later.
+ *
+ * This list is a copy of the engine's — the web app ships separately and
+ * cannot import from it. When a type is added there it must be added here
+ * too, or a signal the API already returns arrives with no label, no
+ * meaning and no tone.
+ */
 export const SIGNAL_TYPES = [
   'LEVERAGED_RALLY',
   'SPOT_CONFIRMED_RALLY',
@@ -43,6 +50,8 @@ export const SIGNAL_TYPES = [
   'SHORT_LIQUIDATION',
   'LONG_CROWDING',
   'SHORT_CROWDING',
+  'PRICE_SPIKE_UP',
+  'PRICE_SPIKE_DOWN',
 ] as const;
 
 export type SignalType = (typeof SIGNAL_TYPES)[number];

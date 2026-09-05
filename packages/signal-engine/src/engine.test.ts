@@ -16,6 +16,8 @@ const thresholds: Thresholds = {
   volumeExtremeMult: 3,
   liquidationSpikeMult: 3,
   basisElevatedPct: 0.1,
+  priceShockAtrMult: 3,
+  priceShockMinMovePct: 1,
 };
 
 const confidenceWeights: ConfidenceWeights = { dataQuality: 0.25, confirmation: 0.3, magnitude: 0.25, historical: 0.2 };
@@ -68,6 +70,7 @@ function baseSnapshot(overrides: {
       close: 65100,
       changePct: overrides.priceChangePct ?? 0,
       atrPct: 0.5,
+      baselineAtrPct: null,
       structureScore: 80,
     },
     spot: {

@@ -89,11 +89,11 @@ export function formatAlertMessage(
   const warning = verdictWarning(verdict);
   const meaning = SIGNAL_MEANING[signal.signalType];
   const lines = [
-    `${SEVERITY_EMOJI[signal.severity]} <b>MARKET HEALTH ALERT</b>`,
+    // Symbol, frame and what happened, all on line one. A phone shows one
+    // line in the notification, and "MARKET HEALTH ALERT" — which is what
+    // this used to say — is the one thing the reader already knows.
+    `${SEVERITY_EMOJI[signal.severity]} <b>${signal.symbol}</b> ${signal.timeframe} — <b>${signal.signalType.replace(/_/g, ' ')}</b>`,
     '',
-    `<b>${signal.symbol}</b> — ${signal.timeframe}`,
-    '',
-    `Signal: <b>${signal.signalType.replace(/_/g, ' ')}</b>`,
     `Severity: ${signal.severity}`,
     `Confidence: ${signal.confidence}%`,
     '',

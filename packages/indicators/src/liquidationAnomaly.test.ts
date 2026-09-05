@@ -14,6 +14,8 @@ const thresholds: Thresholds = {
   volumeExtremeMult: 3,
   liquidationSpikeMult: 3,
   basisElevatedPct: 0.1,
+  priceShockAtrMult: 3,
+  priceShockMinMovePct: 1,
 };
 
 function event(side: 'BUY' | 'SELL', quoteQuantity: number): LiquidationEvent {

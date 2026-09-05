@@ -4,7 +4,7 @@ import { computeOiChange, interpretOiVsPrice } from './openInterest.js';
 import { classifyFunding, fundingRateToPct } from './funding.js';
 import { computeBasis } from './basis.js';
 import { classifyVolumeAnomaly, computeVolumeRatio, rollingAverage } from './volumeAnomaly.js';
-import { computeAtr, computeAtrPct, computePriceStructureScore, computeReturnPct, computeTrueRange } from './volatility.js';
+import { computeAtr, computeAtrPct, computeBaselineAtrPct, computePriceStructureScore, computeReturnPct, computeTrueRange } from './volatility.js';
 import { aggregateLiquidations, computeLiquidationAnomalyRatio, isLiquidationSpike } from './liquidationAnomaly.js';
 import type { MarketSnapshot, SpotSnapshot } from './types.js';
 
@@ -49,6 +49,9 @@ function buildSnapshotCore(input: FuturesOnlyInput): Omit<MarketSnapshot, 'spot'
   const trueRange = computeTrueRange(futuresCandle, input.previousFuturesClose);
   const atr = computeAtr([...input.recentTrueRanges, trueRange]);
   const atrPct = computeAtrPct(atr, futuresCandle.close);
+  // Measured off the open, the same base `changePct` uses, so the ratio of
+  // the two is a like-for-like comparison.
+  const baselineAtrPct = computeBaselineAtrPct(input.recentTrueRanges, futuresCandle.open);
 
   const liquidationBucket = aggregateLiquidations(input.liquidationEventsInWindow);
   const liquidationAnomalyRatio = computeLiquidationAnomalyRatio(liquidationBucket.totalUsd, input.rollingLiquidation24hUsd);
@@ -64,6 +67,7 @@ function buildSnapshotCore(input: FuturesOnlyInput): Omit<MarketSnapshot, 'spot'
       close: futuresCandle.close,
       changePct: priceChangePct,
       atrPct,
+      baselineAtrPct,
       structureScore: computePriceStructureScore(atrPct),
     },
     futures: {

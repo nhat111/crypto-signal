@@ -14,6 +14,8 @@ const thresholds: Thresholds = {
   volumeExtremeMult: 3,
   liquidationSpikeMult: 3,
   basisElevatedPct: 0.1,
+  priceShockAtrMult: 3,
+  priceShockMinMovePct: 1,
 };
 
 describe('classifyFunding — spec §9 exact example thresholds', () => {

@@ -37,6 +37,16 @@ function verdict(overrides: Partial<SignalVerdict> = {}): SignalVerdict {
 }
 
 describe('formatAlertMessage', () => {
+  it('says what happened on the first line', () => {
+    // A phone notification shows one line. It has to carry the symbol, the
+    // frame and the event — the reader already knows it is a market alert,
+    // which is all the old first line said.
+    const first = formatAlertMessage(SIGNAL, HEALTH, RISK).split('\n')[0];
+    expect(first).toContain('BTCUSDT');
+    expect(first).toContain('15m');
+    expect(first).toContain('SELLING ABSORPTION POSSIBLE');
+  });
+
   it('warns when the recorded outcomes say this type is worse than doing nothing', () => {
     // The alert's default reading is "worth acting on". Sending a type the
     // evidence contradicts without saying so is the system measuring

@@ -38,7 +38,7 @@ unit-tested and free of I/O:
   (dedupe/out-of-order/gap detection), reconnect backoff.
 - `indicators` — CVD, OI, funding, basis, volume anomaly, volatility,
   liquidation anomaly → `MarketSnapshot`.
-- `signal-engine` — the 9 signal rules (spec §7/§15), confidence formula,
+- `signal-engine` — the signal rules (spec §7/§15 plus the price-shock pair), confidence formula,
   severity escalation.
 - `health-engine` — Health Score (spec §13 weights) and independent
   Leverage Risk Score.

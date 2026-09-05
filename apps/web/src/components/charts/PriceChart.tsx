@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { ChartPanel } from './ChartPanel';
 import { TimeSeriesChart, type ChartMarker } from './TimeSeriesChart';
-import { SEVERITY_HEX, SIGNAL_TYPE_LABEL } from '@/lib/severity';
+import { SEVERITY_HEX, signalTypeLabel } from '@/lib/severity';
 import type { Signal, SymbolSeriesPoint } from '@/lib/types';
 import { formatUsd } from '@/lib/format';
 
@@ -25,7 +25,7 @@ export function PriceChart({ points, signals, height = 220 }: PriceChartProps) {
       signals.map((s) => ({
         timestamp: s.timestamp,
         color: SEVERITY_HEX[s.severity],
-        text: SIGNAL_TYPE_LABEL[s.signalType],
+        text: signalTypeLabel(s.signalType),
         position: 'aboveBar',
       })),
     [signals],

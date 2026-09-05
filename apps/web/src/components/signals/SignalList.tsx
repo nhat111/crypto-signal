@@ -1,6 +1,6 @@
 import { SignalRow } from './SignalRow';
 import { StatePanel } from '@/components/StatePanel';
-import { SIGNAL_TYPE_LABEL } from '@/lib/severity';
+import { signalTypeLabel } from '@/lib/severity';
 import type { Signal, SignalType, SignalVerdict } from '@/lib/types';
 
 interface SignalListProps {
@@ -65,7 +65,7 @@ function VerdictBanner({ flagged }: { flagged: SignalVerdict[] }) {
       <ul className="mt-1.5 space-y-1">
         {flagged.map((v) => (
           <li key={v.signalType}>
-            <span className="font-semibold">{SIGNAL_TYPE_LABEL[v.signalType]}</span>: {v.hitPct.toFixed(0)}% đúng
+            <span className="font-semibold">{signalTypeLabel(v.signalType)}</span>: {v.hitPct.toFixed(0)}% đúng
             so với baseline {v.baselinePct.toFixed(0)}%, trên {v.sampleCount.toLocaleString('vi-VN')} mẫu ở khung{' '}
             {v.horizon}.
           </li>

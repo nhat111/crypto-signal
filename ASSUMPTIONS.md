@@ -286,3 +286,40 @@ rate off a handful of samples.
 - No holder-growth or social signals.
 - Token names and symbols come from on-chain metadata that anyone can set;
   they are HTML-escaped before display but are not otherwise trustworthy.
+
+## 17. Price-shock signals (`PRICE_SPIKE_UP` / `PRICE_SPIKE_DOWN`)
+
+Not from the spec. Added because every other rule describes *structure* —
+who is buying, with whose money, against what positioning — and none of
+them answers the question a holder asks first: did the price just do
+something violent? A large candle can pass every structural filter and
+still be the only thing worth being woken up for.
+
+**"Abnormal" is measured against the symbol's own recent range, not a
+fixed percentage.** A fixed percentage is wrong for everything: 3% is a
+crash for BTC on a quiet week and a rounding error for a small cap in a
+bull run. The comparison is `|changePct| / baselineAtrPct`, where the
+baseline is the mean true range of the **14 candles before this one**.
+
+Three choices in there are deliberate and each has a test:
+
+- **The baseline excludes the candle being judged.** `price.atrPct`
+  includes it, which is right for describing a market and wrong for
+  detecting a shock: a candle that moves five times the usual amount
+  inflates its own denominator, so the biggest moves would be the ones
+  that quietly stop qualifying.
+- **No baseline means no signal, not a signal against zero.**
+  `baselineAtrPct` is `null` below ten prior candles, and null below any
+  movement at all. Read as 0 it would make every tick infinitely
+  abnormal — an alert storm on every cold start, which is how a channel
+  gets muted.
+- **Up and down are separate types.** Their follow-through is different,
+  and blending them would produce one hit rate that averages the two into
+  a meaningless coin flip on `/performance`.
+
+Defaults: `THRESH_PRICE_SHOCK_ATR_MULT=3` (severity escalates at 1,5× and
+2× that) and `THRESH_PRICE_SHOCK_MIN_MOVE_PCT=1`, an absolute floor so a
+flat market cannot manufacture a shock out of noise. Both are guesses at
+"rare enough to be worth reading", not measured thresholds — the
+`/performance` tab is what will eventually say whether either number is
+right, and until it has 30 recorded outcomes per type it will say so.

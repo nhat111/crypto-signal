@@ -210,6 +210,16 @@ export default function MethodologyPage() {
                 'Sắp sập',
               ],
               [<code key="i" className={CODE}>SHORT_CROWDING</code>, 'Vị thế short đông', 'Sắp bùng'],
+              [
+                <code key="j" className={CODE}>PRICE_SPIKE_UP</code>,
+                'Nến tăng gấp ≥3 lần biên độ trung bình 14 nến trước đó (không tính chính nó)',
+                'Sẽ tăng tiếp',
+              ],
+              [
+                <code key="k" className={CODE}>PRICE_SPIKE_DOWN</code>,
+                'Nến giảm gấp ≥3 lần biên độ trung bình 14 nến trước đó (không tính chính nó)',
+                'Đã chạm đáy',
+              ],
             ]}
           />
           <p>

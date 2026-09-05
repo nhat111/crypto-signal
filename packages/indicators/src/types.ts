@@ -32,6 +32,13 @@ export interface MarketSnapshot {
     close: number;
     changePct: number;
     atrPct: number;
+    /**
+     * Volatility before this candle, so a move can be measured against
+     * what was normal rather than against itself. Null when there is not
+     * enough history to have a baseline — never 0, which would make every
+     * move look infinitely abnormal.
+     */
+    baselineAtrPct: number | null;
     structureScore: number;
   };
   /**

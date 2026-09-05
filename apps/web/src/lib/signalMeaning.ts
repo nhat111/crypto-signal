@@ -68,6 +68,18 @@ export const SIGNAL_MEANING: Record<SignalType, SignalMeaning> = {
     caveat:
       'Đông không có nghĩa là họ sai. Nghĩa là nếu giá bật lên, cú bật sẽ mạnh hơn bình thường vì nhiều người bị ép mua lại cùng lúc.',
   },
+  PRICE_SPIKE_UP: {
+    plain:
+      'Giá vừa bật lên mạnh hơn hẳn biên độ thường ngày của chính nó — một cây nến bằng nhiều cây gộp lại.',
+    caveat:
+      'Chỉ nói cú bật vừa xảy ra và nó bất thường về độ lớn. Không nói giá sẽ đi tiếp, và mua đuổi ngay sau một cây nến như vậy là chỗ dễ mất tiền nhất.',
+  },
+  PRICE_SPIKE_DOWN: {
+    plain:
+      'Giá vừa rơi mạnh hơn hẳn biên độ thường ngày của chính nó — một cây nến bằng nhiều cây gộp lại.',
+    caveat:
+      'Chỉ nói cú rơi vừa xảy ra và nó bất thường về độ lớn. Không nói giá đã chạm đáy, cũng không nói còn rơi tiếp.',
+  },
 };
 
 /**

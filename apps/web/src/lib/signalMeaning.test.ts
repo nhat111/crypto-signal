@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SIGNAL_MEANING as ENGINE_MEANING } from '@crypto-signal/signal-engine';
 import { SIGNAL_MEANING, evidenceReasons } from './signalMeaning';
-import { SIGNAL_TYPE_LABEL } from './severity';
+import { SIGNAL_TYPE_LABEL, signalTypeLabel } from './severity';
 import type { SignalType } from './types';
 
 const ALL = Object.keys(SIGNAL_TYPE_LABEL) as SignalType[];
@@ -82,5 +82,18 @@ describe('evidenceReasons', () => {
 
   it('ignores leading whitespace when deciding', () => {
     expect(evidenceReasons(['   Interpretation: dòng này vẫn phải bị bỏ'])).toEqual([]);
+  });
+});
+
+describe('signalTypeLabel', () => {
+  it('names every type this build knows', () => {
+    for (const type of ALL) expect(signalTypeLabel(type)).toBe(SIGNAL_TYPE_LABEL[type]);
+  });
+
+  it('still says something for a type shipped by a newer worker', () => {
+    // Vercel and Railway finish at different times, so the worker can be
+    // emitting a type minutes before the web build knows its name. A blank
+    // chip in that window reads as a broken signal, not a pending deploy.
+    expect(signalTypeLabel('SOME_FUTURE_TYPE')).toBe('SOME FUTURE TYPE');
   });
 });

@@ -25,6 +25,36 @@ export function computeAtrPct(atr: number, close: number): number {
 }
 
 /**
+ * How many prior candles a volatility baseline needs before it is allowed
+ * to call anything abnormal.
+ *
+ * Ten of the fourteen-candle window. Fewer than that and one violent
+ * candle *is* the average, so the very move being judged sets the bar it
+ * is judged against, and everything looks normal exactly when it isn't.
+ */
+export const MIN_BASELINE_RANGES = 10;
+
+/**
+ * Volatility as it stood *before* the candle being judged.
+ *
+ * `atrPct` above includes the current true range, which is the right
+ * choice for describing a market and the wrong one for detecting a shock:
+ * a candle that moves five times the usual amount inflates its own
+ * denominator and shrinks its own ratio. This one deliberately excludes
+ * it.
+ *
+ * Null rather than 0 when the history is too short — a missing baseline
+ * must not read as "volatility is zero", which would make every move
+ * infinitely abnormal.
+ */
+export function computeBaselineAtrPct(recentTrueRanges: number[], referencePrice: number): number | null {
+  if (recentTrueRanges.length < MIN_BASELINE_RANGES) return null;
+  if (referencePrice <= 0) return null;
+  const pct = computeAtrPct(computeAtr(recentTrueRanges), referencePrice);
+  return pct > 0 ? pct : null;
+}
+
+/**
  * 0-100 "price structure" quality used by the health engine: penalizes
  * outsized volatility regardless of direction, since a market whipping
  * around is structurally less trustworthy than one moving cleanly — this

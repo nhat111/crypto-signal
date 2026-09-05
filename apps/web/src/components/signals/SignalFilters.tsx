@@ -1,6 +1,6 @@
 'use client';
 
-import { SIGNAL_TYPE_LABEL } from '@/lib/severity';
+import { signalTypeLabel } from '@/lib/severity';
 import { SIGNAL_TYPES, TIMEFRAMES, type SignalType, type Timeframe } from '@/lib/types';
 import { useTrackedSymbols } from '@/lib/useTrackedSymbols';
 
@@ -57,7 +57,7 @@ export function SignalFilters({ value, onChange }: SignalFiltersProps) {
         <option value="">All signal types</option>
         {(SIGNAL_TYPES as readonly SignalType[]).map((t) => (
           <option key={t} value={t}>
-            {SIGNAL_TYPE_LABEL[t]}
+            {signalTypeLabel(t)}
           </option>
         ))}
       </select>

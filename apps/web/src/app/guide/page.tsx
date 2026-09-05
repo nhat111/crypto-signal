@@ -198,6 +198,14 @@ export default function GuidePage() {
               ['SHORT_LIQUIDATION', 'Vừa có một đợt cháy tài khoản hàng loạt ở phe cược giảm.'],
               ['LONG_CROWDING', 'Quá đông người cược giá lên. Đông quá thì dễ đạp.'],
               ['SHORT_CROWDING', 'Quá đông người cược giá xuống.'],
+              [
+                'PRICE_SPIKE_UP',
+                'Giá vừa bật lên mạnh hơn hẳn biên độ thường ngày của chính nó. Không phải "sẽ tăng tiếp" — chỉ là cú bật này to bất thường.',
+              ],
+              [
+                'PRICE_SPIKE_DOWN',
+                'Giá vừa rơi mạnh hơn hẳn biên độ thường ngày của chính nó. Không nói đã chạm đáy, cũng không nói còn rơi.',
+              ],
             ]}
           />
 

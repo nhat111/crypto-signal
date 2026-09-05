@@ -9,10 +9,11 @@ import { longLiquidation } from './rules/longLiquidation.js';
 import { shortLiquidation } from './rules/shortLiquidation.js';
 import { longCrowding } from './rules/longCrowding.js';
 import { shortCrowding } from './rules/shortCrowding.js';
+import { priceShock } from './rules/priceShock.js';
 import type { RuleContext, Signal, SignalRule, SignalType } from './types.js';
 
 /**
- * All 9 rules run independently against the same snapshot — a market can
+ * All rules run independently against the same snapshot — a market can
  * legitimately be, say, both LONG_CROWDING and LEVERAGED_RALLY at once.
  * The engine never picks a "winner"; it's purely deterministic fan-out
  * (rule: "Signal engine không phụ thuộc UI", "AI không được quyết định
@@ -28,6 +29,7 @@ const RULES: SignalRule[] = [
   shortLiquidation,
   longCrowding,
   shortCrowding,
+  priceShock,
 ];
 
 export interface EvaluateSignalsOptions {

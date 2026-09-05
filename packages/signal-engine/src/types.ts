@@ -10,7 +10,9 @@ export type SignalType =
   | 'LONG_LIQUIDATION'
   | 'SHORT_LIQUIDATION'
   | 'LONG_CROWDING'
-  | 'SHORT_CROWDING';
+  | 'SHORT_CROWDING'
+  | 'PRICE_SPIKE_UP'
+  | 'PRICE_SPIKE_DOWN';
 
 export const ALL_SIGNAL_TYPES: readonly SignalType[] = [
   'LEVERAGED_RALLY',
@@ -22,6 +24,8 @@ export const ALL_SIGNAL_TYPES: readonly SignalType[] = [
   'SHORT_LIQUIDATION',
   'LONG_CROWDING',
   'SHORT_CROWDING',
+  'PRICE_SPIKE_UP',
+  'PRICE_SPIKE_DOWN',
 ];
 
 export type Severity = 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'EXTREME';
