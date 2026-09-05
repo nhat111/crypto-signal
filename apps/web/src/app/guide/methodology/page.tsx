@@ -301,8 +301,9 @@ export default function MethodologyPage() {
               69 ở khung 15m — cả hai đều đúng, chúng đo hai khoảng khác nhau.
             </p>
             <p>
-              Thẻ ở trang Overview đọc khung <Term>5m</Term> và có ghi rõ; bot Telegram trả về khung{' '}
-              <Term>15m</Term> và cũng ghi rõ. Thấy hai số khác nhau thì xem khung trước khi kết luận có gì sai.
+              Cả thẻ Overview lẫn bot Telegram đều mặc định khung <Term>4h</Term>, và cả hai đều ghi rõ khung trên
+              từng con số. Thẻ Overview có nút chọn khung ngay trên đầu trang — đổi khung thì mọi số trên thẻ đổi
+              theo. Thấy hai số khác nhau thì xem khung trước khi kết luận có gì sai.
             </p>
           </Warning>
           <p>

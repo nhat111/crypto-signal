@@ -1,11 +1,19 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { getFlow, getOverview, getSignals } from '@/lib/api';
 import { usePolling } from '@/lib/usePolling';
 import { useSymbolSnapshots } from '@/lib/useSymbolSnapshots';
-import type { Signal, Timeframe } from '@/lib/types';
+import type { Signal } from '@/lib/types';
 import { SymbolCard } from '@/components/overview/SymbolCard';
+import { TimeframePicker } from '@/components/overview/TimeframePicker';
+import {
+  getServerTimeframe,
+  getStoredTimeframe,
+  pickOverviewTimeframe,
+  storeTimeframe,
+  subscribeStoredTimeframe,
+} from '@/lib/timeframe';
 import { Heatmap } from '@/components/overview/Heatmap';
 import { MacroFlowBar } from '@/components/overview/MacroFlowBar';
 import { SignalList } from '@/components/signals/SignalList';
@@ -13,16 +21,6 @@ import { LoadingPanel, StatePanel } from '@/components/StatePanel';
 
 const POLL_MS = 20_000;
 const FLOW_POLL_MS = 10 * 60_000;
-/**
- * Which timeframe the cards headline.
- *
- * Deliberately named and commented because it silently disagreed with the
- * Telegram bot, which reports 15m: the same symbol scored 88 here and 69
- * there at the same moment, both correct, and neither surface said which
- * timeframe it meant. The cards now label it. Change this to '15m' to make
- * the two read the same, at the cost of a slower-moving headline.
- */
-const DEFAULT_TIMEFRAME: Timeframe = '5m';
 
 export default function OverviewPage() {
   const overview = usePolling(getOverview, POLL_MS, []);
@@ -31,7 +29,15 @@ export default function OverviewPage() {
   const flow = usePolling(getFlow, FLOW_POLL_MS, []);
 
   const symbols = overview.data?.symbols ?? [];
-  const snapshots = useSymbolSnapshots(symbols, DEFAULT_TIMEFRAME, POLL_MS);
+  const available = overview.data?.timeframes ?? [];
+
+  // The frame is resolved from whatever the API actually collects, not from
+  // a constant that goes stale. Null means "reader has not chosen", which is
+  // also what the prerender sees.
+  const chosen = useSyncExternalStore(subscribeStoredTimeframe, getStoredTimeframe, getServerTimeframe);
+  const timeframe = pickOverviewTimeframe(chosen, available);
+
+  const snapshots = useSymbolSnapshots(symbols, timeframe, POLL_MS);
 
   const activeSignalsBySymbol = useMemo(() => {
     const map = new Map<string, Signal[]>();
@@ -48,10 +54,20 @@ export default function OverviewPage() {
   return (
     <div className="space-y-8">
       <section>
-        <div className="mb-3 flex items-baseline justify-between">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
           <h1 className="text-lg font-bold text-slate-100">Market Overview</h1>
           <PollStatus loading={overview.loading} error={overview.error} />
         </div>
+
+        {available.length > 0 && (
+          <div className="mb-4">
+            <TimeframePicker
+              available={available}
+              value={timeframe}
+              onChange={storeTimeframe}
+            />
+          </div>
+        )}
 
         {!isBootstrapping && <div className="mb-4"><MacroFlowBar flow={flow.data?.stablecoin ?? null} fetch={flow.data?.fetch ?? null} /></div>}
 
@@ -72,7 +88,7 @@ export default function OverviewPage() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {symbols.map((symbol) => {
               const row = overview.data?.rows.find(
-                (r) => r.symbol === symbol && r.timeframe === DEFAULT_TIMEFRAME,
+                (r) => r.symbol === symbol && r.timeframe === timeframe,
               );
               const symbolSignals = activeSignalsBySymbol.get(symbol) ?? [];
               return (

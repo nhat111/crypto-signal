@@ -31,7 +31,9 @@ export function SymbolCard({ symbol, overviewRow, snapshot, activeSignalCount, l
   }
 
   const priceUp = overviewRow.priceChangePct >= 0;
-  const stale = isStale(overviewRow.timestamp);
+  // Judged against this row's own frame: a 4h snapshot is legitimately
+  // hours old, and a flat threshold would brand every card stale.
+  const stale = isStale(overviewRow.timestamp, overviewRow.timeframe);
 
   return (
     <Link
@@ -62,8 +64,8 @@ export function SymbolCard({ symbol, overviewRow, snapshot, activeSignalCount, l
         <RiskBadge score={overviewRow.riskScore} />
         {/* A health score without its timeframe is not a number, it is two
             numbers wearing one label: the same symbol scores differently on
-            5m and 15m, and this card reads 5m while the Telegram bot reads
-            15m. Unlabelled, that reads as the two disagreeing. */}
+            5m and 4h. The frame is now the reader's choice, which makes
+            labelling it more necessary rather than less. */}
         <span className="rounded border border-slate-800 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
           khung {overviewRow.timeframe}
         </span>

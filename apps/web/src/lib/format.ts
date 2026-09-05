@@ -1,3 +1,5 @@
+import type { Timeframe } from './types';
+import { stalenessLimitMs } from './timeframe';
 /** Formatting helpers. All display-only — never used to derive logic. */
 
 const usdCompact = new Intl.NumberFormat('en-US', {
@@ -82,15 +84,20 @@ export function cx(...classes: Array<string | false | null | undefined>): string
 /**
  * A symbol's data is only as good as its last snapshot.
  *
- * The threshold matches the collector card on /status, deliberately: a
- * symbol that page calls stale must not read as current on Overview. It
- * did — HYPE's stream stopped and its card kept showing a price, a change
+ * The floor matches the collector card on /status, deliberately: a symbol
+ * that page calls stale must not read as current on Overview. It did —
+ * HYPE's stream stopped and its card kept showing a price, a change
  * percentage and an open interest figure with nothing to say they were
  * fifteen hours old. A number with no age on it is read as "now".
+ *
+ * The limit scales with the frame being shown (see stalenessLimitMs); a
+ * flat fifteen minutes would call every 4h card stale forever.
  */
-export const STALE_DATA_MS = 15 * 60_000;
-
-export function isStale(timestampMs: number | null | undefined, nowMs = Date.now()): boolean {
+export function isStale(
+  timestampMs: number | null | undefined,
+  timeframe?: Timeframe,
+  nowMs = Date.now(),
+): boolean {
   if (timestampMs === null || timestampMs === undefined) return false;
-  return nowMs - timestampMs > STALE_DATA_MS;
+  return nowMs - timestampMs > stalenessLimitMs(timeframe);
 }
