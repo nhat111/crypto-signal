@@ -222,6 +222,19 @@ To settle it, send a real message:
 `TELEGRAM_ALERT_CHAT_IDS` is empty — a different problem from a wrong id,
 with a different fix.
 
+If **nothing at all** appears, work down this list; each line rules out the
+one above it:
+
+- `/status` → **build** → does `worker — commit` match what you pushed? An
+  older commit means this deploy predates the feature and the variable is
+  being read by nobody.
+- The boot log always prints `health alerts armed` with `selfTest: true` or
+  `false`. `false` with the variable set means it is on the wrong service
+  (it must be on `worker`) or misspelled; no such line at all means the
+  build is older than this feature.
+- `alert self-test starting` without a result line means the sends are
+  still in flight or the process died mid-boot — check for a crash.
+
 ## Running the historical replay
 
 Railway gives no shell inside a running container, so the replay is

@@ -221,12 +221,20 @@ export function startSchedulers(ctx: WorkerContext): () => void {
       'health alerts are OFF — no chat ids configured, so no alert will ever be sent and silence proves nothing',
     );
   } else {
-    ctx.logger.info({ chats: ctx.config.telegramAlertChatIds.length }, 'health alerts armed');
+    // selfTest is reported even when off. Without it, a boot that ignores
+    // the switch and a boot running an older build that never heard of the
+    // switch leave identical logs — nothing — and the operator cannot tell
+    // "I set the variable wrong" from "this deploy predates the feature".
+    ctx.logger.info(
+      { chats: ctx.config.telegramAlertChatIds.length, selfTest: ctx.config.telegramAlertTest },
+      'health alerts armed',
+    );
   }
 
   // Opt-in, one shot at boot: the only thing that distinguishes a working
   // chat id from a mistyped one, since a failed send is swallowed by design.
   if (ctx.config.telegramAlertTest) {
+    ctx.logger.info({ chats: ctx.config.telegramAlertChatIds.length }, 'alert self-test starting');
     void runAlertSelfTest(alertDeps).catch((err) => ctx.logger.error({ err }, 'alert self-test failed'));
   }
 
