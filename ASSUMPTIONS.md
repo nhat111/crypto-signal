@@ -386,6 +386,44 @@ does not reset because a process did. A seeded stamp can be newer than
 anything the current process has seen, so the collector card's warming-up
 rule is what keeps a young deploy from reading it as a pipeline fault.
 
+### A confidence term that measured nothing
+
+`SPOT_CONFIRMED_RALLY` passed `confirmed: 2, totalChecks: 2` — a hardcoded
+full mark. The confirmation term is 30% of the confidence formula, so
+every instance of this signal type received a constant 30 points however
+weak the rally was, and the number could not distinguish one instance from
+another through that term at all.
+
+The visible harm was cross-type: `confirmed`/`totalChecks` is documented as
+counting the rule's *optional* checks, so a rule with a real check that
+failed scores 0 there. The same market state therefore read **68%** under
+this rule and **38%** under one whose check did not hold, purely because
+this rule had nothing able to fail — and the Signals page shows the two
+side by side.
+
+The rule now has two genuine optional checks, both conditions the trigger
+permits either way: spot buying clearing the meaningful skew threshold
+(the trigger only asks for *above zero*), and volume above its normal
+band.
+
+Its magnitude term was wrong in the same spirit: it scored the spot CVD
+skew against `cvdSkewRatio` (0,15), **a threshold this rule never
+applies**. Everything from skew 0 to 0,15 therefore sat on the magnitude
+floor of 20 regardless of how it differed — the opposite of what
+`magnitudeFromRatio` documents ("~20 right at the threshold, 100 at 3x").
+Magnitude is now the price move against `priceChangePct`, which is the
+quantity the rule actually gates on.
+
+`SHORT_COVERING_POSSIBLE` has the same hardcoded 1-of-1, and is left as
+is: its `confidenceCap` of 65 bounds the inflation, so the number cannot
+run away. Worth revisiting, not urgent.
+
+Stored confidences from before this change were computed under the old
+definition. Nothing aggregates them — the value is read back only for the
+alert re-trigger comparison — so no version column is needed, but the
+first signal of each type after the deploy may re-alert once as the value
+steps down past `ALERT_CONFIDENCE_DELTA_RETRIGGER`.
+
 ## 17. Price-shock signals (`PRICE_SPIKE_UP` / `PRICE_SPIKE_DOWN`)
 
 Not from the spec. Added because every other rule describes *structure* —

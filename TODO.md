@@ -110,6 +110,15 @@ Check items as they land; each phase's commit message references the phase.
 - [x] One implementation of the significance test, in `packages/db/src/edge.ts`
       — the web app has no workspace deps, so a copy there could only drift
       from the one the API and Telegram read.
+- [x] `SPOT_CONFIRMED_RALLY` confidence: `confirmed` was hardcoded 2/2, so
+      30 of 100 points were a constant and the number was not comparable
+      with rules whose optional check can fail (68 vs 38 on identical
+      inputs). Now two real checks. Its magnitude was scored against a
+      threshold the rule never applies, pinning everything below skew 0,15
+      to the floor; now scored against the price threshold it does gate on.
+- [ ] `SHORT_COVERING_POSSIBLE` has the same hardcoded 1/1. Bounded by its
+      confidence cap of 65 rather than fixed — revisit when there is a real
+      optional check worth adding.
 - [ ] Signal rarity: ~10.000 SELLING_ABSORPTION outcomes in a month means
       the rule is nearly always on. Thresholds need tuning against recorded
       outcomes now that there are some (see also Phase 17's weights).
