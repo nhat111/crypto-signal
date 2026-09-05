@@ -30,6 +30,16 @@ const envSchema = z.object({
   // would need.
   TELEGRAM_API_ROOT: z.string().default('https://api.telegram.org'),
   TELEGRAM_ALERT_CHAT_IDS: z.string().default(''),
+  /**
+   * Set to 1 to make the worker send one test message to every configured
+   * alert chat at boot, then say per chat whether it landed.
+   *
+   * Needed because the count on /status only proves the variable was read.
+   * A mistyped id counts the same as a working one — the send 400s and is
+   * swallowed so a bad recipient cannot stop the collector — so "đang bật
+   * · 1 kênh" can sit over a channel that will never receive anything.
+   */
+  TELEGRAM_ALERT_TEST: z.string().default(''),
 
   SYMBOLS: z.string().default('BTCUSDT,ETHUSDT,SOLUSDT'),
   /** Futures-only symbols (no Binance Spot listing) — see ASSUMPTIONS.md §15. Tracked with a reduced indicator/signal set. */
@@ -129,6 +139,7 @@ export interface AppConfig {
   telegramBotToken: string;
   telegramApiRoot: string;
   telegramDefaultTimeframe: Timeframe;
+  telegramAlertTest: boolean;
   telegramAlertChatIds: string[];
   symbols: string[];
   /** Symbols tracked in reduced (Futures-only, no Spot) mode — disjoint from `symbols`. */
@@ -197,6 +208,18 @@ function assertSumsTo100(name: string, values: number[]): void {
  * Pure and exported so it can be tested without reaching into the config
  * cache, which exists for the whole process lifetime by design.
  */
+/**
+ * Whether an on/off environment variable is on.
+ *
+ * Accepts any non-empty value except an explicit off. Somebody setting a
+ * switch in a Railway dashboard should not have to guess whether this
+ * codebase spells it "1", "true" or "yes", and a flag that silently
+ * ignores "true" is a flag that gets reported as broken.
+ */
+export function isEnabledFlag(value: string): boolean {
+  return !['', '0', 'false', 'no', 'off'].includes(value.trim().toLowerCase());
+}
+
 export function pickDefaultTimeframe(configured: string, collected: Timeframe[]): Timeframe {
   if (collected.includes(configured as Timeframe)) return configured as Timeframe;
   return collected[collected.length - 1] as Timeframe;
@@ -225,6 +248,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     futuresOnlySymbols: parsed.FUTURES_ONLY_SYMBOLS.split(',').map((s) => s.trim()).filter(Boolean),
     timeframes,
     telegramDefaultTimeframe: pickDefaultTimeframe(parsed.TELEGRAM_DEFAULT_TIMEFRAME, timeframes),
+    telegramAlertTest: isEnabledFlag(parsed.TELEGRAM_ALERT_TEST),
     binance: {
       spotRestBase: parsed.BINANCE_SPOT_REST_BASE,
       spotWsBase: parsed.BINANCE_SPOT_WS_BASE,

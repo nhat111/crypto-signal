@@ -36,7 +36,10 @@ export interface HealthIssue {
 export interface AlertDeps {
   pool: Pool;
   logger: Logger;
-  notifier: { send: (chatId: string, text: string) => Promise<void> };
+  // Structural, so a test can pass a stub. The real notifier reports
+  // whether the message landed; this path deliberately ignores it — an
+  // undeliverable alert must not take the collector down.
+  notifier: { send: (chatId: string, text: string) => Promise<unknown> };
   chatIds: string[];
 }
 

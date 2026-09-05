@@ -16,6 +16,7 @@ import { processMatchedCandles } from './pipeline.js';
 import { runGemOutcomeTracker, runGemScanCycle, type GemScanDeps } from './gemScan.js';
 import { runGemWatchCycle, type GemWatchDeps } from './gemWatch.js';
 import { runHealthAlertCycle } from './healthAlerts.js';
+import { runAlertSelfTest } from './alertSelfTest.js';
 import { runStablecoinFlowCycle } from './stablecoinFlow.js';
 import type { WorkerContext } from './context.js';
 
@@ -221,6 +222,12 @@ export function startSchedulers(ctx: WorkerContext): () => void {
     );
   } else {
     ctx.logger.info({ chats: ctx.config.telegramAlertChatIds.length }, 'health alerts armed');
+  }
+
+  // Opt-in, one shot at boot: the only thing that distinguishes a working
+  // chat id from a mistyped one, since a failed send is swallowed by design.
+  if (ctx.config.telegramAlertTest) {
+    void runAlertSelfTest(alertDeps).catch((err) => ctx.logger.error({ err }, 'alert self-test failed'));
   }
 
   void refreshHistoricalScores(ctx).catch((err) => ctx.logger.error({ err }, 'initial historical score refresh failed'));

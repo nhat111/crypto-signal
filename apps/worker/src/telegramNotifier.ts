@@ -21,21 +21,42 @@ export class TelegramNotifier {
     return this.botToken.length > 0;
   }
 
-  async send(chatId: string, text: string): Promise<void> {
-    if (!this.enabled) return;
+  /**
+   * Returns whether it actually landed, on top of logging.
+   *
+   * Every caller before this ignored the result on purpose — an alert that
+   * cannot be delivered must not take the collector down. But that made a
+   * mistyped chat id indistinguishable from a working one: the id counts,
+   * the send 400s, the warning scrolls past, and the operator concludes
+   * alerting is armed. The self-test needs the truth, so it is available
+   * to whoever asks for it.
+   */
+  async send(chatId: string, text: string): Promise<SendResult> {
+    if (!this.enabled) return { ok: false, reason: 'no bot token configured' };
     try {
       const res = await fetch(`https://api.telegram.org/bot${this.botToken}/sendMessage`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
       });
-      if (!res.ok) {
-        this.logger.warn({ status: res.status, chatId }, 'telegram sendMessage failed');
-      }
+      if (res.ok) return { ok: true };
+
+      // Telegram explains itself in the body — "chat not found", "bot was
+      // blocked by the user" — and that sentence is the whole diagnosis.
+      const detail = await res.text().catch(() => '');
+      this.logger.warn({ status: res.status, chatId, detail }, 'telegram sendMessage failed');
+      return { ok: false, reason: `HTTP ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ''}` };
     } catch (err) {
       this.logger.warn({ err, chatId }, 'telegram sendMessage error');
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
     }
   }
+}
+
+export interface SendResult {
+  ok: boolean;
+  /** Why it did not land, in Telegram's own words where possible. */
+  reason?: string;
 }
 
 const SEVERITY_EMOJI: Record<Signal['severity'], string> = {

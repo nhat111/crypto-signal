@@ -199,6 +199,29 @@ deploys first pulls the schema forward, and an old build then queries a
 newer schema. That is fine for additive migrations (every one here so far)
 and is why the order in the previous section is api first.
 
+## Proving the alert path actually works
+
+`/status` shows how many chats the worker could alert, which proves the
+variable was read and nothing more. A mistyped chat id counts exactly the
+same as a correct one — the send returns 400 and is swallowed, because an
+undeliverable alert must never take the collector down — so "đang bật · 1
+kênh" can sit over a channel that will never receive anything.
+
+To settle it, send a real message:
+
+1. Worker service → **Variables** → add `TELEGRAM_ALERT_TEST` = `1`
+2. Redeploy the worker (or let the variable change redeploy it)
+3. A message arrives in each configured chat within a few seconds of boot
+4. The logs say `alert self-test: every chat received the message`, or
+   `alert self-test: some chats did NOT receive the message` naming each
+   failing id and Telegram's own reason — "chat not found" means the id is
+   wrong, "bot was blocked by the user" means somebody blocked the bot
+5. Remove the variable, or it sends again on every deploy
+
+`alert self-test asked for, but no chat ids are configured` means
+`TELEGRAM_ALERT_CHAT_IDS` is empty — a different problem from a wrong id,
+with a different fix.
+
 ## Running the historical replay
 
 Railway gives no shell inside a running container, so the replay is

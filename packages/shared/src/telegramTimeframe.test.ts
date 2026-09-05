@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pickDefaultTimeframe } from './config.js';
+import { isEnabledFlag, pickDefaultTimeframe } from './config.js';
 import type { Timeframe } from './types.js';
 
 /**
@@ -31,6 +31,21 @@ describe('pickDefaultTimeframe', () => {
       for (const list of [collected, ['15m'] as Timeframe[], ['5m', '1h'] as Timeframe[]]) {
         expect(list).toContain(pickDefaultTimeframe(configured, list));
       }
+    }
+  });
+});
+
+describe('isEnabledFlag', () => {
+  it('accepts every spelling of on somebody might type into a dashboard', () => {
+    for (const on of ['1', 'true', 'TRUE', 'yes', 'on', ' 1 ', 'anything']) {
+      expect(isEnabledFlag(on), on).toBe(true);
+    }
+  });
+
+  it('treats unset and every spelling of off as off', () => {
+    // Unset must be off: this switch sends real messages on every boot.
+    for (const off of ['', '   ', '0', 'false', 'FALSE', 'no', 'off']) {
+      expect(isEnabledFlag(off), JSON.stringify(off)).toBe(false);
     }
   });
 });
