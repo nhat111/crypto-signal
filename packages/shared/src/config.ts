@@ -84,6 +84,8 @@ const envSchema = z.object({
   THRESH_PRICE_SHOCK_MIN_MOVE_PCT: numeric(1),
 
   ALERT_COOLDOWN_MINUTES: numeric(30),
+  // Which timeframes may push a Telegram alert. Empty = all collected.
+  ALERT_TIMEFRAMES: z.string().default(''),
   ALERT_CONFIDENCE_DELTA_RETRIGGER: numeric(15),
 
   LOG_LEVEL: z.string().default('info'),
@@ -167,6 +169,10 @@ export interface AppConfig {
   alert: {
     cooldownMinutes: number;
     confidenceDeltaRetrigger: number;
+    /** Frames allowed to push to Telegram. Signals on other frames are still recorded. */
+    timeframes: Timeframe[];
+    /** Names in ALERT_TIMEFRAMES that are not collected — logged at boot so a typo is visible. */
+    ignoredTimeframes: string[];
   };
   logLevel: string;
   anthropicApiKey: string;
@@ -234,6 +240,38 @@ export function pickDefaultTimeframe(configured: string, collected: Timeframe[])
   return collected[collected.length - 1] as Timeframe;
 }
 
+/**
+ * Which timeframes are allowed to push a Telegram alert.
+ *
+ * TELEGRAM_DEFAULT_TIMEFRAME only governs what the bot answers when it is
+ * *asked* — it never touched the push path, so a spot holder who moved
+ * /status to 4h still got woken up by 5m and 15m candles. This is the
+ * other half of that switch.
+ *
+ * Filtering here silences Telegram only. Every signal is still stored and
+ * still scored on /performance: the point is to stop pushing frames the
+ * reader does not trade, not to stop measuring them.
+ *
+ * Empty means every collected frame, so an unset variable changes nothing.
+ * A name that is not collected is reported rather than obeyed, and if
+ * *nothing* matches the whole list is ignored — a typo must not turn every
+ * alert off, because total silence is indistinguishable from a calm market
+ * and is the one failure this system must never fake.
+ */
+export function pickAlertTimeframes(
+  configured: string,
+  collected: Timeframe[],
+): { timeframes: Timeframe[]; ignored: string[] } {
+  const wanted = configured.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const matched = collected.filter((tf) => wanted.includes(tf.toLowerCase()));
+  const ignored = wanted.filter((w) => !collected.some((tf) => tf.toLowerCase() === w));
+
+  // One fallback for both "unset" and "every name was a typo" — they must
+  // land the same way, because in either case the alternative is no alerts
+  // at all, and no alerts is indistinguishable from a calm market.
+  return { timeframes: matched.length > 0 ? matched : collected, ignored };
+}
+
 let cached: AppConfig | undefined;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -241,6 +279,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 
   const parsed = envSchema.parse(env);
   const timeframes = parsed.TIMEFRAMES.split(',').map((s) => s.trim()).filter(Boolean) as Timeframe[];
+
+  const alertTimeframes = pickAlertTimeframes(parsed.ALERT_TIMEFRAMES, timeframes);
 
   assertSumsTo100('health', Object.values(HEALTH_WEIGHTS));
   assertSumsTo100('risk', Object.values(RISK_WEIGHTS));
@@ -285,6 +325,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     alert: {
       cooldownMinutes: parsed.ALERT_COOLDOWN_MINUTES,
       confidenceDeltaRetrigger: parsed.ALERT_CONFIDENCE_DELTA_RETRIGGER,
+      timeframes: alertTimeframes.timeframes,
+      ignoredTimeframes: alertTimeframes.ignored,
     },
     logLevel: parsed.LOG_LEVEL,
     anthropicApiKey: parsed.ANTHROPIC_API_KEY,

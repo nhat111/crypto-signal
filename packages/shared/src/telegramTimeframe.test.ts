@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isEnabledFlag, pickDefaultTimeframe } from './config.js';
+import { isEnabledFlag, pickAlertTimeframes, pickDefaultTimeframe } from './config.js';
 import type { Timeframe } from './types.js';
 
 /**
@@ -46,6 +46,52 @@ describe('isEnabledFlag', () => {
     // Unset must be off: this switch sends real messages on every boot.
     for (const off of ['', '   ', '0', 'false', 'FALSE', 'no', 'off']) {
       expect(isEnabledFlag(off), JSON.stringify(off)).toBe(false);
+    }
+  });
+});
+
+describe('pickAlertTimeframes', () => {
+  const collected = ['5m', '15m', '1h', '4h'] as Timeframe[];
+
+  it('pushes every collected frame when nothing is configured', () => {
+    // An unset variable must change nothing for anyone already running.
+    expect(pickAlertTimeframes('', collected).timeframes).toEqual(collected);
+    expect(pickAlertTimeframes('   ', collected).timeframes).toEqual(collected);
+  });
+
+  it('keeps only the frames asked for', () => {
+    // The whole point: a spot holder does not want to be woken by a 5m
+    // candle, however violent it was.
+    const { timeframes } = pickAlertTimeframes('1h,4h', collected);
+    expect(timeframes).toEqual(['1h', '4h']);
+    expect(timeframes).not.toContain('15m');
+  });
+
+  it('does not care how the frames were typed', () => {
+    // Set in a Railway text box by a person, not by a program.
+    expect(pickAlertTimeframes(' 4H , 1h ', collected).timeframes).toEqual(['1h', '4h']);
+  });
+
+  it('reports a frame that is not collected instead of obeying it', () => {
+    const { timeframes, ignored } = pickAlertTimeframes('4h,1d', collected);
+    expect(timeframes).toEqual(['4h']);
+    expect(ignored).toEqual(['1d']);
+  });
+
+  it('refuses to silence everything over a typo', () => {
+    // The failure that matters. All-unknown means the reader gets no alerts
+    // at all, which looks exactly like a calm market — so the list is
+    // ignored and the mistake is reported instead.
+    const { timeframes, ignored } = pickAlertTimeframes('1d,1w', collected);
+    expect(timeframes).toEqual(collected);
+    expect(ignored).toEqual(['1d', '1w']);
+  });
+
+  it('never returns a frame that is not collected', () => {
+    for (const configured of ['', '4h', '1d', '5m,1d,4h', 'nonsense']) {
+      for (const tf of pickAlertTimeframes(configured, collected).timeframes) {
+        expect(collected).toContain(tf);
+      }
     }
   });
 });

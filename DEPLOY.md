@@ -129,6 +129,30 @@ A restart re-announces whatever is still broken, because the "already told
 you" set lives in memory. One duplicate message after a deploy costs less
 than a table and a migration to avoid it.
 
+### Which timeframes are allowed to wake you
+
+The same chat ids also receive **signal** alerts, and those fire once per
+closed candle on **every** frame in `TIMEFRAMES` — so a 5m and a 15m candle
+push too. `TELEGRAM_DEFAULT_TIMEFRAME` does not change this: it only
+governs what the bot answers when you *ask* it something.
+
+Set `ALERT_TIMEFRAMES` on the **worker** to choose. For spot, `1h,4h`: a
+15m reading flips several times inside one decision, and 4h is the horizon
+`/performance` measures outcomes at.
+
+Filtering here silences Telegram only — every signal is still written and
+still scored, so `/signals` and `/performance` see the frames you muted.
+
+Two guards, because the failure mode is silence and silence looks like a
+calm market: a frame that is not in `TIMEFRAMES` is logged and ignored
+rather than obeyed, and if *every* name is unrecognised the whole list is
+ignored instead of turning alerting off. The boot log always states what
+is armed:
+
+```
+signal alerts armed for timeframes  alertTimeframes=["1h","4h"] collected=["5m","15m","1h","4h"]
+```
+
 ### 4. Telegram bot (optional)
 
 1. **New → GitHub Repo** → same repo, third service.

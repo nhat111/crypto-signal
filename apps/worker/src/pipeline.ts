@@ -17,7 +17,7 @@ import {
   upsertCandle,
 } from '@crypto-signal/db';
 import { assessDataQuality } from './dataQuality.js';
-import { shouldSendAlert } from './alerting.js';
+import { isAlertingTimeframe, shouldSendAlert } from './alerting.js';
 import { formatAlertMessage } from './telegramNotifier.js';
 import { stateKey, type SymbolTimeframeState } from './state.js';
 import type { WorkerContext } from './context.js';
@@ -116,6 +116,11 @@ async function finishSnapshot(ctx: WorkerContext, snapshot: MarketSnapshot): Pro
 }
 
 async function dispatchAlert(ctx: WorkerContext, signal: Signal, signalId: string, health: HealthResult | null, risk: RiskResult): Promise<void> {
+  // Checked before the cooldown lookup: a frame nobody wants pushed should
+  // not cost a query, and it must not consume the cooldown slot of a frame
+  // that does get pushed. The signal itself is already stored.
+  if (!isAlertingTimeframe(signal.timeframe, ctx.config.alert.timeframes)) return;
+
   const lastAlert = await getLastAlertEvent(ctx.pool, signal.symbol, signal.timeframe, signal.signalType);
   const shouldAlert = shouldSendAlert(signal, lastAlert, ctx.config.alert.cooldownMinutes, ctx.config.alert.confidenceDeltaRetrigger, Date.now());
   if (!shouldAlert) return;

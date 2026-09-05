@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { LastSignalAlert } from '@crypto-signal/db';
 import type { Signal } from '@crypto-signal/signal-engine';
-import { shouldSendAlert } from './alerting.js';
+import { isAlertingTimeframe, shouldSendAlert } from './alerting.js';
 
 function signal(overrides: Partial<Signal> = {}): Signal {
   return {
@@ -52,5 +52,18 @@ describe('shouldSendAlert (spec §21 cooldown)', () => {
   it('does not re-send for a small confidence change under the delta', () => {
     const last: LastSignalAlert = { severity: 'MEDIUM', confidence: 55, sentAt: now - 5 * 60_000 };
     expect(shouldSendAlert(signal({ confidence: 60 }), last, 30, 15, now)).toBe(false);
+  });
+});
+
+describe('isAlertingTimeframe', () => {
+  it('lets through only the frames configured to push', () => {
+    expect(isAlertingTimeframe('4h', ['1h', '4h'])).toBe(true);
+    expect(isAlertingTimeframe('15m', ['1h', '4h'])).toBe(false);
+  });
+
+  it('is a different question from cooldown', () => {
+    // A frame nobody wants pushed is skipped before the cooldown lookup, so
+    // it can never consume the cooldown slot of a frame that does push.
+    expect(isAlertingTimeframe('5m', [])).toBe(false);
   });
 });

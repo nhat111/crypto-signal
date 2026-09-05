@@ -231,6 +231,22 @@ export function startSchedulers(ctx: WorkerContext): () => void {
     );
   }
 
+  // Which frames push, stated at boot. A frame that silently stopped
+  // alerting looks exactly like a frame with nothing to say, and the
+  // operator has no way to tell those apart from outside.
+  ctx.logger.info(
+    { alertTimeframes: ctx.config.alert.timeframes, collected: ctx.config.timeframes },
+    'signal alerts armed for timeframes',
+  );
+  if (ctx.config.alert.ignoredTimeframes.length > 0) {
+    // Loud, because the likely cause is a typo and the likely symptom is
+    // fewer alerts than expected — which reads as a quiet market.
+    ctx.logger.warn(
+      { ignored: ctx.config.alert.ignoredTimeframes, collected: ctx.config.timeframes },
+      'ALERT_TIMEFRAMES names frames that are not collected — those entries are ignored',
+    );
+  }
+
   // Opt-in, one shot at boot: the only thing that distinguishes a working
   // chat id from a mistyped one, since a failed send is swallowed by design.
   if (ctx.config.telegramAlertTest) {
