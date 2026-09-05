@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import { getGemPerformance, getGems } from '@/lib/api';
 import { usePolling } from '@/lib/usePolling';
-import type { GemHorizon } from '@/lib/types';
+import type { GemHorizon, GemBaselineComparison } from '@/lib/types';
 import { GemCard } from '@/components/gems/GemCard';
 import { LoadingPanel, StatePanel } from '@/components/StatePanel';
 import { cx } from '@/lib/format';
@@ -127,8 +127,80 @@ function GemPerformancePanel({ data, loading, error }: PerformancePanelProps) {
         trên <span className="font-semibold text-slate-400">mọi token qua được vòng lọc</span>, vì không có nhóm
         điểm thấp thì không so được điểm cao với cái gì.
       </p>
+      <MarketBaselinePanel baseline={data.baseline} />
       <ScoreEdgePanel edge={data.scoreEdge} />
       <ComponentEdgePanel edges={data.componentEdges} />
+    </div>
+  );
+}
+
+/**
+ * The control group, and the only thing that makes the headline mean
+ * anything.
+ *
+ * "14,5% đi lên, trung vị −21%" reads as a verdict on the scanner and is
+ * not one: every token in it passed the same filter, so the number cannot
+ * separate a bad scanner from a bad week for small caps. This compares it
+ * against tokens the scanner REJECTED for being the wrong profile — too
+ * big, too new, already pumped — each of which was something the reader
+ * could genuinely have bought instead that day.
+ */
+function MarketBaselinePanel({ baseline }: { baseline?: GemBaselineComparison }) {
+  if (!baseline || baseline.sampleCount === 0) return null;
+
+  const tone =
+    baseline.verdict === 'beats' ? 'text-emerald-400' : baseline.verdict === 'worse' ? 'text-rose-400' : 'text-slate-400';
+
+  return (
+    <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h4 className="text-xs font-bold uppercase tracking-wide text-slate-300">So với token bị loại</h4>
+        <span className="text-[11px] text-slate-500">{baseline.sampleCount} mẫu đối chứng</span>
+      </div>
+
+      <dl className="mt-2.5 grid grid-cols-2 gap-3">
+        <Stat
+          label="Ăn được phí (đối chứng)"
+          value={baseline.netPositiveMovePct === null ? '—' : `${baseline.netPositiveMovePct}%`}
+          hint="Tỉ lệ token bị loại tăng đủ để bù 3% phí đi-về, tính trên cùng mốc phí như số của scanner."
+        />
+        <Stat
+          label="Trung vị (đối chứng)"
+          value={baseline.medianMovePct === null ? '—' : `${baseline.medianMovePct}%`}
+        />
+      </dl>
+
+      {!baseline.sufficientData ? (
+        <p className="mt-2.5 text-[11px] leading-relaxed text-amber-300/80">
+          Mới {baseline.sampleCount}/20 mẫu đối chứng — chưa đủ để kết luận gì. Con số trên chỉ để nhìn, chưa phải
+          bằng chứng.
+        </p>
+      ) : (
+        <p className={`mt-2.5 text-[11px] font-semibold leading-relaxed ${tone}`}>
+          {baseline.verdict === 'beats' &&
+            `Scanner hơn nhóm đối chứng ${baseline.deltaPp.toFixed(1)} điểm phần trăm — lớn hơn sai số ${baseline.marginPp?.toFixed(1) ?? '—'}.`}
+          {baseline.verdict === 'worse' &&
+            `Scanner KÉM hơn nhóm đối chứng ${Math.abs(baseline.deltaPp).toFixed(1)} điểm phần trăm. Mua đại một token bị loại còn hơn.`}
+          {baseline.verdict === 'indistinguishable' &&
+            `Chênh ${baseline.deltaPp.toFixed(1)} điểm phần trăm, chưa vượt sai số ${baseline.marginPp?.toFixed(1) ?? '—'} — tức là chưa phân biệt được với may rủi.`}
+        </p>
+      )}
+
+      {baseline.medianDeltaPp !== null && (
+        <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+          Trung vị chênh {baseline.medianDeltaPp > 0 ? '+' : ''}
+          {baseline.medianDeltaPp}%. Con số này{' '}
+          <span className="font-semibold text-slate-400">không kèm kiểm định</span> — trung vị không phải tỉ lệ, chạy
+          công thức tỉ lệ lên nó sẽ ra một con số trông chặt chẽ mà không phải vậy.
+        </p>
+      )}
+
+      <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+        Nhóm đối chứng chỉ gồm token bị loại vì <span className="font-semibold text-slate-400">sai hồ sơ</span> (quá
+        lớn, quá mới, đã bơm quá mạnh) — những thứ bro thật sự có thể mua thay thế. Token bị loại vì thanh khoản
+        quá mỏng hoặc thiếu dữ liệu không được tính: giá của chúng không phải giá mua được, đưa vào chỉ làm scanner
+        đẹp lên một cách giả tạo.
+      </p>
     </div>
   );
 }

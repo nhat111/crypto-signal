@@ -106,6 +106,29 @@ export function criticalZ(comparisons: number): number {
  * and stops the comparison being wrong on a fresh install where the
  * baseline is thin too.
  */
+/**
+ * Agresti-Caffo: one notional win and one notional loss added to each arm
+ * before the variance is computed.
+ *
+ * The plain Wald formula this used to be has a hole at the extremes, and
+ * it is the worst possible hole for this codebase: at 0% or 100% the
+ * variance term for that arm is exactly zero, so a *single* observation
+ * that happened to go the right way produced a margin of 9,8pp against a
+ * 50pp gap and the page said "beats". A rule against claiming edge without
+ * evidence, defeated by having almost none.
+ *
+ * Adding two pseudo-observations per arm is the standard remedy and is
+ * well-behaved where Wald is not. On real sample sizes it changes nothing
+ * — 1,081pp against 1,081pp on the production signal counts — and on thin
+ * ones it refuses, which is the only direction worth erring in here.
+ */
+function adjusted(pct: number, sampleCount: number): { p: number; n: number } {
+  // Percentages are what the callers hold; the counts they came from are
+  // recoverable exactly, since every one is a whole number of rows.
+  const wins = Math.round((pct / 100) * sampleCount);
+  return { p: (wins + 1) / (sampleCount + 2), n: sampleCount + 2 };
+}
+
 export function differenceMarginPp(
   hitPct: number,
   sampleCount: number,
@@ -114,10 +137,23 @@ export function differenceMarginPp(
   comparisons = 1,
 ): number | null {
   if (sampleCount <= 0 || baselineSampleCount <= 0) return null;
-  const p1 = hitPct / 100;
-  const p2 = baselinePct / 100;
-  const variance = (p1 * (1 - p1)) / sampleCount + (p2 * (1 - p2)) / baselineSampleCount;
+  const a = adjusted(hitPct, sampleCount);
+  const b = adjusted(baselinePct, baselineSampleCount);
+  const variance = (a.p * (1 - a.p)) / a.n + (b.p * (1 - b.p)) / b.n;
   return criticalZ(comparisons) * Math.sqrt(variance) * 100;
+}
+
+/**
+ * The difference the margin above is a margin *for*.
+ *
+ * Shrunk toward zero by the same pseudo-observations, because an interval
+ * has to be centred on the estimate its width was computed from. The raw
+ * difference is what gets *reported* — that is what actually happened —
+ * but the verdict is decided on this one, which is what stops three lucky
+ * rows reading as a finding.
+ */
+function adjustedDeltaPp(hitPct: number, sampleCount: number, baselinePct: number, baselineSampleCount: number): number {
+  return (adjusted(hitPct, sampleCount).p - adjusted(baselinePct, baselineSampleCount).p) * 100;
 }
 
 export function compareToBaseline(
@@ -127,12 +163,18 @@ export function compareToBaseline(
   baselineSampleCount: number,
   comparisons = 1,
 ): { verdict: EdgeVerdict; deltaPp: number; marginPp: number | null } {
+  // Reported raw: the reader is owed the gap that actually occurred.
   const deltaPp = hitPct - baselinePct;
   const marginPp = differenceMarginPp(hitPct, sampleCount, baselinePct, baselineSampleCount, comparisons);
 
   if (marginPp === null) return { verdict: 'indistinguishable', deltaPp, marginPp };
-  if (deltaPp - marginPp > 0) return { verdict: 'beats', deltaPp, marginPp };
-  if (deltaPp + marginPp < 0) return { verdict: 'worse', deltaPp, marginPp };
+
+  // Judged adjusted: the margin was computed for this estimate, not the raw
+  // one, and testing the raw gap against it would hand back part of the
+  // protection the adjustment exists to give.
+  const tested = adjustedDeltaPp(hitPct, sampleCount, baselinePct, baselineSampleCount);
+  if (tested - marginPp > 0) return { verdict: 'beats', deltaPp, marginPp };
+  if (tested + marginPp < 0) return { verdict: 'worse', deltaPp, marginPp };
   return { verdict: 'indistinguishable', deltaPp, marginPp };
 }
 
@@ -151,5 +193,45 @@ export function samplesNeeded(
   const baselineVariance = (p2 * (1 - p2)) / baselineSampleCount;
   const target = (deltaPp / 100 / z) ** 2;
   if (target <= baselineVariance) return null; // unreachable while the baseline is this thin
-  return Math.ceil((p1 * (1 - p1)) / (target - baselineVariance));
+
+  const analytic = Math.max(1, Math.ceil((p1 * (1 - p1)) / (target - baselineVariance)));
+
+  // The closed form solves the unadjusted variance; the verdict is decided
+  // on the Agresti-Caffo one, which needs a little more. Inverting that
+  // analytically is awkward — the pseudo-counts put n on both sides — and
+  // getting it slightly wrong would make this function promise a sample
+  // size that then does not deliver a verdict, which is worse than
+  // promising nothing. So the closed form is a starting point and the
+  // answer is the smallest n that actually decides.
+  const decides = (n: number): boolean =>
+    compareToBaseline(hitPct, n, baselinePct, baselineSampleCount, comparisons).verdict !== 'indistinguishable';
+
+  if (decides(analytic)) {
+    let low = 1;
+    let high = analytic;
+    while (low < high) {
+      const mid = Math.floor((low + high) / 2);
+      if (decides(mid)) high = mid;
+      else low = mid + 1;
+    }
+    return low;
+  }
+
+  let bound = analytic;
+  while (bound < MAX_SAMPLES_WORTH_PROMISING && !decides(bound)) bound *= 2;
+  // Beyond this the honest answer is "not with a baseline this thin",
+  // which is what null already means here.
+  if (!decides(bound)) return null;
+
+  let low = analytic;
+  let high = bound;
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    if (decides(mid)) high = mid;
+    else low = mid + 1;
+  }
+  return low;
 }
+
+/** A sample count nobody will ever reach is not a plan; past this, say so instead. */
+const MAX_SAMPLES_WORTH_PROMISING = 10_000_000;

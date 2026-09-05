@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareToBaseline, criticalZ, normalQuantile, samplesNeeded } from './edge.js';
+import { compareToBaseline, criticalZ, differenceMarginPp, normalQuantile, samplesNeeded } from './edge.js';
 
 // The live baseline at the time this was written: 51% over 10.736 windows.
 const BASE = 51;
@@ -123,5 +123,63 @@ describe('multiple comparisons', () => {
     const nine = samplesNeeded(58, BASE, BASE_N, 9) as number;
     expect(nine).toBeGreaterThan(one);
     expect(compareToBaseline(58, nine, BASE, BASE_N, 9).verdict).toBe('beats');
+  });
+});
+
+describe('the hole at 0% and 100%', () => {
+  const BASELINE = 50;
+  const BASELINE_N = 100;
+
+  it('refuses to call one lucky observation a finding', () => {
+    // The plain Wald formula this replaced put the variance of a 100% arm
+    // at exactly zero, so a single row that happened to win produced a
+    // 9,8pp margin against a 50pp gap and the page said "beats". A rule
+    // against claiming edge without evidence, defeated by having almost
+    // none.
+    expect(compareToBaseline(100, 1, BASELINE, BASELINE_N).verdict).toBe('indistinguishable');
+    expect(compareToBaseline(0, 1, BASELINE, BASELINE_N).verdict).toBe('indistinguishable');
+  });
+
+  it('refuses a perfect run of three', () => {
+    expect(compareToBaseline(100, 3, BASELINE, BASELINE_N).verdict).toBe('indistinguishable');
+    expect(compareToBaseline(0, 3, BASELINE, BASELINE_N).verdict).toBe('indistinguishable');
+  });
+
+  it('still decides once a perfect run is actually long', () => {
+    // Conservative, not mute: forty straight wins against a coin flip is a
+    // finding, and refusing to say so would be its own kind of dishonesty.
+    expect(compareToBaseline(100, 40, BASELINE, BASELINE_N).verdict).toBe('beats');
+    expect(compareToBaseline(0, 40, BASELINE, BASELINE_N).verdict).toBe('worse');
+  });
+
+  it('never reports a margin of zero, whatever the split', () => {
+    // Zero margin means infinite confidence, which no sample size buys.
+    for (const [pct, n] of [[100, 1], [0, 1], [100, 5], [0, 5], [100, 500]] as const) {
+      expect(differenceMarginPp(pct, n, BASELINE, BASELINE_N), `${pct}% of ${n}`).toBeGreaterThan(0);
+    }
+  });
+
+  it('leaves production-sized samples where they were', () => {
+    // The adjustment must not quietly rewrite verdicts that were already
+    // resting on tens of thousands of rows.
+    const margin = differenceMarginPp(51, 10_655, 54, 35_547, 9) as number;
+    expect(margin).toBeGreaterThan(1.4);
+    expect(margin).toBeLessThan(1.7);
+  });
+
+  it('asks for a sample count that actually delivers a verdict', () => {
+    // The promise this function makes has to be keepable, including from a
+    // degenerate starting point.
+    for (const hitPct of [100, 0, 58, 42]) {
+      const needed = samplesNeeded(hitPct, BASELINE, BASELINE_N);
+      if (needed === null) continue;
+      expect(compareToBaseline(hitPct, needed, BASELINE, BASELINE_N).verdict, `${hitPct}%`).not.toBe(
+        'indistinguishable',
+      );
+      // And it must be the *smallest* such count, not a safe overestimate.
+      expect(compareToBaseline(hitPct, needed - 1, BASELINE, BASELINE_N).verdict, `${hitPct}% minus one`).toBe(
+        'indistinguishable',
+      );
+    }
   });
 });

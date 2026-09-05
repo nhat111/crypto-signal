@@ -11,11 +11,14 @@ import {
 import {
   ensureGemOutcome,
   getAllAlertSubscribers,
+  getBaselinePendingOutcome,
   getGemsPendingOutcome,
   getLastGemAlert,
   insertGemAlertEvent,
+  insertGemBaselineCandidates,
   insertGemScan,
   pruneOldGemScans,
+  recordGemBaselineOutcome,
   recordGemOutcome,
   upsertGemToken,
   type GemHorizon,
@@ -31,6 +34,16 @@ export interface GemScanDeps {
 }
 
 /**
+ * How many rejected candidates each scan keeps as a control group.
+ *
+ * Small on purpose. The control only has to be large enough to answer
+ * "did passing the filter beat not bothering", and every row costs a price
+ * lookup at both horizons against a rate-limited free API. At one scan
+ * every 30 minutes this reaches the 20-sample threshold within a day.
+ */
+const BASELINE_SAMPLE_PER_SCAN = 5;
+
+/**
  * Wires the gem scanner's sources and runs one pass per configured chain.
  *
  * Lives in the worker alongside the Binance collector for the same reason
@@ -39,7 +52,7 @@ export interface GemScanDeps {
  * the process and the database.
  */
 export async function runGemScanCycle(deps: GemScanDeps): Promise<void> {
-  const { logger, gemConfig } = deps;
+  const { pool, logger, gemConfig } = deps;
 
   const dexscreener = new DexScreenerSource({ logger });
   const geckoterminal = new GeckoTerminalSource({ logger });
@@ -54,6 +67,7 @@ export async function runGemScanCycle(deps: GemScanDeps): Promise<void> {
           safetySource: rugcheck,
           config: gemConfig,
           logger,
+          baselineSampleSize: BASELINE_SAMPLE_PER_SCAN,
         },
         chainId,
       );
@@ -62,8 +76,29 @@ export async function runGemScanCycle(deps: GemScanDeps): Promise<void> {
         await persistAndMaybeAlert(deps, gem, result.scannedAt);
       }
 
+      // The control group. Without it the performance page reports a hit
+      // rate with nothing to compare it against, which is the one thing
+      // this codebase refuses to publish anywhere else.
+      const baselineKept = await insertGemBaselineCandidates(
+        pool,
+        result.baselineSample.map((c) => ({
+          chainId: c.chainId,
+          tokenAddress: c.tokenAddress,
+          observedAt: result.scannedAt,
+          priceUsd: c.priceUsd,
+          liquidityUsd: c.liquidityUsd,
+          failures: c.failures,
+        })),
+      );
+
       logger.info(
-        { chainId, candidates: result.candidateCount, eligible: result.eligible.length, rejected: result.rejectedCount },
+        {
+          chainId,
+          candidates: result.candidateCount,
+          eligible: result.eligible.length,
+          rejected: result.rejectedCount,
+          baselineKept,
+        },
         'gem scan cycle complete',
       );
     } catch (err) {
@@ -162,22 +197,33 @@ export async function runGemOutcomeTracker(deps: GemScanDeps): Promise<void> {
 
   for (const horizon of HORIZONS) {
     const pending = await getGemsPendingOutcome(pool, horizon, now);
-    if (pending.length === 0) continue;
+    // The control group, priced at the same horizons from the same source.
+    // A baseline measured differently from the thing it is a baseline for
+    // is not a baseline.
+    const pendingBaseline = await getBaselinePendingOutcome(pool, horizon, now);
+    if (pending.length === 0 && pendingBaseline.length === 0) continue;
 
-    // Group by chain so each chain's addresses batch into as few calls as possible.
-    const byChain = new Map<string, typeof pending>();
-    for (const row of pending) {
-      const list = byChain.get(row.chainId) ?? [];
-      list.push(row);
-      byChain.set(row.chainId, list);
-    }
+    // Group by chain so each chain's addresses batch into as few calls as
+    // possible — and so the control's lookups ride along in the same call
+    // rather than doubling the API budget.
+    const byChain = new Map<string, { scans: typeof pending; baseline: typeof pendingBaseline }>();
+    const bucket = (chainId: string) => {
+      const existing = byChain.get(chainId) ?? { scans: [], baseline: [] };
+      byChain.set(chainId, existing);
+      return existing;
+    };
+    for (const row of pending) bucket(row.chainId).scans.push(row);
+    for (const row of pendingBaseline) bucket(row.chainId).baseline.push(row);
 
     for (const [chainId, rows] of byChain) {
       try {
-        const pairs = await dexscreener.fetchPairsForTokens(chainId, rows.map((r) => r.tokenAddress));
+        const addresses = [
+          ...new Set([...rows.scans.map((r) => r.tokenAddress), ...rows.baseline.map((r) => r.tokenAddress)]),
+        ];
+        const pairs = await dexscreener.fetchPairsForTokens(chainId, addresses);
         const byToken = new Map(pairs.map((p) => [p.baseToken.address, p]));
 
-        for (const row of rows) {
+        for (const row of rows.scans) {
           const pair = byToken.get(row.tokenAddress);
           // No current pair usually means the pool is gone — which is itself
           // the outcome. Recording price 0 would assert a price we never
@@ -185,12 +231,31 @@ export async function runGemOutcomeTracker(deps: GemScanDeps): Promise<void> {
           if (!pair || pair.priceUsd === null) continue;
           await recordGemOutcome(pool, row.scanId, horizon, pair.priceUsd, row.priceAtScan, pair.liquidityUsd);
         }
+
+        for (const row of rows.baseline) {
+          const pair = byToken.get(row.tokenAddress);
+          // Same rule as above, and it matters more here: silently dropping
+          // dead controls while keeping dead picks would bias the
+          // comparison in the scanner's favour. Both sides stay pending.
+          if (!pair || pair.priceUsd === null) continue;
+          await recordGemBaselineOutcome(
+            pool,
+            row.candidateId,
+            horizon,
+            pair.priceUsd,
+            row.priceAtObservation,
+            pair.liquidityUsd,
+          );
+        }
       } catch (err) {
         logger.warn({ err, chainId, horizon }, 'gem outcome tracking failed for this chain');
       }
     }
 
-    logger.info({ horizon, count: pending.length }, 'gem outcome tracker pass complete');
+    logger.info(
+      { horizon, count: pending.length, baselineCount: pendingBaseline.length },
+      'gem outcome tracker pass complete',
+    );
   }
 
   if (gemConfig.enabled) {

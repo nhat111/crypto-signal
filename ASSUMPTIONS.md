@@ -287,6 +287,64 @@ rate off a handful of samples.
 - Token names and symbols come from on-chain metadata that anyone can set;
   they are HTML-escaped before display but are not otherwise trustworthy.
 
+### The control group (added later)
+
+`gem_outcomes` answers "when the scanner called something, what happened",
+and the score bands answer "did a higher score precede a better outcome".
+Neither can answer the question the money depends on — **was passing the
+filter worth anything at all** — because every row in both went through
+the same filter. A hit rate with no control is the one thing this codebase
+refuses to publish, and the gem page was publishing one.
+
+So each scan keeps a bounded random sample (5) of the candidates it
+**rejected** and prices them over the same horizons, from the same source,
+against the same 3% round-trip cost floor. `gem_baseline_candidates` holds
+both the observation and its outcome; there is no "did the scanner call
+this one" question to answer for a control, so there is nothing for a
+second table to hold.
+
+**Only some rejections qualify**, and picking the wrong ones would flatter
+the scanner rather than test it:
+
+- `liquidity_too_low` / `volume_too_low` — a pool nobody trades. Its
+  printed move is an artefact you could not have transacted at, so
+  counting it as the alternative is fiction.
+- `missing_*_data` — unreadable then, unpriceable honestly now.
+- Anything the safety screen rejected never reaches the list at all:
+  screening runs only after the market gate passes, and "you could have
+  bought the rug instead" is not a comparison worth making.
+
+What remains is tokens that were simply the wrong **profile** — too big,
+too new, or already pumped — each of which was something a person could
+genuinely have bought that day. The sample is random rather than the first
+N, because candidates arrive in discovery order and that order correlates
+with volume and recency on every feed we read; taking the head would
+quietly build a control group of the biggest, newest rejects.
+
+`failureCounts` is reported alongside, so a "market baseline" that turned
+out to be entirely already-pumped tokens is visible rather than implied.
+
+### Agresti-Caffo, and the hole it closed
+
+The two-proportion margin used to be a plain Wald interval, which has a
+hole at exactly the values this system produces early on: at 0% or 100%
+the variance term for that arm is **zero**, so a *single* observation that
+happened to go the right way produced a 9,8pp margin against a 50pp gap
+and the page said "beats" — a rule against claiming edge without evidence,
+defeated by having almost none.
+
+One notional win and one notional loss are now added to each arm before
+the variance is computed, and the verdict is decided on the correspondingly
+shrunk difference (the raw difference is still what gets *reported* — that
+is what actually happened). On production sample sizes this changes
+nothing: 1,081pp against 1,081pp on the real signal counts. On thin ones it
+refuses, which is the only direction worth erring in here.
+
+`samplesNeeded` walks up from the closed-form estimate to the smallest
+count that actually produces a verdict, rather than inverting the adjusted
+formula in closed form — a function that promises a sample size which then
+fails to deliver one is worse than a function that promises nothing.
+
 ## 17. Price-shock signals (`PRICE_SPIKE_UP` / `PRICE_SPIKE_DOWN`)
 
 Not from the spec. Added because every other rule describes *structure* —

@@ -208,11 +208,19 @@ Check items as they land; each phase's commit message references the phase.
       First production reading (55 outcomes, 7d): `momentumStructure`, the
       lowest weight at 10%, separated 4% from 33% between its bottom two
       bands.
-- [ ] A market baseline for gems: what a token that *failed* the filters did
-      over the same window. The band comparison answers "does the score
-      rank correctly"; it cannot answer "was any of this worth trading
-      versus the small-cap market", which needs outcomes for rejected
-      candidates.
+- [x] A market baseline for gems: what a token that *failed* the filters did
+      over the same window (migration 017). Five rejects per scan, priced at
+      the same horizons in the same API batch. Only profile rejections
+      qualify — too big, too new, already pumped — because an untradeable
+      or unreadable reject would flatter the scanner rather than test it.
+      Reaches the 20-sample floor within a day at one scan per 30 minutes.
+- [ ] Read the baseline once it has samples. If the scanner does not beat
+      tokens it rejected, tuning weights is beside the point and the
+      honest move is to switch the alerting off.
+- [ ] The control is only as good as its mix. `failureCounts` is reported
+      for exactly this reason — if it turns out to be dominated by
+      `extreme_pump`, the "market baseline" is a momentum baseline and
+      should be split by reason.
 
 ## Known limitations (carried forward, not silently hidden)
 - [ ] Nothing renders the web pages against an older API payload. Web and

@@ -1,6 +1,7 @@
 import type { Logger } from '@crypto-signal/shared';
 import type { GemConfig } from './config.js';
-import { evaluateGem, type GemEvaluation } from './scoring.js';
+import { evaluateGem, type EligibilityFailure, type GemEvaluation } from './scoring.js';
+import { isComparableReject, sampleRejects } from './baseline.js';
 import type { CandidateDiscoverySource, ChainId, GemPair, PairDataSource, SafetyReport, SafetySource } from './types.js';
 
 export interface ScanResult {
@@ -13,6 +14,20 @@ export interface ScanResult {
   eligible: ScoredGem[];
   /** Candidates that failed the gate, kept so the UI can honestly say "we looked at N and N-k didn't qualify". */
   rejectedCount: number;
+  /**
+   * A bounded sample of rejects worth pricing later as a control group.
+   * See baseline.ts for why only some rejections qualify.
+   */
+  baselineSample: RejectedCandidate[];
+}
+
+/** One control-group member: a token that was the wrong profile, not an unreadable or untradeable one. */
+export interface RejectedCandidate {
+  chainId: ChainId;
+  tokenAddress: string;
+  priceUsd: number;
+  liquidityUsd: number | null;
+  failures: EligibilityFailure[];
 }
 
 export interface ScoredGem {
@@ -28,6 +43,14 @@ export interface ScannerDeps {
   safetySource: SafetySource | null;
   config: GemConfig;
   logger: Logger;
+  /**
+   * How many rejected candidates to keep per scan as a control. Bounded so
+   * the baseline costs a fixed number of rows and price lookups however
+   * many candidates were rejected. 0 switches the control off.
+   */
+  baselineSampleSize?: number;
+  /** Injected so a test can make the sampling deterministic. */
+  random?: () => number;
 }
 
 /**
@@ -61,7 +84,7 @@ export async function runScan(deps: ScannerDeps, chainId: ChainId, now = Date.no
   logger.info({ chainId, candidateCount: tokenAddresses.length, candidatesBySource }, 'gem scan: candidates discovered');
 
   if (tokenAddresses.length === 0) {
-    return { chainId, scannedAt: now, candidatesBySource, candidateCount: 0, pairCount: 0, eligible: [], rejectedCount: 0 };
+    return { chainId, scannedAt: now, candidatesBySource, candidateCount: 0, pairCount: 0, eligible: [], rejectedCount: 0, baselineSample: [] };
   }
 
   const pairs = await deps.pairSource.fetchPairsForTokens(chainId, tokenAddresses);
@@ -78,7 +101,20 @@ export async function runScan(deps: ScannerDeps, chainId: ChainId, now = Date.no
   }
 
   const scored: ScoredGem[] = [];
+  const comparableRejects: RejectedCandidate[] = [];
   let rejectedCount = 0;
+
+  const noteReject = (pair: GemPair, failures: EligibilityFailure[]): void => {
+    rejectedCount += 1;
+    if (!isComparableReject(failures, pair.priceUsd)) return;
+    comparableRejects.push({
+      chainId,
+      tokenAddress: pair.baseToken.address,
+      priceUsd: pair.priceUsd as number,
+      liquidityUsd: pair.liquidityUsd,
+      failures,
+    });
+  };
 
   for (const pair of bestPairByToken.values()) {
     // Cheap market gate first, with no safety data — if it fails here it
@@ -93,7 +129,7 @@ export async function runScan(deps: ScannerDeps, chainId: ChainId, now = Date.no
     });
 
     if (!preCheck.eligible) {
-      rejectedCount += 1;
+      noteReject(pair, preCheck.failures);
       continue;
     }
 
@@ -112,13 +148,17 @@ export async function runScan(deps: ScannerDeps, chainId: ChainId, now = Date.no
     });
 
     if (evaluation.eligible) scored.push({ pair, evaluation, safety });
+    // Rejected only after a safety screen ran: not a profile rejection, so
+    // it is counted but never used as a control (see baseline.ts).
     else rejectedCount += 1;
   }
 
   scored.sort((a, b) => (b.evaluation.score ?? 0) - (a.evaluation.score ?? 0));
 
+  const baselineSample = sampleRejects(comparableRejects, deps.baselineSampleSize ?? 0, deps.random);
+
   logger.info(
-    { chainId, pairCount: bestPairByToken.size, eligible: scored.length, rejectedCount },
+    { chainId, pairCount: bestPairByToken.size, eligible: scored.length, rejectedCount, baselineSample: baselineSample.length },
     'gem scan: scoring complete',
   );
 
@@ -130,5 +170,6 @@ export async function runScan(deps: ScannerDeps, chainId: ChainId, now = Date.no
     pairCount: bestPairByToken.size,
     eligible: scored,
     rejectedCount,
+    baselineSample,
   };
 }

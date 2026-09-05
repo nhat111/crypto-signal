@@ -211,8 +211,14 @@ describe.skipIf(!hasTestDatabase)('gem score edge against real Postgres', () => 
     // The shape the first production reading actually had: 25 scans low,
     // 21 middle, 9 high. Insisting on the top band threw away a gap that
     // was sitting between the two bands with data.
+    //
+    // The gap is deliberately wider than that reading's 4%-vs-33%, which
+    // sits right on the significance threshold under a five-way
+    // correction. This case is about which *pair of bands* gets compared;
+    // pinning it to a knife-edge verdict would make it fail for a reason
+    // it is not testing.
     for (let i = 0; i < 25; i += 1) await scan(20, i < 1 ? 20 : -20, undefined, { momentumStructure: 30 });
-    for (let i = 0; i < 21; i += 1) await scan(60, i < 7 ? 20 : -20, undefined, { momentumStructure: 60 });
+    for (let i = 0; i < 21; i += 1) await scan(60, i < 13 ? 20 : -20, undefined, { momentumStructure: 60 });
     for (let i = 0; i < 9; i += 1) await scan(80, 20, undefined, { momentumStructure: 90 });
 
     const momentum = (await getGemComponentEdges(pool, '24h')).find((e) => e.key === 'momentumStructure');

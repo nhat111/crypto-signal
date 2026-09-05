@@ -362,6 +362,22 @@ export interface GemPerformance {
   /** Optional because an API predating it sends nothing — absent is not the same as "no edge". */
   scoreEdge?: GemScoreEdge;
   componentEdges?: GemComponentEdge[];
+  /** What tokens the scanner REJECTED did over the same window. Optional for the same reason. */
+  baseline?: GemBaselineComparison;
+}
+
+export interface GemBaselineComparison {
+  horizon: GemHorizon;
+  sampleCount: number;
+  positiveMovePct: number | null;
+  netPositiveMovePct: number | null;
+  medianMovePct: number | null;
+  sufficientData: boolean;
+  failureCounts?: Record<string, number>;
+  deltaPp: number;
+  marginPp: number | null;
+  verdict: 'beats' | 'worse' | 'indistinguishable';
+  medianDeltaPp: number | null;
 }
 
 export interface GemScoreBand {

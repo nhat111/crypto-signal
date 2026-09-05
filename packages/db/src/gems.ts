@@ -352,6 +352,26 @@ export interface GemPerformance {
   /** Share of surfaced tokens whose liquidity fell below 20% of what it was at scan time — the rug-ish outcome. 7d only. */
   liquidityCollapsePct: number | null;
   sufficientData: boolean;
+  /**
+   * The same figures for tokens the scanner REJECTED, plus the verdict on
+   * the gap. Undefined when no control has been priced yet.
+   *
+   * Without this the headline says "14,5% went up" and cannot say whether
+   * that is good, bad, or exactly what the whole small-cap market did that
+   * week. Optional so an API that predates the table serves nothing rather
+   * than a zero, and so a web build that predates the field is unaffected.
+   */
+  baseline?: GemBaselineComparison;
+}
+
+export interface GemBaselineComparison extends GemBaselinePerformance {
+  /** Scanner net hit rate minus baseline net hit rate, in percentage points. */
+  deltaPp: number;
+  /** How large the gap must be before it is not noise. Null when it cannot be computed. */
+  marginPp: number | null;
+  verdict: EdgeVerdict;
+  /** Median move of the scanner's picks minus the control's, in percentage points. */
+  medianDeltaPp: number | null;
 }
 
 const MIN_GEM_SAMPLES = 20;
@@ -411,14 +431,211 @@ export async function getGemPerformance(
     }
   }
 
+  // Net of the round-trip cost, because that is what the control is
+  // measured on too — comparing a gross hit rate against a net one would
+  // manufacture an edge out of arithmetic.
+  const netPositive = moves.filter((m) => m > GEM_ROUND_TRIP_COST_PCT).length;
+  const netPositivePct = Math.round((netPositive / sampleCount) * 1000) / 10;
+  const medianPct = Math.round(median * 100) / 100;
+
   return {
     horizon,
     sampleCount,
     positiveMovePct: Math.round((positive / sampleCount) * 1000) / 10,
     negativeMovePct: Math.round((negative / sampleCount) * 1000) / 10,
-    medianMovePct: Math.round(median * 100) / 100,
+    medianMovePct: medianPct,
     liquidityCollapsePct,
     sufficientData: sampleCount >= MIN_GEM_SAMPLES,
+    baseline: buildBaselineComparison(await getGemBaseline(pool, horizon), netPositivePct, sampleCount, medianPct),
+  };
+}
+
+/**
+ * The scanner's numbers next to the control's, and whether the gap is real.
+ *
+ * Returns undefined rather than a zeroed block when there is no control
+ * yet: "no baseline recorded" and "the baseline was 0%" are different
+ * facts, and only one of them is true on a fresh deploy.
+ */
+function buildBaselineComparison(
+  baseline: GemBaselinePerformance,
+  netPositivePct: number,
+  sampleCount: number,
+  medianPct: number,
+): GemBaselineComparison | undefined {
+  if (baseline.sampleCount === 0) return undefined;
+
+  const compared = compareToBaseline(
+    netPositivePct,
+    sampleCount,
+    baseline.netPositiveMovePct ?? 0,
+    baseline.sampleCount,
+  );
+
+  return {
+    ...baseline,
+    deltaPp: Math.round(compared.deltaPp * 10) / 10,
+    marginPp: compared.marginPp === null ? null : Math.round(compared.marginPp * 10) / 10,
+    verdict: compared.verdict,
+    // Reported separately from the hit-rate verdict and deliberately given
+    // no significance test: a median difference is not a proportion, and
+    // running the two-proportion machinery over it would be a number that
+    // looks rigorous and is not.
+    medianDeltaPp:
+      baseline.medianMovePct === null ? null : Math.round((medianPct - baseline.medianMovePct) * 100) / 100,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* The control group                                                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * One rejected candidate, kept and priced so the scanner's own numbers
+ * have something to be measured against.
+ *
+ * Everything on /gems until now compared the scanner to itself: the band
+ * comparison asks whether a high score beat a low score among tokens that
+ * all passed the same gate. That cannot answer "was passing the gate worth
+ * anything", and a hit rate with no control is exactly what this codebase
+ * refuses to publish everywhere else.
+ */
+export interface GemBaselineCandidate {
+  chainId: string;
+  tokenAddress: string;
+  observedAt: number;
+  priceUsd: number;
+  liquidityUsd: number | null;
+  failures: string[];
+}
+
+export async function insertGemBaselineCandidates(
+  pool: Pool,
+  candidates: GemBaselineCandidate[],
+): Promise<number> {
+  let inserted = 0;
+  for (const c of candidates) {
+    // ON CONFLICT DO NOTHING: the same token can be rejected by two scans
+    // in the same millisecond only through a retry, and a duplicate control
+    // row would double-count one token in the baseline.
+    const { rowCount } = await pool.query(
+      `INSERT INTO gem_baseline_candidates
+         (chain_id, token_address, observed_at, failures, price_usd, liquidity_usd)
+       VALUES ($1, $2, to_timestamp($3/1000.0), $4::jsonb, $5, $6)
+       ON CONFLICT (chain_id, token_address, observed_at) DO NOTHING`,
+      [c.chainId, c.tokenAddress, c.observedAt, JSON.stringify(c.failures), c.priceUsd, c.liquidityUsd],
+    );
+    inserted += rowCount ?? 0;
+  }
+  return inserted;
+}
+
+export interface PendingGemBaseline {
+  candidateId: string;
+  chainId: string;
+  tokenAddress: string;
+  priceAtObservation: number;
+}
+
+export async function getBaselinePendingOutcome(
+  pool: Pool,
+  horizon: GemHorizon,
+  nowMs: number,
+  limit = 200,
+): Promise<PendingGemBaseline[]> {
+  const { rows } = await pool.query(
+    `SELECT candidate_id, chain_id, token_address, price_usd
+     FROM gem_baseline_candidates
+     WHERE ${HORIZON_PRICE_COLUMN[horizon]} IS NULL
+       AND observed_at <= to_timestamp($1/1000.0)
+     ORDER BY observed_at ASC
+     LIMIT $2`,
+    [nowMs - HORIZON_MS[horizon], limit],
+  );
+  return rows.map((r) => ({
+    candidateId: r.candidate_id,
+    chainId: r.chain_id,
+    tokenAddress: r.token_address,
+    priceAtObservation: Number(r.price_usd),
+  }));
+}
+
+export async function recordGemBaselineOutcome(
+  pool: Pool,
+  candidateId: string,
+  horizon: GemHorizon,
+  price: number,
+  priceAtObservation: number,
+  liquidityUsd: number | null,
+): Promise<void> {
+  const movePct = priceAtObservation > 0 ? ((price - priceAtObservation) / priceAtObservation) * 100 : 0;
+  const liquidityAssignment = horizon === '7d' ? ', liquidity_after_7d_usd = $4' : '';
+  const params: unknown[] = [price, movePct, candidateId];
+  if (horizon === '7d') params.push(liquidityUsd);
+
+  await pool.query(
+    `UPDATE gem_baseline_candidates
+     SET ${HORIZON_PRICE_COLUMN[horizon]} = $1, ${HORIZON_MOVE_COLUMN[horizon]} = $2, updated_at = now()${liquidityAssignment}
+     WHERE candidate_id = $3`,
+    params,
+  );
+}
+
+/** What the control group did, in the same shape the scanner's own figures are reported in. */
+export interface GemBaselinePerformance {
+  horizon: GemHorizon;
+  sampleCount: number;
+  positiveMovePct: number | null;
+  netPositiveMovePct: number | null;
+  medianMovePct: number | null;
+  sufficientData: boolean;
+  /** How the rejects break down, so a control dominated by one reason is visible rather than implied. */
+  failureCounts: Record<string, number>;
+}
+
+export async function getGemBaseline(pool: Pool, horizon: GemHorizon): Promise<GemBaselinePerformance> {
+  const moveCol = HORIZON_MOVE_COLUMN[horizon];
+  const { rows } = await pool.query(
+    `SELECT ${moveCol} AS move, failures
+     FROM gem_baseline_candidates
+     WHERE ${moveCol} IS NOT NULL`,
+  );
+
+  const failureCounts: Record<string, number> = {};
+  for (const row of rows) {
+    for (const f of (row.failures ?? []) as string[]) {
+      failureCounts[f] = (failureCounts[f] ?? 0) + 1;
+    }
+  }
+
+  const moves = rows.map((r) => Number(r.move)).sort((a, b) => a - b);
+  const sampleCount = moves.length;
+  if (sampleCount === 0) {
+    return {
+      horizon,
+      sampleCount: 0,
+      positiveMovePct: null,
+      netPositiveMovePct: null,
+      medianMovePct: null,
+      sufficientData: false,
+      failureCounts,
+    };
+  }
+
+  const mid = Math.floor(sampleCount / 2);
+  const median = sampleCount % 2 === 0 ? ((moves[mid - 1] as number) + (moves[mid] as number)) / 2 : (moves[mid] as number);
+
+  return {
+    horizon,
+    sampleCount,
+    positiveMovePct: Math.round((moves.filter((m) => m > 0).length / sampleCount) * 1000) / 10,
+    // The same cost floor the scanner's own figure carries, or the two
+    // would not be comparable — which is the entire point of having it.
+    netPositiveMovePct:
+      Math.round((moves.filter((m) => m > GEM_ROUND_TRIP_COST_PCT).length / sampleCount) * 1000) / 10,
+    medianMovePct: Math.round(median * 100) / 100,
+    sufficientData: sampleCount >= MIN_GEM_SAMPLES,
+    failureCounts,
   };
 }
 
