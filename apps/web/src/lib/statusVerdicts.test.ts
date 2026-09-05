@@ -4,6 +4,7 @@ import {
   INGEST_TEXT,
   classifySymbol,
   collectorSummary,
+  describeAlertTimeframes,
   connectionVerdict,
   diagnoseFromCensus,
   diagnoseIngest,
@@ -404,5 +405,53 @@ describe('a restarted worker is not a broken one', () => {
 
   it('has wording for the warming state', () => {
     expect(INGEST_TEXT['warming-up'].length).toBeGreaterThan(10);
+  });
+});
+
+describe('describeAlertTimeframes', () => {
+  const all = ['5m', '15m', '1h', '4h'];
+
+  it('says nothing when the worker has not reported it', () => {
+    // A worker or API predating the field. Rendering "no frames" would be
+    // an invented observation, and this page must never do that.
+    expect(describeAlertTimeframes(null)).toBeNull();
+    expect(describeAlertTimeframes(undefined)).toBeNull();
+    expect(describeAlertTimeframes({ armed: [], collected: all, ignored: [] })).toBeNull();
+  });
+
+  it('names the frames when the filter is doing something', () => {
+    const shown = describeAlertTimeframes({ armed: ['1h', '4h'], collected: all, ignored: [] });
+    expect(shown?.value).toBe('1h, 4h');
+    expect(shown?.tone).toBe('ok');
+    expect(shown?.note).toBeNull();
+  });
+
+  it('says so when nothing is being filtered', () => {
+    // The question that prompted this: has ALERT_TIMEFRAMES taken effect?
+    const shown = describeAlertTimeframes({ armed: all, collected: all, ignored: [] });
+    expect(shown?.tone).toBe('idle');
+    expect(shown?.note).toContain('không lọc gì');
+  });
+
+  it('does not claim the variable is unset when it cannot know', () => {
+    // Setting it to every collected frame lands in the same state as not
+    // setting it at all, and guessing which happened would be a claim the
+    // data does not support.
+    const shown = describeAlertTimeframes({ armed: all, collected: all, ignored: [] });
+    expect(shown?.note).not.toContain('chưa đặt');
+  });
+
+  it('surfaces a name that is not collected', () => {
+    // A typo is dropped rather than obeyed, so the symptom is fewer alerts
+    // than expected — indistinguishable from a quiet market unless it says so.
+    const shown = describeAlertTimeframes({ armed: ['4h'], collected: all, ignored: ['1d'] });
+    expect(shown?.tone).toBe('warn');
+    expect(shown?.note).toContain('1d');
+  });
+
+  it('reports the typo even while the rest of the list works', () => {
+    const shown = describeAlertTimeframes({ armed: ['1h', '4h'], collected: all, ignored: ['1w'] });
+    expect(shown?.value).toBe('1h, 4h');
+    expect(shown?.tone).toBe('warn');
   });
 });

@@ -529,6 +529,16 @@ export interface StatusWorkerRuntime {
    * because an API predating the field sends nothing.
    */
   alertChatCount?: number;
+  /**
+   * Which frames may push an alert, what is collected, and any configured
+   * name that is not. Optional because a worker or API predating the field
+   * sends nothing — which is not the same as "no frames are armed".
+   */
+  alertTimeframes?: {
+    armed: string[];
+    collected: string[];
+    ignored: string[];
+  } | null;
 }
 
 export interface StatusJob {

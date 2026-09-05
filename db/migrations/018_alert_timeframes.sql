@@ -1,0 +1,16 @@
+-- Which timeframes are allowed to push a Telegram alert, published so
+-- /status can answer it.
+--
+-- The page already says whether alerting is armed and to how many chats,
+-- but not which frames may fire — so "did ALERT_TIMEFRAMES actually take
+-- effect?" could only be answered by digging through Railway's deploy log,
+-- which is exactly what this page exists to avoid.
+--
+-- One JSONB rather than three columns: armed, collected and ignored are
+-- one observation about one boot, and they are only ever read together.
+-- `ignored` carries the names that are not collected at all, so a typo is
+-- visible on the page instead of only in the boot log.
+--
+-- Nullable: a row written by a worker predating this says nothing, which
+-- is different from "no frames are armed".
+ALTER TABLE worker_runtime ADD COLUMN alert_timeframes JSONB;

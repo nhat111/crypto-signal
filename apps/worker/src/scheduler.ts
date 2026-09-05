@@ -189,7 +189,13 @@ export function startSchedulers(ctx: WorkerContext): () => void {
       spot: ctx.connectionStatus.spot,
       futures: ctx.connectionStatus.futures,
       liquidation: ctx.connectionStatus.liquidation,
-    }, ctx.symbolIngest, ctx.config.telegramAlertChatIds.length).catch((err) => ctx.logger.error({ err }, 'worker heartbeat failed'));
+    }, ctx.symbolIngest, ctx.config.telegramAlertChatIds.length, {
+      // Published so /status can answer "did ALERT_TIMEFRAMES take
+      // effect?" without anyone opening a deploy log.
+      armed: ctx.config.alert.timeframes,
+      collected: ctx.config.timeframes,
+      ignored: ctx.config.alert.ignoredTimeframes,
+    }).catch((err) => ctx.logger.error({ err }, 'worker heartbeat failed'));
   };
   timers.push(setInterval(beat, HEARTBEAT_INTERVAL_MS));
   beat();

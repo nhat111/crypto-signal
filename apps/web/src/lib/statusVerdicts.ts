@@ -327,3 +327,49 @@ export function collectorSummary(
   }
   return { verdict: 'ok', headline: `${total} symbol đều tươi` };
 }
+
+/* ------------------------------------------------------------------ */
+/* Which frames may actually wake you                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * "Cảnh báo Telegram: đang bật · 1 kênh" says alerting is armed and to
+ * whom. It does not say *which timeframes* may fire, so the obvious next
+ * question — did setting ALERT_TIMEFRAMES take effect? — could only be
+ * answered by digging through a deploy log, which is the thing this page
+ * exists to avoid.
+ *
+ * Null when the worker or API predates the field: silence is honest there,
+ * and rendering "no frames" would be an invented observation.
+ */
+export function describeAlertTimeframes(
+  report: { armed: string[]; collected: string[]; ignored: string[] } | null | undefined,
+): { tone: Verdict; value: string; note: string | null } | null {
+  if (!report || report.armed.length === 0) return null;
+
+  const value = report.armed.join(', ');
+
+  if (report.ignored.length > 0) {
+    // A name that is not collected is dropped rather than obeyed, so the
+    // symptom is fewer alerts than expected — which reads as a quiet
+    // market. It has to be visible.
+    return {
+      tone: 'warn',
+      value,
+      note: `Bỏ qua tên không có trong TIMEFRAMES: ${report.ignored.join(', ')}. Kiểm lại ALERT_TIMEFRAMES.`,
+    };
+  }
+
+  if (report.armed.length === report.collected.length) {
+    // Deliberately not phrased as "chưa đặt": setting the variable to
+    // every collected frame lands here too, and claiming it is unset would
+    // be a guess about which of the two happened.
+    return {
+      tone: 'idle',
+      value,
+      note: 'Mọi khung đều được bắn — ALERT_TIMEFRAMES hiện không lọc gì. Mua spot thì đặt 1h,4h trên service worker.',
+    };
+  }
+
+  return { tone: 'ok', value, note: null };
+}

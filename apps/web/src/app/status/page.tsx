@@ -14,6 +14,7 @@ import type {
 import { ago, Row, StatusCard } from '@/components/status/StatusBlocks';
 import {
   classifySymbol,
+  describeAlertTimeframes,
   collectorSummary,
   isHorizonStuck,
   isJobBroken,
@@ -141,12 +142,24 @@ function AlertArming({ worker }: { worker: StatusWorkerRuntime | null }) {
     );
   }
 
+  const frames = describeAlertTimeframes(worker.alertTimeframes);
+
   return (
-    <Row
-      label="Cảnh báo Telegram"
-      value={`đang bật · ${worker.alertChatCount} kênh`}
-      tone="ok"
-    />
+    <>
+      <Row
+        label="Cảnh báo Telegram"
+        value={`đang bật · ${worker.alertChatCount} kênh`}
+        tone="ok"
+      />
+      {frames && (
+        <>
+          <Row label="Khung được bắn" value={frames.value} tone={frames.tone} />
+          {frames.note && (
+            <p className="-mt-0.5 pb-1.5 text-right text-[11px] leading-relaxed text-slate-500">{frames.note}</p>
+          )}
+        </>
+      )}
+    </>
   );
 }
 

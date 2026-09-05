@@ -65,4 +65,49 @@ describe.skipIf(!hasTestDatabase)('worker heartbeat against real Postgres', () =
     await recordWorkerHeartbeat(pool, RUNTIME_WORKER, { spot: 'open', futures: 'open', liquidation: 'open' }, {});
     expect((await getWorkerRuntime(pool))?.alertChatCount).toBe(0);
   });
+
+  it('publishes which timeframes may push an alert', async () => {
+    // The reason this column exists: /status could say alerting was armed
+    // and to how many chats, but not which frames may fire — so "did
+    // ALERT_TIMEFRAMES take effect?" needed a deploy log to answer.
+    await recordWorkerHeartbeat(
+      pool,
+      RUNTIME_WORKER,
+      { spot: 'open', futures: 'open', liquidation: 'open' },
+      {},
+      1,
+      { armed: ['1h', '4h'], collected: ['5m', '15m', '1h', '4h'], ignored: ['1d'] },
+    );
+    const row = await getWorkerRuntime(pool);
+    expect(row?.alertTimeframes).toEqual({
+      armed: ['1h', '4h'],
+      collected: ['5m', '15m', '1h', '4h'],
+      ignored: ['1d'],
+    });
+  });
+
+  it('reports null rather than an empty report when the worker sends none', async () => {
+    // A worker predating the field says nothing, which is different from
+    // "no frames are armed" — and the page keys off exactly that
+    // difference to decide whether to render the row at all.
+    await recordWorkerHeartbeat(pool, RUNTIME_WORKER, { spot: 'open', futures: 'open', liquidation: 'open' });
+    expect((await getWorkerRuntime(pool))?.alertTimeframes).toBeNull();
+  });
+
+  it('replaces the report rather than merging into the old one', async () => {
+    // Narrowing the list must actually narrow it on the page; a merge
+    // would leave a frame showing as armed after it was removed.
+    const beat = (armed: string[]) =>
+      recordWorkerHeartbeat(
+        pool,
+        RUNTIME_WORKER,
+        { spot: 'open', futures: 'open', liquidation: 'open' },
+        {},
+        1,
+        { armed, collected: ['5m', '15m', '1h', '4h'], ignored: [] },
+      );
+    await beat(['5m', '15m', '1h', '4h']);
+    await beat(['4h']);
+    expect((await getWorkerRuntime(pool))?.alertTimeframes?.armed).toEqual(['4h']);
+  });
 });

@@ -40,6 +40,22 @@ export interface WorkerRuntime {
    * indistinguishable from outside, and only one of them is good news.
    */
   alertChatCount: number;
+  /**
+   * Which timeframes may push an alert, what the collector actually reads,
+   * and any name in ALERT_TIMEFRAMES that is not collected.
+   *
+   * Null from a worker that predates the field — which is not the same as
+   * "no frames are armed", and the page must not read it as that.
+   */
+  alertTimeframes: AlertTimeframeReport | null;
+}
+
+export interface AlertTimeframeReport {
+  /** Frames allowed to push. Equal to `collected` when ALERT_TIMEFRAMES is unset. */
+  armed: string[];
+  collected: string[];
+  /** Names configured but not collected — a typo, reported rather than obeyed. */
+  ignored: string[];
 }
 
 export const RUNTIME_WORKER = 'worker';
@@ -66,10 +82,11 @@ export async function recordWorkerHeartbeat(
   connections: { spot: string; futures: string; liquidation: string },
   symbolIngest: Record<string, number> = {},
   alertChatCount = 0,
+  alertTimeframes: AlertTimeframeReport | null = null,
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO worker_runtime (service, last_heartbeat_at, spot_ws, futures_ws, liquidation_ws, symbol_ingest, alert_chat_count, updated_at)
-     VALUES ($1, now(), $2, $3, $4, $5::jsonb, $6, now())
+    `INSERT INTO worker_runtime (service, last_heartbeat_at, spot_ws, futures_ws, liquidation_ws, symbol_ingest, alert_chat_count, alert_timeframes, updated_at)
+     VALUES ($1, now(), $2, $3, $4, $5::jsonb, $6, $7::jsonb, now())
      ON CONFLICT (service) DO UPDATE SET
        last_heartbeat_at = now(),
        spot_ws = EXCLUDED.spot_ws,
@@ -77,8 +94,17 @@ export async function recordWorkerHeartbeat(
        liquidation_ws = EXCLUDED.liquidation_ws,
        symbol_ingest = EXCLUDED.symbol_ingest,
        alert_chat_count = EXCLUDED.alert_chat_count,
+       alert_timeframes = EXCLUDED.alert_timeframes,
        updated_at = now()`,
-    [service, connections.spot, connections.futures, connections.liquidation, JSON.stringify(symbolIngest), alertChatCount],
+    [
+      service,
+      connections.spot,
+      connections.futures,
+      connections.liquidation,
+      JSON.stringify(symbolIngest),
+      alertChatCount,
+      alertTimeframes === null ? null : JSON.stringify(alertTimeframes),
+    ],
   );
 }
 
@@ -90,7 +116,7 @@ export async function getWorkerRuntime(
 ): Promise<WorkerRuntime | null> {
   const { rows } = await pool.query(
     `SELECT service, extract(epoch from last_heartbeat_at)*1000 AS beat_ms,
-            spot_ws, futures_ws, liquidation_ws, symbol_ingest, alert_chat_count
+            spot_ws, futures_ws, liquidation_ws, symbol_ingest, alert_chat_count, alert_timeframes
      FROM worker_runtime WHERE service = $1`,
     [service],
   );
@@ -109,5 +135,6 @@ export async function getWorkerRuntime(
     },
     symbolIngest: (row.symbol_ingest ?? {}) as Record<string, number>,
     alertChatCount: Number(row.alert_chat_count ?? 0),
+    alertTimeframes: (row.alert_timeframes ?? null) as AlertTimeframeReport | null,
   };
 }

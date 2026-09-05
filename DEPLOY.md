@@ -153,6 +153,17 @@ is armed:
 signal alerts armed for timeframes  alertTimeframes=["1h","4h"] collected=["5m","15m","1h","4h"]
 ```
 
+`/status` says the same thing without a log, under **Kết nối Binance**:
+
+- `Khung được bắn: 1h, 4h` — the variable took effect.
+- `Khung được bắn: 5m, 15m, 1h, 4h` plus a grey note that nothing is being
+  filtered — either unset, or set to everything; the page does not guess
+  which.
+- An amber note naming a frame that is not in `TIMEFRAMES` — a typo, which
+  is dropped rather than obeyed and would otherwise look like a quiet
+  market.
+- No row at all — the worker predates the field and has not redeployed.
+
 ### 4. Telegram bot (optional)
 
 1. **New → GitHub Repo** → same repo, third service.
