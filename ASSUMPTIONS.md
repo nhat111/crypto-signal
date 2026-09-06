@@ -400,6 +400,38 @@ would otherwise render as an unexplained list: the arming could not be
 read (worker down, or too old to report it), and the worker is armed on
 nothing (ALERT_TIMEFRAMES naming frames the collector does not produce).
 
+### Analysing something the collector never tracked
+
+A lookup answers about a symbol nobody subscribed to and a token nobody
+scanned, so it cannot read the pipeline — no CVD, no open interest, no
+funding, no health score. What it can read is OHLCV for an exchange
+ticker, and a pool plus a contract for an address.
+
+Three things this constrains, all of them deliberate:
+
+- **The split is by shape, not by trying one then the other.** A ticker and
+  a contract address are different data, so guessing wrongly does not give
+  a worse answer, it gives the wrong KIND of answer. A truncated `0x`
+  paste is refused with a reason rather than searched for as a ticker and
+  blamed on the token.
+- **On-chain has no chart.** DexScreener's free API returns no candle
+  history, so `technical` is null for an address and says so. Deriving RSI
+  or a trend from the four percentage changes it does return would be
+  making up a series.
+- **Exchange has no fundamentals worth the name.** Circulating supply and
+  market cap need a data source this project has not wired; deriving a
+  market cap from a price is exactly the confident wrong number the rest
+  of this codebase refuses to print. The gaps are listed by name instead.
+
+Nothing a lookup produces is persisted. It is a question, not an
+observation the scanner made, and writing it anywhere would put unscreened
+tokens into the tables the performance numbers are computed from.
+
+The wording is held to description: "RSI is 72" is measurable, "RSI is 72
+so it will fall" is a claim with no recorded outcomes behind it. A test
+asserts the generated text never recommends an action, because a technical
+panel is exactly where that creeps in.
+
 ### Scoring
 
 Two independent 0-100 scores, mirroring Health vs Leverage Risk on the

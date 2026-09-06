@@ -621,3 +621,77 @@ export interface StatusResponse {
   gemChains?: StatusGemChain[];
   serverTime: number;
 }
+
+/* ---------- On-demand lookup ---------- */
+
+export interface LookupTechnical {
+  barCount: number;
+  lastPrice: number;
+  rsi14: number | null;
+  trend: { direction: 'up' | 'down' | 'sideways'; separationPct: number } | null;
+  atrPct: number | null;
+  support: number | null;
+  resistance: number | null;
+  rangePositionPct: number | null;
+  changePct: { last24Bars: number | null; last7Bars: number | null };
+  /** Readings the history was too short for, in words. A blank field and an uncomputable one look identical otherwise. */
+  missing: string[];
+}
+
+export interface LookupExchangeFundamentals {
+  symbol: string;
+  spotListed: boolean;
+  futuresListed: boolean;
+  quoteVolume24hUsd: number | null;
+  fundingRate: number | null;
+  openInterest: number | null;
+  unknowns: string[];
+}
+
+export interface LookupOnChainFundamentals {
+  chainId: string;
+  tokenAddress: string;
+  symbol: string;
+  name: string;
+  dexId: string;
+  priceUsd: number | null;
+  liquidityUsd: number | null;
+  fdvUsd: number | null;
+  marketCapUsd: number | null;
+  volume24hUsd: number | null;
+  ageDays: number | null;
+  liquidityToFdvPct: number | null;
+  volumeToLiquidity: number | null;
+  buys24h: number | null;
+  sells24h: number | null;
+  safetyVerdict: SafetyVerdict | null;
+  safetyFlags: string[];
+  topHolderPct: number | null;
+  lpLocked: boolean | null;
+  mintAuthorityRevoked: boolean | null;
+  freezeAuthorityRevoked: boolean | null;
+  unknowns: string[];
+}
+
+export type LookupResult =
+  | {
+      kind: 'exchange';
+      symbol: string;
+      timeframe: string;
+      technical: LookupTechnical;
+      fundamentals: LookupExchangeFundamentals;
+      triedSymbols: string[];
+    }
+  | {
+      kind: 'onchain';
+      fundamentals: LookupOnChainFundamentals;
+      /** Always null today: the free DEX API returns no candle history, so there is no chart to read. */
+      technical: null;
+      otherPools: Array<{ chainId: string; dexId: string; liquidityUsd: number | null }>;
+    };
+
+export interface LookupResponse {
+  query: string;
+  timeframe: string;
+  result: LookupResult;
+}

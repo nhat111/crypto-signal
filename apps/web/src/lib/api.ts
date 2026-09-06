@@ -9,6 +9,7 @@ import type {
   PerformanceResult,
   PerformanceSource,
   SignalType,
+  LookupResponse,
   SignalsResponse,
   StatusOutcomeDiagnostics,
   StatusResponse,
@@ -99,6 +100,31 @@ export function getSignals(filter: SignalsFilter = {}): Promise<SignalsResponse>
   if (filter.limit) params.set('limit', String(filter.limit));
   const qs = params.toString();
   return fetchJson<SignalsResponse>(`/api/signals${qs ? `?${qs}` : ''}`);
+}
+
+/**
+ * A lookup's failure reason IS most of its answer — "that address has no
+ * pool on any DEX we cover" and "responded with 404" send somebody to two
+ * very different places — so this reads the error body instead of letting
+ * fetchJson collapse it into a status code.
+ */
+export async function getLookup(q: string, timeframe?: string): Promise<LookupResponse> {
+  const qs = new URLSearchParams({ q });
+  if (timeframe) qs.set('timeframe', timeframe);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/api/lookup?${qs.toString()}`, { cache: 'no-store' });
+  } catch {
+    throw new ApiError(`Không gọi được API ở ${API_BASE_URL}.`);
+  }
+
+  const body = (await res.json().catch(() => null)) as { error?: string } | LookupResponse | null;
+  if (!res.ok) {
+    const reason = body && 'error' in body && typeof body.error === 'string' ? body.error : `API trả về ${res.status}`;
+    throw new ApiError(reason, res.status);
+  }
+  return body as LookupResponse;
 }
 
 export function getGems(params: { chain?: string; minScore?: number; limit?: number } = {}): Promise<GemsResponse> {

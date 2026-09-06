@@ -162,6 +162,49 @@ export interface StablecoinFlowDTO {
   change30d: StablecoinFlowWindowDTO | null;
 }
 
+export interface LookupDTO {
+  query: string;
+  timeframe: string;
+  result:
+    | {
+        kind: 'exchange';
+        symbol: string;
+        timeframe: string;
+        technical: {
+          barCount: number;
+          lastPrice: number;
+          rsi14: number | null;
+          trend: { direction: string; separationPct: number } | null;
+          atrPct: number | null;
+          support: number | null;
+          resistance: number | null;
+          rangePositionPct: number | null;
+          missing: string[];
+        };
+        fundamentals: { unknowns: string[] };
+      }
+    | {
+        kind: 'onchain';
+        fundamentals: {
+          symbol: string;
+          name: string;
+          chainId: string;
+          dexId: string;
+          priceUsd: number | null;
+          liquidityUsd: number | null;
+          fdvUsd: number | null;
+          volume24hUsd: number | null;
+          ageDays: number | null;
+          liquidityToFdvPct: number | null;
+          safetyVerdict: string | null;
+          safetyFlags: string[];
+          topHolderPct: number | null;
+          lpLocked: boolean | null;
+          unknowns: string[];
+        };
+      };
+}
+
 export class ApiClient {
   constructor(private readonly baseUrl: string) {}
 
@@ -227,6 +270,23 @@ export class ApiClient {
       // narrow the list.
       return null;
     }
+  }
+
+  /**
+   * Returns the API's own failure reason on a 404, because for a lookup
+   * that reason IS the answer — "no pool on any DEX we cover" and "404"
+   * send somebody to two different places.
+   */
+  async lookup(q: string, timeframe?: string): Promise<{ ok: true; data: LookupDTO } | { ok: false; reason: string }> {
+    const qs = new URLSearchParams({ q });
+    if (timeframe) qs.set('timeframe', timeframe);
+    const res = await fetch(`${this.baseUrl}/api/lookup?${qs.toString()}`);
+    const body = (await res.json().catch(() => null)) as { error?: string } | LookupDTO | null;
+    if (!res.ok) {
+      const reason = body && 'error' in body && typeof body.error === 'string' ? body.error : `API trả về ${res.status}`;
+      return { ok: false, reason };
+    }
+    return { ok: true, data: body as LookupDTO };
   }
 
   getGems(limit = 10): Promise<{ gems: GemRow[] }> {

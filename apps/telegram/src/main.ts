@@ -5,6 +5,7 @@ import {
   buildHelpText,
   escapeHtml,
   formatGemList,
+  formatLookup,
   formatFlow,
   formatHeatmap,
   formatJournal,
@@ -157,6 +158,31 @@ async function main(): Promise<void> {
     } catch (err) {
       logger.error({ err }, '/signals failed');
       await ctx.reply('Could not load recent signals right now — try again shortly.');
+    }
+  });
+
+  /**
+   * On-demand analysis of anything, not just what the collector tracks.
+   *
+   * Each call costs somebody else's API request, so there is no polling
+   * and no prefetch — it runs when a person asks.
+   */
+  bot.command('traccuu', async (ctx) => {
+    const q = ctx.message.text.split(/\s+/).slice(1).join(' ').trim();
+    if (q === '') {
+      await ctx.reply('Cách dùng: /traccuu BTC · /traccuu ETHUSDT · /traccuu <địa chỉ contract>');
+      return;
+    }
+    try {
+      const res = await api.lookup(q, config.telegramDefaultTimeframe);
+      if (!res.ok) {
+        await ctx.reply(res.reason);
+        return;
+      }
+      await ctx.reply(formatLookup(res.data), { parse_mode: 'HTML', link_preview_options: { is_disabled: true } });
+    } catch (err) {
+      logger.error({ err, q }, '/traccuu failed');
+      await ctx.reply('Không tra cứu được lúc này — thử lại sau.');
     }
   });
 
@@ -324,6 +350,7 @@ async function main(): Promise<void> {
       ...symbols.map((symbol) => ({ command: commandNameFor(symbol), description: `${symbol} detail` })),
       { command: 'signals', description: 'Tín hiệu gần đây (mặc định: khung bot bắn alert)' },
       { command: 'gems', description: 'Small-cap candidates' },
+      { command: 'traccuu', description: 'Phân tích một mã hoặc địa chỉ contract' },
       { command: 'watch', description: 'Track a position, get a sell alert' },
       { command: 'watches', description: 'List your active watches' },
       { command: 'unwatch', description: 'Stop tracking a position' },

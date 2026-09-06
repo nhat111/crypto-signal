@@ -10,6 +10,7 @@ const LINKS = [
   { href: '/', label: 'Overview' },
   { href: '/signals', label: 'Signals' },
   { href: '/gems', label: 'Gems' },
+  { href: '/tra-cuu', label: 'Tra cứu' },
   { href: '/journal', label: 'Journal' },
   { href: '/performance', label: 'Performance' },
   { href: '/guide', label: 'Guide' },
