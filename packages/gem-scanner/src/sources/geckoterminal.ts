@@ -106,6 +106,12 @@ const GECKO_NETWORK_BY_CHAIN: Record<string, string> = {
   // own network slug as "API-ID robinhood". Verified rather than assumed:
   // DexScreener and GeckoTerminal agree here, and they often do not.
   robinhood: 'robinhood',
+  // BNB Chain. GeckoTerminal serves it at geckoterminal.com/bsc/pools and
+  // DexScreener calls it 'bsc' too, so the slugs coincide here. Without
+  // this line bsc ran on the paid-promotion feeds alone and found two
+  // candidates on the largest DEX chain there is — the volume-ranked feed
+  // is the whole point of this source.
+  bsc: 'bsc',
 };
 
 export function toGeckoNetwork(chainId: ChainId): string | null {

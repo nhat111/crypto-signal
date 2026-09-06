@@ -376,8 +376,14 @@ cannot tell you before relying on it.
 On the **`worker`** service only, add:
 
 - `GEM_SCAN_ENABLED=true`
-- `GEM_CHAINS=solana` (Solana is the only chain with a safety screen wired
-  up; others would be surfaced unverified)
+- `GEM_CHAINS=solana` — comma-separated DexScreener chain slugs. `solana`
+  (RugCheck) and the EVM chains GoPlus covers (`bsc`, `ethereum`, `base`,
+  `polygon`, `arbitrum`, `avalanche`, `optimism`) have a safety screen;
+  anything else is surfaced with a "no screen" badge and no gate. Both
+  discovery feeds cover `solana`, `robinhood` and `bsc`; other chains run
+  on DexScreener's paid-promotion feeds alone, which is a much narrower
+  slice of the chain than it looks — `/status` names which source is
+  missing.
 - optionally `RUGCHECK_API_KEY` — without it, screening is attempted
   unauthenticated and degrades to "unverified", never to "safe"
 

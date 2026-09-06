@@ -234,6 +234,16 @@ claim to have found "the best" small cap, only the best among what it
 looked at. Scan results record how many candidates each feed produced so
 that coverage stays visible rather than implied.
 
+How lopsided that first bias is only became measurable once `/status`
+reported candidates per source per chain. On one pass, `bsc` — the largest
+DEX chain in the set — produced **2** candidates while a chain launched
+weeks earlier produced 52. Nothing was broken: `bsc` had no GeckoTerminal
+mapping, so it ran on the paid feeds alone, and those feeds happened to
+carry two BNB Chain tokens that day. A chain missing its volume-ranked
+feed does not look under-covered; it looks like a quiet chain. Which is
+why "chỉ 1/2 nguồn phủ chain này" is an amber state on the status page
+rather than a log line.
+
 ### Scoring
 
 Two independent 0-100 scores, mirroring Health vs Leverage Risk on the

@@ -57,7 +57,7 @@ describe.skipIf(!hasTestDatabase)('gem list against real Postgres', () => {
     const top = await getLatestGems(pool, { limit: 3 });
 
     expect(top).toHaveLength(3);
-    expect(top[0].tokenAddress).toBe('SoLbest');
+    expect(top[0]?.tokenAddress).toBe('SoLbest');
     expect(top.map((g) => g.gemScore)).toEqual([95, 44, 43]);
   });
 
@@ -80,7 +80,7 @@ describe.skipIf(!hasTestDatabase)('gem list against real Postgres', () => {
     const gems = await getLatestGems(pool, {});
 
     expect(gems).toHaveLength(1);
-    expect(gems[0].gemScore).toBe(70);
+    expect(gems[0]?.gemScore).toBe(70);
   });
 
   it('applies the limit after the score filter, not before it', async () => {

@@ -11,14 +11,15 @@ describe('toGeckoNetwork', () => {
     // prints its network slug as "API-ID".
     expect(toGeckoNetwork('solana')).toBe('solana');
     expect(toGeckoNetwork('robinhood')).toBe('robinhood');
+    expect(toGeckoNetwork('bsc')).toBe('bsc');
   });
 
   it('returns null for a chain nobody has confirmed', () => {
     // Null makes the source skip itself and report 'unsupported', which is
     // what puts "chỉ 1/2 nguồn phủ chain này" on /status. Guessing a slug
     // instead would send real requests that 404 and look like an outage.
-    expect(toGeckoNetwork('bsc')).toBeNull();
     expect(toGeckoNetwork('hyperevm')).toBeNull();
+    expect(toGeckoNetwork('base')).toBeNull();
     expect(toGeckoNetwork('')).toBeNull();
   });
 
@@ -28,7 +29,8 @@ describe('toGeckoNetwork', () => {
     const source = new GeckoTerminalSource({ logger });
     expect(source.supportsChain('robinhood')).toBe(true);
     expect(source.supportsChain('solana')).toBe(true);
-    expect(source.supportsChain('bsc')).toBe(false);
+    expect(source.supportsChain('bsc')).toBe(true);
+    expect(source.supportsChain('hyperevm')).toBe(false);
   });
 });
 
