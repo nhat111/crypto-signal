@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { deleteTrade, getTradeSummary, getTrades, insertTrade, updateTrade, type TradeSide, type TradeStatus } from '@crypto-signal/db';
+import { deleteTrade, getTradeSummary, getTrades, insertTrade, isTradeSide, updateTrade, type TradeSide, type TradeStatus } from '@crypto-signal/db';
 import type { ApiDeps } from '../deps.js';
 
 interface CreateTradeBody {
@@ -38,12 +38,14 @@ export function registerJournalRoutes(app: FastifyInstance, deps: ApiDeps): void
     if (!chatId || !symbol || !side || entryPrice === undefined) {
       return reply.code(400).send({ error: 'chatId, symbol, side, and entryPrice are required' });
     }
-    if (side !== 'long' && side !== 'short') {
-      return reply.code(400).send({ error: 'side must be "long" or "short"' });
+    if (!isTradeSide(side)) {
+      return reply.code(400).send({ error: 'side must be "spot", "long" or "short"' });
     }
     const trade = await insertTrade(deps.pool, {
       chatId,
-      symbol: symbol.toUpperCase(),
+      // Casing is decided in one place (normalizeTradeSymbol), because a
+      // contract address must survive it unchanged and a ticker must not.
+      symbol,
       side,
       entryPrice,
       size: req.body.size ?? null,

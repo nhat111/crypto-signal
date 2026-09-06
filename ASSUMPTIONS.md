@@ -284,6 +284,28 @@ the filter working; a memecoin's name in that list is the bug.
 Known gap, accepted: a fund named `<something> Trust` with no recognised
 issuer word still gets through. Under-catching is the cheap direction.
 
+### Upper-casing a symbol destroyed the address it was meant to store
+
+The journal form did `symbol.trim().toUpperCase()`, which is right for
+`btcusdt` and wrong for everything the gem scanner surfaces. A Solana
+address is base58 and case-sensitive: `bdm98av7…` upper-cased is not that
+token, and is very likely no token at all. The row then names something
+that was never bought, and pasting it into an explorer fails.
+
+Nothing crashed, which is why it survived: the entry looked like a logged
+trade, in a table whose whole job is being a faithful record.
+
+`normalizeTradeSymbol` now splits by SHAPE rather than by chain — a ticker
+is short and alphanumeric (≤12), an address is not — and it runs
+server-side so the web form, the bot and the API cannot disagree. Lookups
+go through it too, or `/close btcusdt` would miss the row `/trade BTCUSDT`
+wrote.
+
+The same class of damage sat one column over: `formatUsd(price, false)`
+rounds to cents, so a gem bought at $0.00042 rendered as **$0.00** — which
+does not read as rounding, it reads as a recorded zero, next to the P&L
+the user opened the page to check.
+
 ### Scoring
 
 Two independent 0-100 scores, mirroring Health vs Leverage Risk on the

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isStale } from './format';
+import { isStale, formatTokenPrice } from './format';
 import type { Timeframe } from './types';
 
 describe('isStale', () => {
@@ -45,5 +45,46 @@ describe('isStale', () => {
     // state, and claiming its data is old would be inventing a history.
     expect(isStale(null, '5m', now)).toBe(false);
     expect(isStale(undefined, '5m', now)).toBe(false);
+  });
+});
+
+describe('formatTokenPrice', () => {
+  it('shows a normal price to the cent, like everything else', () => {
+    expect(formatTokenPrice(78_000)).toBe('$78,000.00');
+    expect(formatTokenPrice(1)).toBe('$1.00');
+    expect(formatTokenPrice(4_123.456)).toBe('$4,123.46');
+  });
+
+  /**
+   * The bug this exists for. A gem bought at $0.00042 rendered as "$0.00"
+   * in the journal, which does not read as rounding — it reads as a
+   * recorded zero, right next to the P&L the user came to check.
+   */
+  it('keeps a sub-cent price readable instead of rounding it to zero', () => {
+    expect(formatTokenPrice(0.00042)).not.toBe('$0.00');
+    expect(formatTokenPrice(0.00042)).toContain('0.00042');
+    expect(formatTokenPrice(0.000000123)).toContain('123');
+  });
+
+  it('uses more decimals only where cents would lose the number', () => {
+    expect(formatTokenPrice(0.5)).toBe('$0.5');
+    expect(formatTokenPrice(0.1234)).toBe('$0.1234');
+  });
+
+  it('prints an exact zero as a price, not as significant digits', () => {
+    // Zero has no significant digits, so the small-value branch would
+    // render "$0.00000" — a number that looks measured rather than nil.
+    expect(formatTokenPrice(0)).toBe('$0.00');
+  });
+
+  it('keeps the sign on a negative', () => {
+    expect(formatTokenPrice(-0.00042)).toContain('-');
+    expect(formatTokenPrice(-12.5)).toBe('-$12.50');
+  });
+
+  it('says nothing rather than zero when there is no price', () => {
+    expect(formatTokenPrice(null)).toBe('—');
+    expect(formatTokenPrice(undefined)).toBe('—');
+    expect(formatTokenPrice(Number.NaN)).toBe('—');
   });
 });

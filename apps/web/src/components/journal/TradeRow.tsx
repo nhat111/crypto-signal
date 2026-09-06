@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { deleteTrade, updateTrade } from '@/lib/api';
 import type { Trade } from '@/lib/types';
-import { cx, formatDateTime, formatUsd } from '@/lib/format';
+import { cx, formatDateTime, formatTokenPrice, formatUsd } from '@/lib/format';
 
 interface TradeRowProps {
   trade: Trade;
@@ -11,6 +11,13 @@ interface TradeRowProps {
 }
 
 type Mode = 'view' | 'closing' | 'editing';
+
+/** Spot is its own colour: reading it as a long at a glance is the mistake worth preventing. */
+const SIDE_BADGE: Record<Trade['side'], string> = {
+  spot: 'bg-sky-500/15 text-sky-300',
+  long: 'bg-emerald-500/15 text-emerald-300',
+  short: 'bg-rose-500/15 text-rose-300',
+};
 
 const inputClass =
   'rounded border border-slate-700 bg-slate-950/60 px-1.5 py-1 text-xs text-slate-200 focus:border-sky-500/60 focus:outline-none';
@@ -81,12 +88,7 @@ export function TradeRow({ trade, onChanged }: TradeRowProps) {
     <tr className="border-b border-slate-800/60 align-top">
       <td className="py-2 pl-3 pr-3">
         <span className="font-semibold text-slate-100">{trade.symbol}</span>
-        <span
-          className={cx(
-            'ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase',
-            trade.side === 'long' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300',
-          )}
-        >
+        <span className={cx('ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase', SIDE_BADGE[trade.side])}>
           {trade.side}
         </span>
       </td>
@@ -133,9 +135,9 @@ export function TradeRow({ trade, onChanged }: TradeRowProps) {
         </>
       ) : (
         <>
-          <td className="py-2 pr-3 tabular-nums text-slate-300">{formatUsd(trade.entryPrice, false)}</td>
+          <td className="py-2 pr-3 tabular-nums text-slate-300">{formatTokenPrice(trade.entryPrice)}</td>
           <td className="py-2 pr-3 tabular-nums text-slate-300">
-            {trade.exitPrice === null ? <span className="text-slate-600">open</span> : formatUsd(trade.exitPrice, false)}
+            {trade.exitPrice === null ? <span className="text-slate-600">open</span> : formatTokenPrice(trade.exitPrice)}
           </td>
           <td className="py-2 pr-3 tabular-nums text-slate-400">{trade.size ?? <span className="text-slate-600">—</span>}</td>
           <td className="py-2 pr-3 tabular-nums">

@@ -1,25 +1,57 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createTrade } from '@/lib/api';
 import type { TradeSide } from '@/lib/types';
 import { cx } from '@/lib/format';
+import type { TradePrefill } from '@/lib/journalPrefill';
 
 interface TradeFormProps {
   onCreated: () => void;
+  /**
+   * Filled in by "Ghi vào journal" on a gem card. Deliberately a draft and
+   * not a submission: the price came from the last scan, not from the fill
+   * the user actually got, so it has to be theirs to correct before it
+   * becomes a record of what they did.
+   */
+  prefill?: TradePrefill | null;
 }
 
 const inputClass =
   'rounded-md border border-slate-700 bg-slate-950/60 px-2.5 py-1.5 text-sm text-slate-200 placeholder:text-slate-600 focus:border-sky-500/60 focus:outline-none';
 
-export function TradeForm({ onCreated }: TradeFormProps) {
+const SIDE_STYLES: Record<TradeSide, string> = {
+  spot: 'bg-sky-500/20 text-sky-300',
+  long: 'bg-emerald-500/20 text-emerald-300',
+  short: 'bg-rose-500/20 text-rose-300',
+};
+
+const SIDE_LABELS: Record<TradeSide, string> = { spot: 'Spot', long: 'Long', short: 'Short' };
+
+export function TradeForm({ onCreated, prefill }: TradeFormProps) {
   const [symbol, setSymbol] = useState('');
-  const [side, setSide] = useState<TradeSide>('long');
+  // Spot by default: it is the only one of the three that needs no margin
+  // account, and a wrong default here writes a position type into the log
+  // that the user never took.
+  const [side, setSide] = useState<TradeSide>('spot');
   const [entryPrice, setEntryPrice] = useState('');
   const [size, setSize] = useState('');
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Keyed on the prefill object, so clicking the same gem twice after
+  // editing the form refills it, and typing in between is never clobbered
+  // by a re-render.
+  useEffect(() => {
+    if (!prefill) return;
+    setSymbol(prefill.symbol);
+    setSide(prefill.side);
+    setEntryPrice(prefill.entryPrice);
+    setNote(prefill.note);
+    setSize('');
+    setError(null);
+  }, [prefill]);
 
   const canSubmit = symbol.trim().length > 0 && entryPrice.trim().length > 0 && !submitting;
 
@@ -30,7 +62,9 @@ export function TradeForm({ onCreated }: TradeFormProps) {
     setError(null);
     try {
       await createTrade({
-        symbol: symbol.trim().toUpperCase(),
+        // Sent as typed. The API decides casing, because a Solana contract
+        // address is base58 and upper-casing it stores a different token.
+        symbol: symbol.trim(),
         side,
         entryPrice: Number(entryPrice),
         size: size.trim() === '' ? null : Number(size),
@@ -54,8 +88,8 @@ export function TradeForm({ onCreated }: TradeFormProps) {
       <div className="flex flex-wrap items-end gap-2">
         <Field label="Symbol">
           <input
-            className={cx(inputClass, 'w-28')}
-            placeholder="BTCUSDT"
+            className={cx(inputClass, 'w-44')}
+            placeholder="BTCUSDT hoặc địa chỉ contract"
             value={symbol}
             onChange={(e) => setSymbol(e.target.value)}
           />
@@ -63,21 +97,17 @@ export function TradeForm({ onCreated }: TradeFormProps) {
 
         <Field label="Side">
           <div className="flex overflow-hidden rounded-md border border-slate-700">
-            {(['long', 'short'] as const).map((s) => (
+            {(['spot', 'long', 'short'] as const).map((s) => (
               <button
                 key={s}
                 type="button"
                 onClick={() => setSide(s)}
                 className={cx(
-                  'px-3 py-1.5 text-sm font-semibold capitalize transition-colors',
-                  side === s
-                    ? s === 'long'
-                      ? 'bg-emerald-500/20 text-emerald-300'
-                      : 'bg-rose-500/20 text-rose-300'
-                    : 'bg-slate-950/60 text-slate-500 hover:text-slate-300',
+                  'px-3 py-1.5 text-sm font-semibold transition-colors',
+                  side === s ? SIDE_STYLES[s] : 'bg-slate-950/60 text-slate-500 hover:text-slate-300',
                 )}
               >
-                {s}
+                {SIDE_LABELS[s]}
               </button>
             ))}
           </div>

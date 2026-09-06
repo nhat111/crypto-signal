@@ -288,7 +288,20 @@ signal engine and the gem scanner, which never write here. `chatId` scopes
 entries to whoever logged them (a Telegram chat id, or the fixed string
 `"web"` for entries made on the dashboard, which has no login).
 
-`POST /api/journal` body: `{ chatId, symbol, side: "long"|"short", entryPrice, size?, note? }`
+`POST /api/journal` body: `{ chatId, symbol, side: "spot"|"long"|"short", entryPrice, size?, note? }`
+
+`spot` prices identically to `long` — it exists so the row records the
+position that was actually taken rather than the nearest futures word.
+Rows written before it are `long` and stay that way; re-labelling them
+would invent history, and this table is the one place that is only ever
+what the user typed.
+
+`symbol` is stored as sent, with one server-side rule
+(`normalizeTradeSymbol`): a **ticker** (≤12 alphanumeric characters) is
+upper-cased so `/close btcusdt` finds what `/trade BTCUSDT` stored, and
+anything longer — a contract address — is left byte-for-byte. Solana
+addresses are base58 and case-SENSITIVE, so upper-casing one names a
+different token. Lookups normalise the same way, so both directions agree.
 → `{ trade }`, status `open`.
 
 `GET /api/journal?chatId=&status=open|closed&limit=` — all filters

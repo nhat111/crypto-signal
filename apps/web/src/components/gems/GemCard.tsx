@@ -1,7 +1,9 @@
+import Link from 'next/link';
 import { useState } from 'react';
 import { RiskBadge } from '@/components/RiskBadge';
 import { SafetyBadge } from './SafetyBadge';
 import type { Gem } from '@/lib/types';
+import { journalPrefillHref } from '@/lib/journalPrefill';
 import { cx, formatPct, formatUsd } from '@/lib/format';
 
 interface GemCardProps {
@@ -70,16 +72,21 @@ export function GemCard({ gem }: GemCardProps) {
         </ol>
       </details>
 
-      {gem.url && (
-        <a
-          href={gem.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-3 inline-block text-xs font-medium text-sky-400 hover:text-sky-300"
-        >
-          View chart on DexScreener →
-        </a>
-      )}
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        {gem.url && (
+          <a
+            href={gem.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-medium text-sky-400 hover:text-sky-300"
+          >
+            View chart on DexScreener →
+          </a>
+        )}
+        <Link href={journalPrefillHref(gem)} className="text-xs font-medium text-slate-400 hover:text-slate-200">
+          Ghi vào journal →
+        </Link>
+      </div>
     </article>
   );
 }

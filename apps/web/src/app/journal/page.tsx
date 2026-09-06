@@ -1,7 +1,9 @@
 'use client';
 
-import { useCallback } from 'react';
+import { Suspense, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { getTradeSummary, getTrades } from '@/lib/api';
+import { parseTradePrefill, type TradePrefill } from '@/lib/journalPrefill';
 import { usePolling } from '@/lib/usePolling';
 import { JournalSummary } from '@/components/journal/JournalSummary';
 import { TradeForm } from '@/components/journal/TradeForm';
@@ -10,11 +12,25 @@ import { LoadingPanel, StatePanel } from '@/components/StatePanel';
 
 const POLL_MS = 20_000;
 
+/**
+ * useSearchParams suspends during prerender, so the reader lives below a
+ * boundary rather than at the page root — without it the whole journal
+ * would be client-rendered on every load just to read an optional param.
+ */
 export default function JournalPage() {
+  return (
+    <Suspense fallback={<LoadingPanel label="Loading journal…" />}>
+      <JournalContent />
+    </Suspense>
+  );
+}
+
+function JournalContent() {
   const tradesFetcher = useCallback(() => getTrades(200), []);
   const summaryFetcher = useCallback(() => getTradeSummary(), []);
   const trades = usePolling(tradesFetcher, POLL_MS, []);
   const summary = usePolling(summaryFetcher, POLL_MS, []);
+  const prefill = usePrefill();
 
   const refreshAll = () => {
     trades.refresh();
@@ -41,10 +57,17 @@ export default function JournalPage() {
       ) : (
         <>
           {summary.data && <JournalSummary summary={summary.data.summary} />}
-          <TradeForm onCreated={refreshAll} />
+          <TradeForm onCreated={refreshAll} prefill={prefill} />
           <TradeTable trades={trades.data?.trades ?? []} onChanged={refreshAll} />
         </>
       )}
     </div>
   );
+}
+
+/** Thin wrapper: the parsing itself is pure and tested in lib/journalPrefill. */
+function usePrefill(): TradePrefill | null {
+  const params = useSearchParams();
+  const search = params.toString();
+  return useMemo(() => parseTradePrefill(new URLSearchParams(search)), [search]);
 }

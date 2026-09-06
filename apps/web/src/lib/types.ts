@@ -278,7 +278,17 @@ export interface FlowResponse {
 
 /* ---------- Trade journal ---------- */
 
-export type TradeSide = 'long' | 'short';
+/**
+ * 'spot' arrived after the other two. Old rows are 'long' and stay that
+ * way — the journal records what was typed, and re-labelling history would
+ * invent a fact.
+ */
+export type TradeSide = 'long' | 'short' | 'spot';
+
+/** Guards a side arriving from a URL, where anything at all can be typed. */
+export function isTradeSide(value: unknown): value is TradeSide {
+  return value === 'spot' || value === 'long' || value === 'short';
+}
 export type TradeStatus = 'open' | 'closed';
 
 export interface Trade {

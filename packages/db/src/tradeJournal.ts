@@ -1,6 +1,33 @@
 import type { Pool } from 'pg';
 
-export type TradeSide = 'long' | 'short';
+export type TradeSide = 'long' | 'short' | 'spot';
+
+export const TRADE_SIDES: readonly TradeSide[] = ['spot', 'long', 'short'];
+
+export function isTradeSide(value: unknown): value is TradeSide {
+  return typeof value === 'string' && (TRADE_SIDES as readonly string[]).includes(value);
+}
+
+/**
+ * How a symbol is stored, applied server-side so every client agrees.
+ *
+ * Tickers are upper-cased because "btcusdt" and "BTCUSDT" are the same
+ * position and /close has to find it. Contract addresses are left exactly
+ * as typed: a Solana address is base58, which is case-SENSITIVE, so
+ * upper-casing one produces a different string that resolves to nothing —
+ * the address in the journal would no longer be the token that was bought,
+ * and pasting it into an explorer would fail. EVM hex survives the
+ * round-trip but loses its checksum casing, which is its own quiet damage.
+ *
+ * The split is by shape rather than by chain: a ticker is short and
+ * alphanumeric, an address is not.
+ */
+const TICKER_SHAPE = /^[A-Za-z0-9]{1,12}$/;
+
+export function normalizeTradeSymbol(raw: string): string {
+  const trimmed = raw.trim();
+  return TICKER_SHAPE.test(trimmed) ? trimmed.toUpperCase() : trimmed;
+}
 export type TradeStatus = 'open' | 'closed';
 
 export interface TradePnl {
@@ -15,7 +42,10 @@ export interface TradePnl {
  * log, not a position calculator, so it only knows what was typed in.
  */
 export function computeTradePnl(side: TradeSide, entryPrice: number, exitPrice: number, size: number | null): TradePnl {
-  const direction = side === 'long' ? 1 : -1;
+  // Spot prices as a long: buying and holding gains when price rises. Only
+  // 'short' inverts, so testing for it directly keeps a future fourth side
+  // from silently defaulting to inverted P&L.
+  const direction = side === 'short' ? -1 : 1;
   const pnlPct = ((exitPrice - entryPrice) / entryPrice) * direction * 100;
   const pnlUsd = size === null ? null : (exitPrice - entryPrice) * direction * size;
   return { pnlPct, pnlUsd };
@@ -85,7 +115,7 @@ export async function insertTrade(pool: Pool, input: InsertTradeInput): Promise<
     `INSERT INTO trade_journal (chat_id, symbol, side, entry_price, size, note)
      VALUES ($1,$2,$3,$4,$5,$6)
      RETURNING ${SELECT_COLUMNS}`,
-    [input.chatId, input.symbol, input.side, input.entryPrice, input.size, input.note],
+    [input.chatId, normalizeTradeSymbol(input.symbol), input.side, input.entryPrice, input.size, input.note],
   );
   return toTradeRow(rows[0]);
 }
@@ -129,7 +159,9 @@ export async function getOpenTradeForSymbol(pool: Pool, chatId: string, symbol: 
     `SELECT ${SELECT_COLUMNS} FROM trade_journal
      WHERE chat_id = $1 AND symbol = $2 AND status = 'open'
      ORDER BY opened_at DESC LIMIT 1`,
-    [chatId, symbol],
+    // Normalized on the way in too, or "/close btcusdt" would miss the row
+    // that "/trade btcusdt" stored as BTCUSDT.
+    [chatId, normalizeTradeSymbol(symbol)],
   );
   return rows[0] ? toTradeRow(rows[0]) : undefined;
 }

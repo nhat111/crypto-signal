@@ -15,7 +15,7 @@ import {
   formatWatchConfirmation,
   formatWatchList,
 } from './formatting.js';
-import type { TradeSide } from './apiClient.js';
+import { isTradeSide } from './apiClient.js';
 import { parseTimeframeArg, type TimeframeChoice } from './timeframeArg.js';
 
 async function main(): Promise<void> {
@@ -216,13 +216,15 @@ async function main(): Promise<void> {
     const chatId = String(ctx.chat.id);
     const parts = ctx.message.text.split(/\s+/).slice(1);
     const [symbolRaw, sideRaw, entryRaw, sizeRaw] = parts;
-    const symbol = symbolRaw?.toUpperCase();
-    const side = sideRaw?.toLowerCase() as TradeSide | undefined;
+    // Sent as typed: the API decides casing, because a contract address is
+    // case-sensitive on Solana and upper-casing it stores a different token.
+    const symbol = symbolRaw;
+    const side = sideRaw?.toLowerCase();
     const entryPrice = entryRaw !== undefined ? Number(entryRaw) : NaN;
     const size = sizeRaw !== undefined ? Number(sizeRaw) : null;
 
-    if (!symbol || (side !== 'long' && side !== 'short') || !Number.isFinite(entryPrice) || (size !== null && !Number.isFinite(size))) {
-      await ctx.reply('Usage: /trade SYMBOL long|short ENTRY_PRICE [SIZE]\ne.g. /trade BTCUSDT long 78000 0.1');
+    if (!symbol || !isTradeSide(side) || !Number.isFinite(entryPrice) || (size !== null && !Number.isFinite(size))) {
+      await ctx.reply('Usage: /trade SYMBOL spot|long|short ENTRY_PRICE [SIZE]\ne.g. /trade BTCUSDT spot 78000 0.1');
       return;
     }
 
@@ -238,7 +240,9 @@ async function main(): Promise<void> {
   bot.command('close', async (ctx) => {
     const chatId = String(ctx.chat.id);
     const parts = ctx.message.text.split(/\s+/).slice(1);
-    const symbol = parts[0]?.toUpperCase();
+    // Same reason as /trade: the API normalises, and it normalises the
+    // lookup the same way, so "/close btcusdt" still finds BTCUSDT.
+    const symbol = parts[0];
     const exitPrice = parts[1] !== undefined ? Number(parts[1]) : NaN;
 
     if (!symbol || !Number.isFinite(exitPrice)) {

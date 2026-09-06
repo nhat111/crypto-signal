@@ -20,6 +20,30 @@ const numberCompact = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 2,
 });
 
+/**
+ * A token price, at a precision that survives being cheap.
+ *
+ * formatUsd rounds to cents, which is right for liquidity and volume and
+ * silently destroys the number that matters most in a journal: a gem
+ * bought at $0.00042 renders as "$0.00", which does not read as rounding
+ * — it reads as a recorded zero, next to a P&L the user is trying to
+ * check. Small values switch to significant digits instead, so the entry
+ * is still the price that was paid.
+ */
+export function formatTokenPrice(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return '—';
+  const magnitude = Math.abs(value);
+  // Exact zero is a real, printable price; it must not fall into the
+  // significant-digits branch, where Intl would render it as "$0.00000".
+  if (magnitude >= 1 || value === 0) return usdFull.format(value);
+  const digits = magnitude >= 0.01 ? 4 : 6;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumSignificantDigits: digits,
+  }).format(value);
+}
+
 export function formatUsd(value: number | null | undefined, compact = true): string {
   if (value === null || value === undefined || Number.isNaN(value)) return '—';
   return (compact ? usdCompact : usdFull).format(value);

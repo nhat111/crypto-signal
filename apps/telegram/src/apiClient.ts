@@ -114,7 +114,12 @@ export class ApiError extends Error {
   }
 }
 
-export type TradeSide = 'long' | 'short';
+export type TradeSide = 'long' | 'short' | 'spot';
+
+/** Mirrors the API's own check — this app has no dependency on the db package. */
+export function isTradeSide(value: unknown): value is TradeSide {
+  return value === 'spot' || value === 'long' || value === 'short';
+}
 export type TradeStatus = 'open' | 'closed';
 
 export interface TradeDTO {
