@@ -18,6 +18,7 @@ import {
   classifySymbol,
   describeAlertTimeframes,
   describeChainSources,
+  describeFilteredSecurities,
   diagnoseChain,
   collectorSummary,
   isHorizonStuck,
@@ -315,6 +316,7 @@ function GemChainCard({ chains, now }: { chains?: StatusGemChain[]; now: number 
     <StatusCard title="Quét gem theo chain" verdict={verdict} headline={headline}>
       {diagnosed.map(({ chain, diagnosis }) => {
         const { tone, note } = CHAIN_TEXT[diagnosis];
+        const filtered = describeFilteredSecurities(chain);
         return (
           <div key={chain.chainId}>
             <Row
@@ -326,6 +328,9 @@ function GemChainCard({ chains, now }: { chains?: StatusGemChain[]; now: number 
             <p className="-mt-0.5 pb-1 text-right text-[11px] leading-relaxed text-slate-500">
               {describeChainSources(chain.sources)}
             </p>
+            {filtered && (
+              <p className="-mt-0.5 pb-1 text-right text-[11px] leading-relaxed text-sky-300/70">{filtered}</p>
+            )}
             {note && (
               <p
                 className={`-mt-0.5 pb-1.5 text-right text-[11px] leading-relaxed ${
@@ -341,6 +346,11 @@ function GemChainCard({ chains, now }: { chains?: StatusGemChain[]; now: number 
       <p className="mt-2.5 text-[11px] leading-relaxed text-slate-500">
         <span className="font-semibold text-slate-400">không phủ</span> nghĩa là nguồn đó không có chain này nên bị
         bỏ qua hoàn toàn — khác hẳn với &ldquo;có quét mà không thấy gì&rdquo;, và cần cách sửa khác.
+      </p>
+      <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
+        <span className="font-semibold text-slate-400">chứng khoán token hoá</span> (cổ phiếu, ETF được bọc lại) bị
+        loại trước khi chấm điểm — model gem không đo được gì có nghĩa về chúng. Tên bị loại được liệt kê ra để bro
+        soi: thấy tên một memecoin thật nằm trong đó là bộ lọc đang bắt nhầm.
       </p>
     </StatusCard>
   );

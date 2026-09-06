@@ -1,5 +1,6 @@
 import { clamp } from '@crypto-signal/shared';
 import type { GemRiskWeights, GemScoreWeights, GemThresholds } from './config.js';
+import { detectTokenizedSecurity } from './tokenizedSecurity.js';
 import type { GemPair, SafetyReport } from './types.js';
 
 /**
@@ -40,7 +41,8 @@ export type EligibilityFailure =
   | 'extreme_pump'
   | 'missing_liquidity_data'
   | 'missing_volume_data'
-  | 'missing_age_data';
+  | 'missing_age_data'
+  | 'tokenized_security';
 
 export interface GemEvaluation {
   eligible: boolean;
@@ -98,6 +100,14 @@ export function checkEligibility(pair: GemPair, thresholds: GemThresholds, now: 
   if (pair.priceChangePct.h24 !== null && pair.priceChangePct.h24 >= thresholds.extremePump24hPct) {
     failures.push('extreme_pump');
   }
+
+  // A wrapped equity or ETF passes every gate above and none of the
+  // scoring below means anything for it — see tokenizedSecurity.ts. This
+  // is the one failure that is a statement about what the token IS rather
+  // than about where its numbers sit, which is also why it is not a
+  // comparable reject: the control group is for tokens that could have
+  // qualified, and this one never could.
+  if (detectTokenizedSecurity(pair.baseToken.name) !== null) failures.push('tokenized_security');
 
   return failures;
 }
@@ -366,6 +376,8 @@ function describeFailure(failure: EligibilityFailure): string {
       return 'Volume was not reported — not scored rather than assumed.';
     case 'missing_age_data':
       return 'Pool creation time was not reported, so age could not be verified.';
+    case 'tokenized_security':
+      return 'This is a tokenized stock or fund, not a crypto token — the gem model measures nothing meaningful about it.';
   }
 }
 

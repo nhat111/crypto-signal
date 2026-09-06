@@ -2,6 +2,7 @@ import type { Logger } from '@crypto-signal/shared';
 import type { GemConfig } from './config.js';
 import { evaluateGem, type EligibilityFailure, type GemEvaluation } from './scoring.js';
 import { isComparableReject, sampleRejects } from './baseline.js';
+import { detectTokenizedSecurity } from './tokenizedSecurity.js';
 import type { CandidateDiscoverySource, ChainId, GemPair, PairDataSource, SafetyReport, SafetySource } from './types.js';
 
 export interface ScanResult {
@@ -27,6 +28,23 @@ export interface ScanResult {
    * See baseline.ts for why only some rejections qualify.
    */
   baselineSample: RejectedCandidate[];
+  /**
+   * Tokens dropped for being wrapped equities or funds rather than crypto,
+   * with the rule that caught each one.
+   *
+   * Reported rather than merely counted because the expensive failure of
+   * that filter is the silent one: a rule that is slightly too broad eats
+   * a real candidate and nothing anywhere says so. A named list is the
+   * only way to notice, and /status shows it.
+   */
+  filteredSecurities: FilteredSecurity[];
+}
+
+/** One token the security filter caught, and why. */
+export interface FilteredSecurity {
+  symbol: string;
+  name: string;
+  signal: string;
 }
 
 /** One control-group member: a token that was the wrong profile, not an unreadable or untradeable one. */
@@ -110,7 +128,10 @@ export async function runScan(deps: ScannerDeps, chainId: ChainId, now = Date.no
   logger.info({ chainId, candidateCount: tokenAddresses.length, candidatesBySource }, 'gem scan: candidates discovered');
 
   if (tokenAddresses.length === 0) {
-    return { chainId, scannedAt: now, candidatesBySource, candidateCount: 0, pairCount: 0, eligible: [], rejectedCount: 0, baselineSample: [] };
+    return {
+      chainId, scannedAt: now, candidatesBySource, candidateCount: 0, pairCount: 0,
+      eligible: [], rejectedCount: 0, baselineSample: [], filteredSecurities: [],
+    };
   }
 
   const pairs = await deps.pairSource.fetchPairsForTokens(chainId, tokenAddresses);
@@ -128,10 +149,19 @@ export async function runScan(deps: ScannerDeps, chainId: ChainId, now = Date.no
 
   const scored: ScoredGem[] = [];
   const comparableRejects: RejectedCandidate[] = [];
+  const filteredSecurities: FilteredSecurity[] = [];
   let rejectedCount = 0;
 
   const noteReject = (pair: GemPair, failures: EligibilityFailure[]): void => {
     rejectedCount += 1;
+    if (failures.includes('tokenized_security')) {
+      const detection = detectTokenizedSecurity(pair.baseToken.name);
+      filteredSecurities.push({
+        symbol: pair.baseToken.symbol,
+        name: pair.baseToken.name,
+        signal: detection?.signal ?? 'unknown',
+      });
+    }
     if (!isComparableReject(failures, pair.priceUsd)) return;
     comparableRejects.push({
       chainId,
@@ -184,7 +214,16 @@ export async function runScan(deps: ScannerDeps, chainId: ChainId, now = Date.no
   const baselineSample = sampleRejects(comparableRejects, deps.baselineSampleSize ?? 0, deps.random);
 
   logger.info(
-    { chainId, pairCount: bestPairByToken.size, eligible: scored.length, rejectedCount, baselineSample: baselineSample.length },
+    {
+      chainId,
+      pairCount: bestPairByToken.size,
+      eligible: scored.length,
+      rejectedCount,
+      baselineSample: baselineSample.length,
+      // Logged in full, not as a count: this is the audit trail for a
+      // filter whose false positives are otherwise invisible.
+      filteredSecurities,
+    },
     'gem scan: scoring complete',
   );
 
@@ -197,5 +236,6 @@ export async function runScan(deps: ScannerDeps, chainId: ChainId, now = Date.no
     eligible: scored,
     rejectedCount,
     baselineSample,
+    filteredSecurities,
   };
 }

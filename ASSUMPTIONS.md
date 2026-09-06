@@ -244,6 +244,46 @@ feed does not look under-covered; it looks like a quiet chain. Which is
 why "chỉ 1/2 nguồn phủ chain này" is an amber state on the status page
 rather than a log line.
 
+### The scanner found a gold ETF
+
+Robinhood Chain mints wrappers for listed equities and funds, and they walk
+straight through the market gate: inside the liquidity band, real volume, a
+pool genuinely weeks old. Two of them — SPDR Gold Trust and SpaceX Class A
+— were the entire /gems list on one pass, scoring 53 and 52.
+
+Nothing was broken. Every input was read correctly and every number meant
+something other than what the model assumed:
+
+- `survivalScore` read the wrapper's age. The fund behind GLD dates from 2004.
+- `momentumStructure` and `buyPressure` read flow that is largely
+  arbitrage holding a peg, not discovery.
+- `maxFdvUsd` never bound, because FDV here is minted supply on one chain,
+  not the market cap of the asset.
+
+So the score was well-formed and carried no information — the failure this
+codebase is otherwise built to refuse. Worse, they were also filling the
+**control group**: the baseline is what decides whether the scanner is
+worth using, and stuffing both sides with assets no model can have edge on
+drags the comparison toward "no difference" for reasons that say nothing
+about the scanner.
+
+`gem-scanner/src/tokenizedSecurity.ts` now rejects them before scoring, as
+a failure that is a statement about what the token IS rather than where its
+numbers sit — which is why it is deliberately not a *comparable* reject:
+the control group is for tokens that could have qualified.
+
+The filter's own failure mode is the invisible one — a rule slightly too
+broad deletes a real candidate and the list just gets shorter. So signals
+are tiered by how impossible they are in a memecoin name (`common stock`
+and a terminal `Inc` qualify; a name merely ending in `Trust` does not),
+weak issuer names that double as plausible memes are excluded on purpose
+(`Vanguard`, `Blackrock`), and every catch is stored with the rule that
+made it and shown on /status by name. Reading `GLD, SPCX, TSLA` there is
+the filter working; a memecoin's name in that list is the bug.
+
+Known gap, accepted: a fund named `<something> Trust` with no recognised
+issuer word still gets through. Under-catching is the cheap direction.
+
 ### Scoring
 
 Two independent 0-100 scores, mirroring Health vs Leverage Risk on the

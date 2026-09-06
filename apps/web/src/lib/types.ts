@@ -566,6 +566,15 @@ export interface StatusGemChain {
   eligibleCount: number;
   sources: Record<string, number | 'unsupported'>;
   consecutiveEmptyScans: number;
+  /** Optional: added after the field rule at the top of this file — an old worker's row has neither. */
+  securitiesFiltered?: number;
+  securitiesSample?: StatusFilteredSecurity[];
+}
+
+export interface StatusFilteredSecurity {
+  symbol: string;
+  name: string;
+  signal: string;
 }
 
 export interface StatusResponse {

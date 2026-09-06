@@ -112,6 +112,8 @@ export async function runGemScanCycle(deps: GemScanDeps): Promise<void> {
         candidateCount: result.candidateCount,
         eligibleCount: result.eligible.length,
         sources: result.candidatesBySource,
+        securitiesFiltered: result.filteredSecurities.length,
+        securitiesSample: result.filteredSecurities,
       });
 
       logger.info(

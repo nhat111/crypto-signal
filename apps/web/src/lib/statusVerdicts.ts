@@ -448,3 +448,32 @@ export function describeChainSources(sources: Record<string, number | 'unsupport
   if (names.length === 0) return '—';
   return names.map((n) => `${n}: ${sources[n] === 'unsupported' ? 'không phủ' : sources[n]}`).join(' · ');
 }
+
+/**
+ * The tokenized-security filter's audit line, or null when it caught
+ * nothing on the last scan.
+ *
+ * Named, not counted. The filter drops wrapped equities and ETFs before
+ * scoring, and the mistake worth catching is the opposite one: a rule
+ * broad enough to eat a real token. That only ever shows up as a name
+ * somebody recognises in this list, so a bare count would hide exactly the
+ * failure the line exists for.
+ *
+ * Undefined (an older worker that never wrote the column) reads as no line
+ * rather than as zero — same rule as everywhere else on this page.
+ */
+export function describeFilteredSecurities(chain: {
+  securitiesFiltered?: number;
+  securitiesSample?: Array<{ symbol: string }>;
+}): string | null {
+  const count = chain.securitiesFiltered;
+  if (count === undefined || count <= 0) return null;
+
+  const names = (chain.securitiesSample ?? []).map((s) => s.symbol).filter((s) => s.length > 0);
+  if (names.length === 0) return `đã lọc ${count} mã chứng khoán token hoá`;
+
+  const shown = names.join(', ');
+  // The sample is capped, so say so rather than implying it is the whole list.
+  const more = count > names.length ? `, +${count - names.length} nữa` : '';
+  return `đã lọc ${count} mã chứng khoán token hoá: ${shown}${more}`;
+}

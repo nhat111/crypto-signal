@@ -511,7 +511,20 @@ export interface GemChainHealth {
   /** Per feed: how many it found, or 'unsupported' when it does not cover this chain. */
   sources: Record<string, number | 'unsupported'>;
   consecutiveEmptyScans: number;
+  /** How many candidates the tokenized-security filter removed on the last scan. */
+  securitiesFiltered: number;
+  /** A bounded sample of them, named, so a wrong catch is visible rather than silent. */
+  securitiesSample: FilteredSecuritySample[];
 }
+
+export interface FilteredSecuritySample {
+  symbol: string;
+  name: string;
+  signal: string;
+}
+
+/** Enough to recognise a bad rule, few enough to read on a phone. */
+export const SECURITIES_SAMPLE_LIMIT = 5;
 
 export async function recordGemChainScan(
   pool: Pool,
@@ -521,17 +534,22 @@ export async function recordGemChainScan(
     candidateCount: number;
     eligibleCount: number;
     sources: Record<string, number | 'unsupported'>;
+    securitiesFiltered?: number;
+    securitiesSample?: FilteredSecuritySample[];
   },
 ): Promise<void> {
   await pool.query(
     `INSERT INTO gem_chain_health
-       (chain_id, last_scan_at, candidate_count, eligible_count, sources, consecutive_empty_scans, updated_at)
-     VALUES ($1, to_timestamp($2/1000.0), $3, $4, $5::jsonb, $6, now())
+       (chain_id, last_scan_at, candidate_count, eligible_count, sources, consecutive_empty_scans,
+        securities_filtered, securities_sample, updated_at)
+     VALUES ($1, to_timestamp($2/1000.0), $3, $4, $5::jsonb, $6, $7, $8::jsonb, now())
      ON CONFLICT (chain_id) DO UPDATE SET
        last_scan_at = EXCLUDED.last_scan_at,
        candidate_count = EXCLUDED.candidate_count,
        eligible_count = EXCLUDED.eligible_count,
        sources = EXCLUDED.sources,
+       securities_filtered = EXCLUDED.securities_filtered,
+       securities_sample = EXCLUDED.securities_sample,
        -- The streak is the whole diagnosis, so it has to accumulate across
        -- scans rather than be recomputed from one of them.
        consecutive_empty_scans = CASE
@@ -546,6 +564,10 @@ export async function recordGemChainScan(
       scan.eligibleCount,
       JSON.stringify(scan.sources),
       scan.candidateCount > 0 ? 0 : 1,
+      scan.securitiesFiltered ?? 0,
+      // Truncated here rather than at the call site so the column can never
+      // grow without this limit being the thing that changed.
+      JSON.stringify((scan.securitiesSample ?? []).slice(0, SECURITIES_SAMPLE_LIMIT)),
     ],
   );
 }
@@ -553,7 +575,8 @@ export async function recordGemChainScan(
 export async function getGemChainHealth(pool: Pool): Promise<GemChainHealth[]> {
   const { rows } = await pool.query(
     `SELECT chain_id, extract(epoch from last_scan_at)*1000 AS scan_ms,
-            candidate_count, eligible_count, sources, consecutive_empty_scans
+            candidate_count, eligible_count, sources, consecutive_empty_scans,
+            securities_filtered, securities_sample
      FROM gem_chain_health ORDER BY chain_id`,
   );
   return rows.map((r) => ({
@@ -563,6 +586,12 @@ export async function getGemChainHealth(pool: Pool): Promise<GemChainHealth[]> {
     eligibleCount: Number(r.eligible_count),
     sources: (r.sources ?? {}) as Record<string, number | 'unsupported'>,
     consecutiveEmptyScans: Number(r.consecutive_empty_scans),
+    // No null fallback on either: the migration adds both columns NOT NULL
+    // with a default, so a row written before the filter existed already
+    // reads as 0 and []. A `?? 0` here would be a branch that can never
+    // run, and the DB test above is what actually proves the backfill.
+    securitiesFiltered: Number(r.securities_filtered),
+    securitiesSample: r.securities_sample as FilteredSecuritySample[],
   }));
 }
 

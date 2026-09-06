@@ -7,6 +7,7 @@ import {
   collectorSummary,
   describeAlertTimeframes,
   describeChainSources,
+  describeFilteredSecurities,
   diagnoseChain,
   EMPTY_SCANS_BEFORE_SUSPECT,
   connectionVerdict,
@@ -551,5 +552,41 @@ describe('describeChainSources', () => {
 
   it('handles a chain with nothing recorded', () => {
     expect(describeChainSources({})).toBe('—');
+  });
+});
+
+describe('describeFilteredSecurities', () => {
+  it('says nothing when the filter caught nothing', () => {
+    expect(describeFilteredSecurities({ securitiesFiltered: 0, securitiesSample: [] })).toBeNull();
+  });
+
+  it('says nothing for a worker too old to have written the column', () => {
+    // Absent is not zero. An old worker filtered nothing because the filter
+    // did not exist, and claiming "đã lọc 0" would be a made-up fact.
+    expect(describeFilteredSecurities({})).toBeNull();
+  });
+
+  it('names what it caught, because the count alone hides the bug worth finding', () => {
+    expect(
+      describeFilteredSecurities({
+        securitiesFiltered: 2,
+        securitiesSample: [{ symbol: 'GLD' }, { symbol: 'SPCX' }],
+      }),
+    ).toBe('đã lọc 2 mã chứng khoán token hoá: GLD, SPCX');
+  });
+
+  it('admits the sample is capped rather than implying it is the whole list', () => {
+    expect(
+      describeFilteredSecurities({
+        securitiesFiltered: 9,
+        securitiesSample: [{ symbol: 'A' }, { symbol: 'B' }],
+      }),
+    ).toBe('đã lọc 9 mã chứng khoán token hoá: A, B, +7 nữa');
+  });
+
+  it('still reports the count when the sample is missing or unnamed', () => {
+    expect(describeFilteredSecurities({ securitiesFiltered: 3 })).toBe('đã lọc 3 mã chứng khoán token hoá');
+    expect(describeFilteredSecurities({ securitiesFiltered: 3, securitiesSample: [{ symbol: '' }] }))
+      .toBe('đã lọc 3 mã chứng khoán token hoá');
   });
 });
