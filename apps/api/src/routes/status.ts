@@ -9,6 +9,7 @@ import {
   getStuckOutcomeSample,
   getWorkerRuntime,
   type OutcomeHorizon,
+  getGemChainHealth,
 } from '@crypto-signal/db';
 import { resolveBuildInfo } from '@crypto-signal/shared';
 import type { ApiDeps } from '../deps.js';
@@ -31,12 +32,16 @@ const BUILD = resolveBuildInfo();
  */
 export function registerStatusRoute(app: FastifyInstance, deps: ApiDeps): void {
   app.get('/api/status', async () => {
-    const [symbols, outcomes, jobs, serviceBuilds, workerRuntime] = await Promise.all([
+    const [symbols, outcomes, jobs, serviceBuilds, workerRuntime, gemChains] = await Promise.all([
       getEnabledSymbols(deps.pool),
       getOutcomeTrackerStatus(deps.pool),
       getAllJobHealth(deps.pool),
       getServiceBuilds(deps.pool),
       getWorkerRuntime(deps.pool),
+      // Empty rather than fatal: the gem scanner is opt-in, and a status
+      // page that fails because an optional subsystem never ran is worse
+      // than one that says nothing about it.
+      getGemChainHealth(deps.pool).catch(() => []),
     ]);
 
     const { rows: migrations } = await deps.pool.query(
@@ -83,6 +88,7 @@ export function registerStatusRoute(app: FastifyInstance, deps: ApiDeps): void {
       // Null until the worker has published once. That is a cold start, not
       // a fault, and the page has to be able to tell those apart.
       worker: workerRuntime,
+      gemChains,
       serverTime: now,
     };
   });

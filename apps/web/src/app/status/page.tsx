@@ -7,14 +7,18 @@ import type {
   StatusJob,
   StatusOutcomeDiagnostics,
   StatusOutcomeHorizon,
+  StatusGemChain,
   StatusResponse,
   StatusService,
   StatusWorkerRuntime,
 } from '@/lib/types';
 import { ago, Row, StatusCard } from '@/components/status/StatusBlocks';
 import {
+  CHAIN_TEXT,
   classifySymbol,
   describeAlertTimeframes,
+  describeChainSources,
+  diagnoseChain,
   collectorSummary,
   isHorizonStuck,
   isJobBroken,
@@ -30,6 +34,7 @@ import {
   INGEST_TEXT,
   versionVerdict,
 } from '@/lib/statusVerdicts';
+import type { Verdict } from '@/lib/statusVerdicts';
 import { LoadingPanel, StatePanel } from '@/components/StatePanel';
 
 const POLL_MS = 30_000;
@@ -66,6 +71,7 @@ function StatusBody({ data }: { data: StatusResponse }) {
       <BuildCard data={data} />
       <WorkerCard worker={data.worker} />
       <CollectorCard data={data} />
+      <GemChainCard chains={data.gemChains} now={data.serverTime} />
       <OutcomesCard outcomes={data.outcomes} />
       <JobsCard jobs={data.jobs} />
     </div>
@@ -274,6 +280,67 @@ function CollectorCard({ data }: { data: StatusResponse }) {
         <span className="font-semibold text-slate-400">phía kết nối</span> (nến không tới) hay{' '}
         <span className="font-semibold text-slate-400">phần xử lý</span> (nến tới mà không ra kết quả). Ngay sau khi
         worker khởi động lại, mọi symbol im lặng là bình thường — phải chờ cây nến 15m đầu tiên đóng.
+      </p>
+    </StatusCard>
+  );
+}
+
+/* ---------------- gem chains ---------------- */
+
+/**
+ * Whether each configured gem chain is producing anything.
+ *
+ * Nothing rendered when the scanner is off or has never run — an empty
+ * card about an opt-in subsystem is noise. But once it runs, a chain that
+ * scans nothing for hours has to say so: that state is indistinguishable
+ * from a quiet market without it, and a wrong chain id can sit in the
+ * config for days looking exactly like a slow week.
+ */
+function GemChainCard({ chains, now }: { chains?: StatusGemChain[]; now: number }) {
+  if (!chains || chains.length === 0) return null;
+
+  const diagnosed = chains.map((chain) => ({ chain, diagnosis: diagnoseChain(chain) }));
+  const broken = diagnosed.filter((d) => CHAIN_TEXT[d.diagnosis].tone === 'bad').length;
+  const warned = diagnosed.filter((d) => CHAIN_TEXT[d.diagnosis].tone === 'warn').length;
+
+  const verdict: Verdict = broken > 0 ? 'bad' : warned > 0 ? 'warn' : 'ok';
+  const headline =
+    broken > 0
+      ? `${broken}/${chains.length} chain không ra ứng viên`
+      : warned > 0
+        ? `${warned}/${chains.length} chain thiếu nguồn`
+        : `${chains.length} chain đang chạy`;
+
+  return (
+    <StatusCard title="Quét gem theo chain" verdict={verdict} headline={headline}>
+      {diagnosed.map(({ chain, diagnosis }) => {
+        const { tone, note } = CHAIN_TEXT[diagnosis];
+        return (
+          <div key={chain.chainId}>
+            <Row
+              label={chain.chainId}
+              // The server's clock, like every other age on this page.
+              value={`${chain.candidateCount} ứng viên · ${chain.eligibleCount} qua lọc · ${ago(now - chain.lastScanAt)}`}
+              tone={tone}
+            />
+            <p className="-mt-0.5 pb-1 text-right text-[11px] leading-relaxed text-slate-500">
+              {describeChainSources(chain.sources)}
+            </p>
+            {note && (
+              <p
+                className={`-mt-0.5 pb-1.5 text-right text-[11px] leading-relaxed ${
+                  tone === 'bad' ? 'text-rose-300/80' : 'text-amber-300/80'
+                }`}
+              >
+                {note}
+              </p>
+            )}
+          </div>
+        );
+      })}
+      <p className="mt-2.5 text-[11px] leading-relaxed text-slate-500">
+        <span className="font-semibold text-slate-400">không phủ</span> nghĩa là nguồn đó không có chain này nên bị
+        bỏ qua hoàn toàn — khác hẳn với &ldquo;có quét mà không thấy gì&rdquo;, và cần cách sửa khác.
       </p>
     </StatusCard>
   );

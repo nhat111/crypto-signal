@@ -80,6 +80,18 @@ export type CandidateSource = 'dexscreener_profiles' | 'dexscreener_boosts' | 'g
 /** Produces token addresses worth evaluating. Each feed is a *sample* of the chain, never all of it — see ASSUMPTIONS.md §16. */
 export interface CandidateDiscoverySource {
   readonly name: string;
+  /**
+   * Whether this feed covers the chain at all.
+   *
+   * Without it, a source that silently skips an unmapped chain records the
+   * same `0` as one that ran and found nothing — so half the discovery
+   * could be switched off for a chain and the logs would read as a quiet
+   * market. `SafetySource` has always had this method; the discovery side
+   * needed it for the same reason.
+   *
+   * Optional so a source that covers every chain need not declare it.
+   */
+  supportsChain?(chainId: ChainId): boolean;
   discoverCandidates(chainId: ChainId): Promise<GemCandidate[]>;
 }
 

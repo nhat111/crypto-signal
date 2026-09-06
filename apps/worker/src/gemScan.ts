@@ -17,6 +17,7 @@ import {
   insertGemAlertEvent,
   insertGemBaselineCandidates,
   insertGemScan,
+  recordGemChainScan,
   pruneOldGemScans,
   recordGemBaselineOutcome,
   recordGemOutcome,
@@ -90,6 +91,17 @@ export async function runGemScanCycle(deps: GemScanDeps): Promise<void> {
           failures: c.failures,
         })),
       );
+
+      // Persisted, not just logged: a scan runs every thirty minutes, so an
+      // in-memory record would be empty for half an hour after every deploy
+      // — exactly when somebody goes looking for why a chain is silent.
+      await recordGemChainScan(pool, {
+        chainId,
+        scannedAt: result.scannedAt,
+        candidateCount: result.candidateCount,
+        eligibleCount: result.eligible.length,
+        sources: result.candidatesBySource,
+      });
 
       logger.info(
         {

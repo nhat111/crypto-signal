@@ -57,6 +57,10 @@ export class GeckoTerminalSource implements CandidateDiscoverySource {
     this.pages = opts.pages ?? DEFAULT_PAGES;
   }
 
+  supportsChain(chainId: ChainId): boolean {
+    return toGeckoNetwork(chainId) !== null;
+  }
+
   async discoverCandidates(chainId: ChainId): Promise<GemCandidate[]> {
     const network = toGeckoNetwork(chainId);
     if (!network) {

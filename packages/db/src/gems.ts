@@ -487,6 +487,77 @@ function buildBaselineComparison(
 }
 
 /* ------------------------------------------------------------------ */
+/* Is each configured chain actually working?                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * One chain's last scan, kept so "this chain id is wrong" stops looking
+ * like "this chain is quiet".
+ */
+export interface GemChainHealth {
+  chainId: string;
+  lastScanAt: number;
+  candidateCount: number;
+  eligibleCount: number;
+  /** Per feed: how many it found, or 'unsupported' when it does not cover this chain. */
+  sources: Record<string, number | 'unsupported'>;
+  consecutiveEmptyScans: number;
+}
+
+export async function recordGemChainScan(
+  pool: Pool,
+  scan: {
+    chainId: string;
+    scannedAt: number;
+    candidateCount: number;
+    eligibleCount: number;
+    sources: Record<string, number | 'unsupported'>;
+  },
+): Promise<void> {
+  await pool.query(
+    `INSERT INTO gem_chain_health
+       (chain_id, last_scan_at, candidate_count, eligible_count, sources, consecutive_empty_scans, updated_at)
+     VALUES ($1, to_timestamp($2/1000.0), $3, $4, $5::jsonb, $6, now())
+     ON CONFLICT (chain_id) DO UPDATE SET
+       last_scan_at = EXCLUDED.last_scan_at,
+       candidate_count = EXCLUDED.candidate_count,
+       eligible_count = EXCLUDED.eligible_count,
+       sources = EXCLUDED.sources,
+       -- The streak is the whole diagnosis, so it has to accumulate across
+       -- scans rather than be recomputed from one of them.
+       consecutive_empty_scans = CASE
+         WHEN EXCLUDED.candidate_count > 0 THEN 0
+         ELSE gem_chain_health.consecutive_empty_scans + 1
+       END,
+       updated_at = now()`,
+    [
+      scan.chainId,
+      scan.scannedAt,
+      scan.candidateCount,
+      scan.eligibleCount,
+      JSON.stringify(scan.sources),
+      scan.candidateCount > 0 ? 0 : 1,
+    ],
+  );
+}
+
+export async function getGemChainHealth(pool: Pool): Promise<GemChainHealth[]> {
+  const { rows } = await pool.query(
+    `SELECT chain_id, extract(epoch from last_scan_at)*1000 AS scan_ms,
+            candidate_count, eligible_count, sources, consecutive_empty_scans
+     FROM gem_chain_health ORDER BY chain_id`,
+  );
+  return rows.map((r) => ({
+    chainId: String(r.chain_id),
+    lastScanAt: Math.round(Number(r.scan_ms)),
+    candidateCount: Number(r.candidate_count),
+    eligibleCount: Number(r.eligible_count),
+    sources: (r.sources ?? {}) as Record<string, number | 'unsupported'>,
+    consecutiveEmptyScans: Number(r.consecutive_empty_scans),
+  }));
+}
+
+/* ------------------------------------------------------------------ */
 /* The control group                                                   */
 /* ------------------------------------------------------------------ */
 

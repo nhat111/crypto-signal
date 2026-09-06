@@ -7,8 +7,16 @@ import type { CandidateDiscoverySource, ChainId, GemPair, PairDataSource, Safety
 export interface ScanResult {
   chainId: ChainId;
   scannedAt: number;
-  /** How many candidates each discovery feed produced, so sampling coverage stays visible rather than implied. */
-  candidatesBySource: Record<string, number>;
+  /**
+   * What each discovery feed produced: a count, or `'unsupported'` when the
+   * feed does not cover this chain at all.
+   *
+   * The distinction is the whole point. A skipped source used to record `0`
+   * just like a source that ran and found nothing, so a chain running on
+   * half its discovery looked identical to a quiet one — which is how a
+   * wrong chain id can sit in the config for days saying nothing.
+   */
+  candidatesBySource: Record<string, number | 'unsupported'>;
   candidateCount: number;
   pairCount: number;
   eligible: ScoredGem[];
@@ -66,18 +74,36 @@ export interface ScannerDeps {
 export async function runScan(deps: ScannerDeps, chainId: ChainId, now = Date.now()): Promise<ScanResult> {
   const { logger, config } = deps;
 
-  const candidatesBySource: Record<string, number> = {};
+  const candidatesBySource: Record<string, number | 'unsupported'> = {};
   const addresses = new Set<string>();
 
   for (const source of deps.discoverySources) {
+    if (source.supportsChain && !source.supportsChain(chainId)) {
+      candidatesBySource[source.name] = 'unsupported';
+      continue;
+    }
     try {
       const found = await source.discoverCandidates(chainId);
       candidatesBySource[source.name] = found.length;
       for (const c of found) addresses.add(c.tokenAddress);
     } catch (err) {
+      // A failure is still coverage that exists — reported as zero found,
+      // never as "this feed does not do this chain", which would send
+      // somebody to fix the wrong thing.
       candidatesBySource[source.name] = 0;
       logger.warn({ err, source: source.name, chainId }, 'discovery source failed, continuing with the others');
     }
+  }
+
+  const supportedSources = Object.values(candidatesBySource).filter((v) => v !== 'unsupported').length;
+  if (supportedSources === 0) {
+    // Knowable without a single network call, and permanent until somebody
+    // changes the config: no feed covers this chain, so it can only ever
+    // report zero.
+    logger.error(
+      { chainId, sources: Object.keys(candidatesBySource) },
+      'gem scan: no discovery source covers this chain — it will never produce a candidate',
+    );
   }
 
   const tokenAddresses = [...addresses];

@@ -424,6 +424,39 @@ alert re-trigger comparison — so no version column is needed, but the
 first signal of each type after the deploy may re-alert once as the value
 steps down past `ALERT_CONFIDENCE_DELTA_RETRIGGER`.
 
+### A wrong chain id looked exactly like a quiet chain
+
+`GEM_CHAINS` takes DexScreener `chainId` strings, and getting one wrong
+produced zero candidates forever with nothing said. Worse,
+`GECKO_NETWORK_BY_CHAIN` maps exactly one chain (`solana`), so every other
+chain silently ran on **one** discovery feed instead of two — GeckoTerminal
+returned an empty array, which recorded as `0`, identical to having run and
+found nothing. Half the discovery could be switched off and the logs read
+as a slow market. This had been true in production for days.
+
+Three things now separate those states:
+
+- A discovery source can declare `supportsChain`, so a skipped feed records
+  `'unsupported'` rather than `0`. Failure still records `0` — an upstream
+  having a bad minute is not the same as a missing mapping, and conflating
+  them sends the reader to the wrong fix.
+- A chain no feed covers is logged at **error** on the first scan. That is
+  knowable with no network call and permanent until the config changes.
+- `gem_chain_health` accumulates consecutive empty scans per chain, and
+  `/status` names a chain that has found nothing for hours — pointing at
+  the chain id, since that is usually what is wrong.
+
+Six empty scans, at one scan per thirty minutes, is three hours: long
+enough not to fire on a genuinely slow afternoon, short enough to catch a
+typo the same day. Severity wins over the lesser fault: a chain silent for
+hours reads as broken even when a feed is also unmapped, since labelling
+that merely "missing a source" buries the bigger problem — and the missing
+feed still shows on the sources line.
+
+A table rather than worker memory, for the reason `symbolIngest` taught: a
+scan runs every thirty minutes, so an in-memory record would be empty for
+half an hour after every deploy, which is exactly when somebody looks.
+
 ## 17. Price-shock signals (`PRICE_SPIKE_UP` / `PRICE_SPIKE_DOWN`)
 
 Not from the spec. Added because every other rule describes *structure* —

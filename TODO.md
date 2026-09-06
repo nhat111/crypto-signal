@@ -200,6 +200,14 @@ Check items as they land; each phase's commit message references the phase.
 - [x] `/api/gems`, `/api/gems/:chain/:address`, `/api/gems/performance`.
 - [x] `/gems` web page and `/gems` Telegram command.
 - [x] Unit tests for the scoring gate and the safety interpreter.
+- [x] Tell a wrong chain id apart from a quiet chain (migration 019). A
+      skipped discovery feed records `'unsupported'` instead of `0`, a chain
+      no feed covers is an error on the first scan, and `/status` names a
+      chain that has scanned nothing for hours.
+- [ ] `GECKO_NETWORK_BY_CHAIN` still maps only `solana`, so every other
+      chain runs on one discovery feed. The page now says so instead of
+      hiding it; adding a mapping needs the slug verified against
+      GeckoTerminal first, never guessed.
 - [ ] EVM safety source (GoPlus-style honeypot simulation) — needed before
       HyperEVM tokens should be surfaced as anything but unverified.
 - [ ] Holder-growth and social signals.

@@ -373,3 +373,78 @@ export function describeAlertTimeframes(
 
   return { tone: 'ok', value, note: null };
 }
+
+/* ------------------------------------------------------------------ */
+/* Is each configured gem chain actually working?                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A wrong chain id and a quiet chain report the same thing: zero
+ * candidates, forever. One is a typo somebody can fix in ten seconds and
+ * the other is the market; nothing on any surface told them apart, and a
+ * chain had already been scanning nothing for days.
+ *
+ * Scans run every thirty minutes, so this many empties is several hours —
+ * long enough not to fire on a genuinely slow afternoon, short enough that
+ * a bad chain id is caught the same day.
+ */
+export const EMPTY_SCANS_BEFORE_SUSPECT = 6;
+
+export type ChainDiagnosis =
+  /** Finding candidates. */
+  | 'working'
+  /** Covered by every feed, but nothing has come back for hours. */
+  | 'silent'
+  /** Some feed does not cover this chain, so discovery is running at half strength. */
+  | 'partial-coverage'
+  /** No feed covers it at all — it can only ever report zero. */
+  | 'no-coverage';
+
+export function diagnoseChain(chain: {
+  candidateCount: number;
+  sources: Record<string, number | 'unsupported'>;
+  consecutiveEmptyScans: number;
+}): ChainDiagnosis {
+  const names = Object.keys(chain.sources);
+  const covered = names.filter((n) => chain.sources[n] !== 'unsupported');
+
+  // Knowable with no network call and permanent until the config changes:
+  // there is no feed that could ever return anything for this chain.
+  if (names.length > 0 && covered.length === 0) return 'no-coverage';
+
+  // Severity first. A chain that has produced nothing for hours is broken
+  // whether or not a feed is also missing, and labelling that merely
+  // "warn" because of the lesser fault buries the bigger one. The missing
+  // feed is still visible on the sources line right above the note.
+  if (chain.candidateCount === 0 && chain.consecutiveEmptyScans >= EMPTY_SCANS_BEFORE_SUSPECT) return 'silent';
+
+  // Reported even while candidates are arriving: running on half the feeds
+  // is a real reduction in what the scanner can see, and it is invisible
+  // from the candidate count alone.
+  if (covered.length < names.length) return 'partial-coverage';
+
+  return 'working';
+}
+
+export const CHAIN_TEXT: Record<ChainDiagnosis, { tone: Verdict; note: string }> = {
+  working: { tone: 'ok', note: '' },
+  silent: {
+    tone: 'bad',
+    note: 'Nhiều lượt quét liên tiếp không ra ứng viên nào. Nhiều khả năng chain id sai — mở dexscreener.com, tìm một token của chain đó, lấy đúng chuỗi trong URL dexscreener.com/<chainId>/…',
+  },
+  'partial-coverage': {
+    tone: 'warn',
+    note: 'Có nguồn không phủ chain này nên bị bỏ qua — scanner đang chạy với ít nguồn hơn bình thường, và nó không thể thấy những gì nguồn kia thấy.',
+  },
+  'no-coverage': {
+    tone: 'bad',
+    note: 'Không nguồn nào phủ chain này, nên nó sẽ không bao giờ ra ứng viên. Kiểm lại GEM_CHAINS.',
+  },
+};
+
+/** Which feeds are live for this chain and which are skipped, as one readable line. */
+export function describeChainSources(sources: Record<string, number | 'unsupported'>): string {
+  const names = Object.keys(sources).sort();
+  if (names.length === 0) return '—';
+  return names.map((n) => `${n}: ${sources[n] === 'unsupported' ? 'không phủ' : sources[n]}`).join(' · ');
+}

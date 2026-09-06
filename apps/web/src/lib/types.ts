@@ -558,6 +558,16 @@ export interface StatusService {
   startedAt: number;
 }
 
+/** One configured gem chain and whether it is actually producing anything. */
+export interface StatusGemChain {
+  chainId: string;
+  lastScanAt: number;
+  candidateCount: number;
+  eligibleCount: number;
+  sources: Record<string, number | 'unsupported'>;
+  consecutiveEmptyScans: number;
+}
+
 export interface StatusResponse {
   version: StatusVersion;
   services: StatusService[];
@@ -566,5 +576,7 @@ export interface StatusResponse {
   jobs: StatusJob[];
   /** Null before the worker's first heartbeat — a cold start, not a failure. */
   worker: StatusWorkerRuntime | null;
+  /** Optional: an API predating the gem-chain table sends nothing, and the scanner is opt-in anyway. */
+  gemChains?: StatusGemChain[];
   serverTime: number;
 }

@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   DIAGNOSIS_TEXT,
   INGEST_TEXT,
+  CHAIN_TEXT,
   classifySymbol,
   collectorSummary,
   describeAlertTimeframes,
+  describeChainSources,
+  diagnoseChain,
+  EMPTY_SCANS_BEFORE_SUSPECT,
   connectionVerdict,
   diagnoseFromCensus,
   diagnoseIngest,
@@ -453,5 +457,99 @@ describe('describeAlertTimeframes', () => {
     const shown = describeAlertTimeframes({ armed: ['1h', '4h'], collected: all, ignored: ['1w'] });
     expect(shown?.value).toBe('1h, 4h');
     expect(shown?.tone).toBe('warn');
+  });
+});
+
+describe('diagnoseChain', () => {
+  const both = { dexscreener: 5, geckoterminal: 3 };
+
+  it('says nothing is wrong while candidates arrive', () => {
+    expect(diagnoseChain({ candidateCount: 8, sources: both, consecutiveEmptyScans: 0 })).toBe('working');
+  });
+
+  it('names a chain no feed covers, before it has scanned anything', () => {
+    // Knowable with no network call and permanent until the config
+    // changes: this chain can only ever report zero.
+    const d = diagnoseChain({
+      candidateCount: 0,
+      sources: { dexscreener: 'unsupported', geckoterminal: 'unsupported' },
+      consecutiveEmptyScans: 0,
+    });
+    expect(d).toBe('no-coverage');
+    expect(CHAIN_TEXT[d].tone).toBe('bad');
+  });
+
+  it('reports half coverage even while candidates are arriving', () => {
+    // The production case: GeckoTerminal maps only solana, so every other
+    // chain silently ran on one feed instead of two. The candidate count
+    // alone can never show that.
+    const d = diagnoseChain({
+      candidateCount: 12,
+      sources: { dexscreener: 12, geckoterminal: 'unsupported' },
+      consecutiveEmptyScans: 0,
+    });
+    expect(d).toBe('partial-coverage');
+    expect(CHAIN_TEXT[d].tone).toBe('warn');
+  });
+
+  it('does not call one empty scan a fault', () => {
+    // Half an hour with nothing new is a quiet market, not a typo.
+    expect(diagnoseChain({ candidateCount: 0, sources: both, consecutiveEmptyScans: 1 })).toBe('working');
+    expect(
+      diagnoseChain({ candidateCount: 0, sources: both, consecutiveEmptyScans: EMPTY_SCANS_BEFORE_SUSPECT - 1 }),
+    ).toBe('working');
+  });
+
+  it('calls a long streak of empties suspect', () => {
+    // Several hours of nothing from every covered feed. The note points at
+    // the chain id, because that is what is usually wrong.
+    const d = diagnoseChain({ candidateCount: 0, sources: both, consecutiveEmptyScans: EMPTY_SCANS_BEFORE_SUSPECT });
+    expect(d).toBe('silent');
+    expect(CHAIN_TEXT[d].tone).toBe('bad');
+    expect(CHAIN_TEXT[d].note).toContain('dexscreener.com');
+  });
+
+  it('calls a long-silent chain broken even when a feed is also missing', () => {
+    // The production shape: hyperevm, one feed unmapped, and nothing found
+    // for hours. Labelling that merely "thiếu nguồn" buries the bigger
+    // fault — the missing feed still shows on the sources line.
+    const d = diagnoseChain({
+      candidateCount: 0,
+      sources: { dexscreener: 0, geckoterminal: 'unsupported' },
+      consecutiveEmptyScans: 11,
+    });
+    expect(d).toBe('silent');
+    expect(CHAIN_TEXT[d].tone).toBe('bad');
+  });
+
+  it('does not claim silence while the last scan found something', () => {
+    // A stale streak with a fresh non-empty scan would be contradictory;
+    // the count is the more recent fact.
+    expect(diagnoseChain({ candidateCount: 4, sources: both, consecutiveEmptyScans: 99 })).toBe('working');
+  });
+
+  it('says nothing about a chain that has no sources listed at all', () => {
+    // Nothing recorded is not the same as nothing covering it.
+    expect(diagnoseChain({ candidateCount: 0, sources: {}, consecutiveEmptyScans: 0 })).toBe('working');
+  });
+
+  it('has a note for every fault and none for the healthy state', () => {
+    expect(CHAIN_TEXT.working.note).toBe('');
+    for (const key of ['silent', 'partial-coverage', 'no-coverage'] as const) {
+      expect(CHAIN_TEXT[key].note.length, key).toBeGreaterThan(20);
+    }
+  });
+});
+
+describe('describeChainSources', () => {
+  it('separates "did not cover" from "covered and found none"', () => {
+    // Two different fixes: one is a missing mapping, the other is the market.
+    const line = describeChainSources({ dexscreener: 0, geckoterminal: 'unsupported' });
+    expect(line).toContain('dexscreener: 0');
+    expect(line).toContain('geckoterminal: không phủ');
+  });
+
+  it('handles a chain with nothing recorded', () => {
+    expect(describeChainSources({})).toBe('—');
   });
 });
