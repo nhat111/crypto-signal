@@ -268,11 +268,18 @@ Check items as they land; each phase's commit message references the phase.
       should be split by reason.
 
 ## Known limitations (carried forward, not silently hidden)
-- [ ] Nothing renders the web pages against an older API payload. Web and
-      API deploy separately, so new client code meets an old response on
-      every release; a required-but-missing field crashed /gems outright.
-      The types now carry the rule (fields must be optional) but nothing
-      enforces it — a page smoke test against a stubbed old payload would.
+- [x] Components now render against older API payloads in the test suite
+      (`apps/web/src/lib/legacyPayload.test.ts`). The optional fields are
+      read out of `lib/types.ts` with the TypeScript AST rather than listed
+      by hand, so a field added tomorrow is stripped tomorrow with nobody
+      remembering. Each payload is rendered with every optional field
+      missing AND with each one missing on its own — the all-missing case
+      alone takes early exits that never reach the unsafe branches.
+      Verified against the real bug shape: a raw deref of an optional field
+      fails the suite with the same `Cannot read properties of undefined`
+      the browser threw.
+      Not covered: pages as wholes (they fetch), and any component still
+      private to its page file.
 - [x] CI builds the production bundles and boots the Telegram one against
       stub services (`scripts/bundle-smoke.mjs`), because `tsx` does not
       bundle and a bundler-only failure was green everywhere else while

@@ -358,6 +358,28 @@ pruning on their schedule would recreate the hole.
 None of this can be backfilled, which is why it went in before any
 analysis that would use it.
 
+### A rule written in a comment is not a rule
+
+`lib/types.ts` opens with the split-deploy rule: a field added to an API
+response must be declared optional here, because Vercel and Railway finish
+at different times and a new client meets an old payload on every release.
+The rule was correct and nothing enforced it — a required-but-missing
+field had already taken out /gems.
+
+The enforcement reads the optional fields out of the type definitions with
+the TypeScript AST, so it covers fields nobody has written yet. Two things
+it taught immediately:
+
+- **Stripping every optional field at once covers less than it looks.** A
+  guard on one field shields an unguarded second one by never letting its
+  branch run, so the all-missing payload takes an early exit and the
+  unsafe line is never reached. Each field also has to be removed on its
+  own.
+- **A cast in a fixture switches off the check that keeps the fixture
+  honest.** The first `GemPerformance` fixture was written with `as
+  unknown as`, invented half the shape, and failed three tests against
+  perfectly good code. Fixtures are typed now, with no `as` anywhere.
+
 ### Scoring
 
 Two independent 0-100 scores, mirroring Health vs Leverage Risk on the
