@@ -305,10 +305,25 @@ export interface Trade {
   note: string | null;
   openedAt: number;
   closedAt: number | null;
+
+  /**
+   * Estimated P&L while the position is open. All optional: an API
+   * deployed before this existed sends none of it, and an open position
+   * whose symbol no price source knows sends the reasons without the
+   * numbers. Never blended with pnlPct/pnlUsd, which are realized facts.
+   */
+  markPrice?: number | null;
+  markPriceAt?: number | null;
+  markPriceSource?: 'snapshot' | 'gem_scan' | null;
+  markPriceUnknownReason?: 'not_found' | 'ambiguous_ticker' | null;
+  unrealizedPnlPct?: number | null;
+  unrealizedPnlUsd?: number | null;
 }
 
 export interface TradesResponse {
   trades: Trade[];
+  /** Optional: an API deployed before mark pricing sends no clock, and then no age is shown. */
+  serverTime?: number;
 }
 
 export interface TradeSummary {
@@ -320,6 +335,11 @@ export interface TradeSummary {
   /** Null when no closed trade recorded a size — "$0.00" would read as break-even rather than "not knowable". */
   totalPnlUsd: number | null;
   avgPnlPct: number | null;
+
+  /** Optional: added after this interface shipped, so an older API omits both. */
+  unrealizedPnlUsd?: number | null;
+  /** How many open positions that total actually covers — a total over some of them is not a total. */
+  unrealizedPricedCount?: number;
 }
 
 /* ---------- Small-cap discovery (gem scanner) ---------- */

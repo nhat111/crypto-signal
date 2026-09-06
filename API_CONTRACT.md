@@ -304,6 +304,34 @@ addresses are base58 and case-SENSITIVE, so upper-casing one names a
 different token. Lookups normalise the same way, so both directions agree.
 → `{ trade }`, status `open`.
 
+`GET /api/journal` → `{ trades, serverTime }`. `serverTime` is the API's
+clock, sent so the page can age a mark price without calling `Date.now()`
+during render (impure) or trusting the phone's clock.
+
+Every **open** trade also carries an estimated P&L; a closed one never
+does, because its stored `pnlPct`/`pnlUsd` were priced from the exit the
+user actually got and re-pricing them against today's market would rewrite
+history on every poll:
+
+```
+markPrice, markPriceAt, markPriceSource: "snapshot" | "gem_scan",
+markPriceUnknownReason: "not_found" | "ambiguous_ticker" | null,
+unrealizedPnlPct, unrealizedPnlUsd
+```
+
+The price is resolved from `market_health_snapshots` first, then the last
+`gem_scans` row — matched by contract address (case-insensitive, but only
+when exactly one token matches) before ticker. A ticker two different
+tokens share resolves to `ambiguous_ticker` and **no price**: tickers are
+not unique across chains, and a confident wrong number is one somebody
+sells on. `unrealizedPnlUsd` is null without a recorded size; both are
+null, never 0, when there is no usable price.
+
+`GET /api/journal/summary` adds `unrealizedPnlUsd` and
+`unrealizedPricedCount` alongside the realized figures, never folded into
+them. The count is there because a total covering three of five open
+positions is not a total, and looks like one.
+
 `GET /api/journal?chatId=&status=open|closed&limit=` — all filters
 optional; omit `chatId` to get every chat's entries (what the web
 dashboard does). Returns `{ trades: [...] }`, most recent first.

@@ -306,6 +306,31 @@ rounds to cents, so a gem bought at $0.00042 rendered as **$0.00** — which
 does not read as rounding, it reads as a recorded zero, next to the P&L
 the user opened the page to check.
 
+### An open position had no number at all until it was closed
+
+The journal showed "open" and a dash where the P&L goes, so a spot buy
+held for a week said nothing about itself — which is most of what a spot
+buyer wants from a journal.
+
+It now prices open positions, under the same rule the rest of the system
+runs on: **estimates never mix with facts**. A closed trade's P&L was
+computed once, from the exit the user actually got; an open one is
+recomputed on every poll from a price nobody transacted at. They sit in
+the same column, so the estimate is prefixed `≈`, dimmed, and titled
+"tạm tính", and the summary gives it its own tile rather than adding it to
+Total P&L — the same reason Health is never netted against Leverage Risk.
+
+Three refusals are deliberate:
+
+- **A ticker two tokens share resolves to no price.** Tickers are not
+  unique across chains. Picking the newest scan would put a confident
+  wrong number in front of somebody deciding whether to sell, so the row
+  says why and how to fix it (log the contract address).
+- **A mark price of 0 or less is refused**, not used. It would render every
+  long as -100%, an alarm far worse than a blank.
+- **The summary reports how many open positions its total covers.** A
+  total over three of five is not a total, and looks exactly like one.
+
 ### Scoring
 
 Two independent 0-100 scores, mirroring Health vs Leverage Risk on the

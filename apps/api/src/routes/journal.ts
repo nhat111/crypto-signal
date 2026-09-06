@@ -1,5 +1,18 @@
 import type { FastifyInstance } from 'fastify';
-import { deleteTrade, getTradeSummary, getTrades, insertTrade, isTradeSide, updateTrade, type TradeSide, type TradeStatus } from '@crypto-signal/db';
+import {
+  computeUnrealized,
+  deleteTrade,
+  getMarkPrices,
+  getTradeSummary,
+  getTrades,
+  insertTrade,
+  isTradeSide,
+  updateTrade,
+  type TradeRow,
+  type TradeSide,
+  type TradeStatus,
+  type UnrealizedPnl,
+} from '@crypto-signal/db';
 import type { ApiDeps } from '../deps.js';
 
 interface CreateTradeBody {
@@ -60,12 +73,17 @@ export function registerJournalRoutes(app: FastifyInstance, deps: ApiDeps): void
       status: req.query.status,
       limit: req.query.limit !== undefined ? Math.min(1000, Number(req.query.limit)) : undefined,
     });
-    return { trades };
+    // The page ages the mark price against this rather than its own clock:
+    // Date.now() in render is impure, and a phone's clock can be minutes out.
+    return { trades: await withUnrealized(deps.pool, trades), serverTime: Date.now() };
   });
 
   app.get<{ Querystring: { chatId?: string } }>('/api/journal/summary', async (req) => {
-    const summary = await getTradeSummary(deps.pool, req.query.chatId);
-    return { summary };
+    const [summary, open] = await Promise.all([
+      getTradeSummary(deps.pool, req.query.chatId),
+      getTrades(deps.pool, { chatId: req.query.chatId, status: 'open', limit: 1000 }),
+    ]);
+    return { summary: { ...summary, ...aggregateUnrealized(await withUnrealized(deps.pool, open)) } };
   });
 
   app.patch<{ Params: { id: string }; Body: UpdateTradeBody }>('/api/journal/:id', async (req, reply) => {
@@ -79,4 +97,49 @@ export function registerJournalRoutes(app: FastifyInstance, deps: ApiDeps): void
     if (!deleted) return reply.code(404).send({ error: 'unknown trade' });
     return { deleted: true };
   });
+}
+
+/**
+ * Attaches an estimated P&L to every OPEN trade, and to no closed one.
+ *
+ * A closed trade already has the only P&L that is a fact — priced from the
+ * exit the user actually got, at close, and never recomputed. Re-pricing
+ * it against today's market would silently rewrite history every time the
+ * page polled.
+ */
+async function withUnrealized(pool: Parameters<typeof getMarkPrices>[0], trades: TradeRow[]): Promise<Array<TradeRow & Partial<UnrealizedPnl>>> {
+  const open = trades.filter((t) => t.status === 'open');
+  if (open.length === 0) return trades;
+
+  const marks = await getMarkPrices(pool, open.map((t) => t.symbol));
+  return trades.map((trade) => {
+    if (trade.status !== 'open') return trade;
+    const mark = marks.get(trade.symbol);
+    if (!mark) return trade;
+    return {
+      ...trade,
+      ...computeUnrealized({ side: trade.side, entryPrice: trade.entryPrice, size: trade.size }, mark),
+    };
+  });
+}
+
+/**
+ * The open book as one number, reported separately from realized P&L and
+ * never added to it.
+ *
+ * `pricedCount` against `openCount` is the honest part: a total that
+ * silently covers three of five positions is worse than no total, because
+ * it looks complete. Null rather than 0 when nothing could be priced —
+ * "$0" would read as "flat", not as "unknown".
+ */
+function aggregateUnrealized(trades: Array<TradeRow & Partial<UnrealizedPnl>>): {
+  unrealizedPnlUsd: number | null;
+  unrealizedPricedCount: number;
+} {
+  const priced = trades.filter((t) => t.status === 'open' && typeof t.unrealizedPnlUsd === 'number');
+  if (priced.length === 0) return { unrealizedPnlUsd: null, unrealizedPricedCount: 0 };
+  return {
+    unrealizedPnlUsd: priced.reduce((sum, t) => sum + (t.unrealizedPnlUsd as number), 0),
+    unrealizedPricedCount: priced.length,
+  };
 }

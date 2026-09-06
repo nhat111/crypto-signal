@@ -8,6 +8,8 @@ interface JournalSummaryProps {
 /** Same stat-tile shape as PerformanceCard's Stat — same rule applies: no closed trades means no rate to show, not a misleading 0%. */
 export function JournalSummary({ summary }: JournalSummaryProps) {
   const { closedCount, winRatePct, totalPnlUsd, avgPnlPct, openCount } = summary;
+  const openPnl = summary.unrealizedPnlUsd;
+  const priced = summary.unrealizedPricedCount ?? 0;
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -29,6 +31,23 @@ export function JournalSummary({ summary }: JournalSummaryProps) {
         tone={avgPnlPct === null ? undefined : avgPnlPct >= 0 ? 'emerald' : 'rose'}
       />
       <Stat label="Open positions" value={String(openCount)} />
+      {openCount > 0 && (
+        <Stat
+          label="P&L đang mở"
+          // Deliberately its own tile, never folded into Total P&L: that
+          // one is realized and settled, this one moves on its own every
+          // time the page polls.
+          value={openPnl === null || openPnl === undefined ? '—' : formatUsd(openPnl, false)}
+          detail={
+            openPnl === null || openPnl === undefined
+              ? 'tạm tính — chưa có giá'
+              : priced < openCount
+                ? `tạm tính · ${priced}/${openCount} vị thế có giá`
+                : 'tạm tính'
+          }
+          tone={openPnl === null || openPnl === undefined ? undefined : openPnl >= 0 ? 'emerald' : 'rose'}
+        />
+      )}
     </div>
   );
 }

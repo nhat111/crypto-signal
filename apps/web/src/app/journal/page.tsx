@@ -57,8 +57,15 @@ function JournalContent() {
       ) : (
         <>
           {summary.data && <JournalSummary summary={summary.data.summary} />}
-          <TradeForm onCreated={refreshAll} prefill={prefill} />
-          <TradeTable trades={trades.data?.trades ?? []} onChanged={refreshAll} />
+          <TradeForm
+            // Remount on a new draft rather than syncing state in an
+            // effect: the form is uncontrolled once open, and a new draft
+            // means a new form.
+            key={prefill === null ? 'blank' : `${prefill.symbol}:${prefill.entryPrice}:${prefill.side}`}
+            onCreated={refreshAll}
+            prefill={prefill}
+          />
+          <TradeTable trades={trades.data?.trades ?? []} onChanged={refreshAll} nowMs={trades.data?.serverTime ?? null} />
         </>
       )}
     </div>

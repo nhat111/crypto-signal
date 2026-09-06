@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { createTrade } from '@/lib/api';
 import type { TradeSide } from '@/lib/types';
 import { cx } from '@/lib/format';
@@ -13,6 +13,10 @@ interface TradeFormProps {
    * not a submission: the price came from the last scan, not from the fill
    * the user actually got, so it has to be theirs to correct before it
    * becomes a record of what they did.
+   *
+   * Read once, as the initial state. The caller remounts this component
+   * with a new `key` when the draft changes — which is also what keeps a
+   * half-typed form from being overwritten by a re-render.
    */
   prefill?: TradePrefill | null;
 }
@@ -29,29 +33,16 @@ const SIDE_STYLES: Record<TradeSide, string> = {
 const SIDE_LABELS: Record<TradeSide, string> = { spot: 'Spot', long: 'Long', short: 'Short' };
 
 export function TradeForm({ onCreated, prefill }: TradeFormProps) {
-  const [symbol, setSymbol] = useState('');
+  const [symbol, setSymbol] = useState(prefill?.symbol ?? '');
   // Spot by default: it is the only one of the three that needs no margin
   // account, and a wrong default here writes a position type into the log
   // that the user never took.
-  const [side, setSide] = useState<TradeSide>('spot');
-  const [entryPrice, setEntryPrice] = useState('');
+  const [side, setSide] = useState<TradeSide>(prefill?.side ?? 'spot');
+  const [entryPrice, setEntryPrice] = useState(prefill?.entryPrice ?? '');
   const [size, setSize] = useState('');
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState(prefill?.note ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Keyed on the prefill object, so clicking the same gem twice after
-  // editing the form refills it, and typing in between is never clobbered
-  // by a re-render.
-  useEffect(() => {
-    if (!prefill) return;
-    setSymbol(prefill.symbol);
-    setSide(prefill.side);
-    setEntryPrice(prefill.entryPrice);
-    setNote(prefill.note);
-    setSize('');
-    setError(null);
-  }, [prefill]);
 
   const canSubmit = symbol.trim().length > 0 && entryPrice.trim().length > 0 && !submitting;
 

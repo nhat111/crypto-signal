@@ -4,9 +4,11 @@ import { TradeRow } from './TradeRow';
 interface TradeTableProps {
   trades: Trade[];
   onChanged: () => void;
+  /** The API's clock, threaded down so no row reads Date.now() during render. */
+  nowMs: number | null;
 }
 
-export function TradeTable({ trades, onChanged }: TradeTableProps) {
+export function TradeTable({ trades, onChanged, nowMs }: TradeTableProps) {
   if (trades.length === 0) {
     return (
       <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-6 text-center text-sm text-slate-500">
@@ -32,7 +34,7 @@ export function TradeTable({ trades, onChanged }: TradeTableProps) {
         </thead>
         <tbody className="pl-3">
           {trades.map((trade) => (
-            <TradeRow key={trade.id} trade={trade} onChanged={onChanged} />
+            <TradeRow key={trade.id} trade={trade} onChanged={onChanged} nowMs={nowMs} />
           ))}
         </tbody>
       </table>
