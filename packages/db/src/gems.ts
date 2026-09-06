@@ -150,23 +150,32 @@ export async function getLatestGems(
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   params.push(filters.limit ?? 50);
 
+  // DISTINCT ON forces ORDER BY to lead with its dedupe keys, so the limit
+  // cannot be applied to that query directly: it would cut by (chain, address)
+  // and keep whichever tokens happen to sort first, not the best-scoring ones.
+  // With one chain configured nothing showed; add a second and the list
+  // silently drops the tail chain's top picks while still claiming to be
+  // ranked by score. Hence: dedupe in the inner query, rank and cut outside it.
   const { rows } = await pool.query(
-    `SELECT DISTINCT ON (s.chain_id, s.token_address)
-            s.scan_id, s.chain_id, s.token_address, s.gem_score, s.gem_components, s.risk_score,
-            s.risk_components, s.reasons, s.price_usd, s.liquidity_usd, s.volume_24h_usd, s.fdv_usd,
-            s.price_change_24h_pct, s.buys_24h, s.sells_24h, s.age_days, s.safety_verdict,
-            s.safety_flags, s.top_holder_pct, s.lp_locked,
-            extract(epoch from s.scanned_at)*1000 AS ts,
-            t.symbol, t.name, t.dex_id, t.dexscreener_url
-     FROM gem_scans s
-     JOIN gem_tokens t ON t.chain_id = s.chain_id AND t.token_address = s.token_address
-     ${where}
-     ORDER BY s.chain_id, s.token_address, s.scanned_at DESC
+    `SELECT * FROM (
+       SELECT DISTINCT ON (s.chain_id, s.token_address)
+              s.scan_id, s.chain_id, s.token_address, s.gem_score, s.gem_components, s.risk_score,
+              s.risk_components, s.reasons, s.price_usd, s.liquidity_usd, s.volume_24h_usd, s.fdv_usd,
+              s.price_change_24h_pct, s.buys_24h, s.sells_24h, s.age_days, s.safety_verdict,
+              s.safety_flags, s.top_holder_pct, s.lp_locked,
+              extract(epoch from s.scanned_at)*1000 AS ts,
+              t.symbol, t.name, t.dex_id, t.dexscreener_url
+       FROM gem_scans s
+       JOIN gem_tokens t ON t.chain_id = s.chain_id AND t.token_address = s.token_address
+       ${where}
+       ORDER BY s.chain_id, s.token_address, s.scanned_at DESC
+     ) latest
+     ORDER BY gem_score DESC, chain_id, token_address
      LIMIT $${params.length}`,
     params,
   );
 
-  return rows.map(toGemRow).sort((a, b) => b.gemScore - a.gemScore);
+  return rows.map(toGemRow);
 }
 
 export async function getGemByAddress(pool: Pool, chainId: string, tokenAddress: string): Promise<GemRow | undefined> {
