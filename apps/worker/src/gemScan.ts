@@ -1,8 +1,10 @@
 import type { Pool } from 'pg';
 import type { Logger } from '@crypto-signal/shared';
 import {
+  CompositeSafetySource,
   DexScreenerSource,
   GeckoTerminalSource,
+  GoPlusSource,
   RugCheckSource,
   runScan,
   type GemConfig,
@@ -57,7 +59,16 @@ export async function runGemScanCycle(deps: GemScanDeps): Promise<void> {
 
   const dexscreener = new DexScreenerSource({ logger });
   const geckoterminal = new GeckoTerminalSource({ logger });
-  const rugcheck = new RugCheckSource({ logger, apiKey: gemConfig.rugcheckApiKey || undefined });
+  // One screen per chain family, and no chain is covered twice: RugCheck
+  // does Solana, GoPlus does EVM. A chain neither covers still gets a
+  // report — `unknown` with a reason — rather than nothing at all.
+  const safety = new CompositeSafetySource(
+    [
+      new RugCheckSource({ logger, apiKey: gemConfig.rugcheckApiKey || undefined }),
+      new GoPlusSource({ logger }),
+    ],
+    logger,
+  );
 
   for (const chainId of gemConfig.chains) {
     try {
@@ -65,7 +76,7 @@ export async function runGemScanCycle(deps: GemScanDeps): Promise<void> {
         {
           discoverySources: [dexscreener, geckoterminal],
           pairSource: dexscreener,
-          safetySource: rugcheck,
+          safetySource: safety,
           config: gemConfig,
           logger,
           baselineSampleSize: BASELINE_SAMPLE_PER_SCAN,

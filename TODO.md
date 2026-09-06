@@ -209,8 +209,13 @@ Check items as they land; each phase's commit message references the phase.
       "API-ID robinhood". Every other chain still runs on one discovery
       feed; the page says so instead of hiding it, and a new mapping needs
       the slug read off that page rather than guessed.
-- [ ] EVM safety source (GoPlus-style honeypot simulation) — needed before
-      HyperEVM tokens should be surfaced as anything but unverified.
+- [x] EVM safety source: GoPlus (`sources/goplus.ts`), routed per chain by
+      `CompositeSafetySource`. Covers ethereum, bsc, base, polygon,
+      arbitrum, avalanche, optimism. `safetyDisqualifies` can finally fire
+      on an EVM chain, which is what makes `bsc` worth enabling at all.
+- [ ] `robinhood` still has no safety screen — its EVM id is known but
+      GoPlus coverage of a chain that new is not verified. Tokens there
+      stay unverified, and the alert now says so above the score.
 - [ ] Holder-growth and social signals.
 - [x] Answer whether the score works at all before tuning it: outcomes are
       split into fixed score bands and the top band is judged against the

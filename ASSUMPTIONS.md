@@ -282,7 +282,22 @@ rate off a handful of samples.
   DexScreener (chain id `hyperevm`), but no EVM safety source is wired up,
   so those tokens would be surfaced unverified — which is why only
   `solana` is enabled by default.
-- No honeypot simulation (would need a GoPlus-style EVM source).
+- Honeypot and contract screening on EVM chains comes from GoPlus
+  (`sources/goplus.ts`), under the same two rules RugCheck follows: a
+  screen that could not run reports `unknown` and never `safe`, and an
+  individual check is `null` when unreported rather than `false`. GoPlus
+  sends its booleans as the strings "0"/"1" and omits keys it has no
+  answer for, so anything that is neither string reads as null — coercing
+  it to false would turn "we could not tell whether this is a honeypot"
+  into "this is not a honeypot".
+- `CompositeSafetySource` routes each chain to whichever source covers it
+  (RugCheck for Solana, GoPlus for EVM). A chain neither covers still
+  produces a report — `unknown`, with the chain named — because the rule
+  each source follows has to survive being composed.
+- The GoPlus chain table lists only chains it is known to index. Notably
+  **absent: `robinhood`**. Its EVM id is known (4663), but whether GoPlus
+  covers a chain that new is not, and a screen that returns nothing while
+  looking like it ran is worse than no screen at all.
 - No holder-growth or social signals.
 - Token names and symbols come from on-chain metadata that anyone can set;
   they are HTML-escaped before display but are not otherwise trustworthy.
