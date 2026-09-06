@@ -173,14 +173,35 @@ export async function persistAndMaybeAlert(deps: GemScanDeps, gem: ScoredGem, sc
   logger.info({ symbol: pair.baseToken.symbol, score, riskScore: evaluation.riskScore }, 'gem alert sent');
 }
 
+/**
+ * Whether a safety screen actually ran on this token.
+ *
+ * Null means no screen exists for the chain at all — RugCheck covers
+ * Solana and nothing else — and 'unknown' means one was attempted and
+ * could not confirm anything. Neither is "safe", and on a chain with no
+ * screening the difference between them is the difference between a
+ * scored candidate and a coin flip on a rug.
+ */
+function screeningGap(gem: ScoredGem): string | null {
+  if (gem.safety === null) return 'CHƯA QUÉT ĐƯỢC AN TOÀN — chain này không có nguồn quét rug. Có thể là honeypot.';
+  if (gem.safety.verdict === 'unknown') return 'QUÉT AN TOÀN KHÔNG XONG — không xác nhận được gì. Coi như chưa kiểm.';
+  return null;
+}
+
 export function formatGemAlert(gem: ScoredGem): string {
   const { pair, evaluation } = gem;
+  const gap = screeningGap(gem);
   const lines = [
     '💎 <b>SMALL-CAP CANDIDATE</b>',
     '',
     `<b>${escapeHtml(pair.baseToken.symbol)}</b> — ${escapeHtml(pair.baseToken.name)}`,
     `${pair.chainId} · ${pair.dexId}`,
     '',
+    // Above the score, not buried in the reasons list under it. An alert's
+    // default reading is "worth acting on", and a Gem Score of 78 printed
+    // over a token nobody screened reads as a recommendation. The same
+    // sentence sat at position six of eight and did not land.
+    ...(gap ? [`⚠️ <b>${gap}</b>`, ''] : []),
     `Gem Score: ${evaluation.score}/100`,
     `Risk Score: ${evaluation.riskScore}/100`,
     '',

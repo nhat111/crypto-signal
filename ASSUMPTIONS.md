@@ -286,6 +286,12 @@ rate off a handful of samples.
 - No holder-growth or social signals.
 - Token names and symbols come from on-chain metadata that anyone can set;
   they are HTML-escaped before display but are not otherwise trustworthy.
+- On a chain with no safety source, the gem alert leads with the fact that
+  nothing screened the token, **above** the Gem Score. The sentence had
+  always been in the message, at position six of the reasons list under a
+  headline score — where it read as a footnote to a recommendation. An
+  alert's default reading is "worth acting on", so the fact that
+  contradicts it has to arrive before the number, not after.
 
 ### The control group (added later)
 
