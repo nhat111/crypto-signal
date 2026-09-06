@@ -16,6 +16,7 @@ export default defineConfig({
       '@crypto-signal/signal-engine': alias('signal-engine'),
       '@crypto-signal/health-engine': alias('health-engine'),
       '@crypto-signal/gem-scanner': alias('gem-scanner'),
+      '@crypto-signal/lookup': alias('lookup'),
       '@crypto-signal/db': alias('db'),
       '@': fileURLToPath(new URL('./apps/web/src', import.meta.url)),
     },
