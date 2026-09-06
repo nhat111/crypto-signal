@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cx } from '@/lib/format';
+import { showsSymbolChips } from '@/lib/navScope';
 import { useTrackedSymbols } from '@/lib/useTrackedSymbols';
 
 const LINKS = [
@@ -55,7 +56,12 @@ export function NavBar() {
         {/* ml-auto only once there is room for it: on a narrow screen it
             shoved the symbol chips against the right edge of an already
             overflowing row. */}
+        {showsSymbolChips(pathname) && (
         <div className="flex flex-wrap items-center gap-1 sm:ml-auto">
+          {/* Labelled, because an unlabelled chip row sitting under the
+              tabs reads as a filter for the page below rather than as a
+              jump into another section. */}
+          <span className="mr-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-600">Chi tiết</span>
           {symbols.map((symbol) => {
             const active = pathname === `/symbol/${symbol}`;
             return (
@@ -74,6 +80,7 @@ export function NavBar() {
             );
           })}
         </div>
+        )}
       </div>
     </header>
   );
