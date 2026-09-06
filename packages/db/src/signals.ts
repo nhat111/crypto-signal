@@ -97,7 +97,7 @@ export interface RecentSignalRow extends StoredSignal {
 
 export async function getRecentSignals(
   pool: Pool,
-  filters: { symbol?: string; timeframe?: string; signalType?: string; limit?: number } = {},
+  filters: { symbol?: string; timeframes?: string[]; signalType?: string; limit?: number } = {},
 ): Promise<RecentSignalRow[]> {
   const conditions: string[] = [];
   const params: unknown[] = [];
@@ -105,9 +105,14 @@ export async function getRecentSignals(
     params.push(filters.symbol);
     conditions.push(`symbol = $${params.length}`);
   }
-  if (filters.timeframe) {
-    params.push(filters.timeframe);
-    conditions.push(`timeframe = $${params.length}`);
+  // A list rather than one value: the Telegram bot asks for exactly the
+  // frames the worker is armed to alert on, which is usually two of them.
+  // An empty array means "no filter" — same as omitting it — because a
+  // caller resolving a set can legitimately end up with none, and
+  // `= ANY('{}')` would silently return nothing.
+  if (filters.timeframes && filters.timeframes.length > 0) {
+    params.push(filters.timeframes);
+    conditions.push(`timeframe = ANY($${params.length})`);
   }
   if (filters.signalType) {
     params.push(filters.signalType);

@@ -204,8 +204,29 @@ export class ApiClient {
     return this.get(`/api/symbols/${symbol}?timeframe=${timeframe}`);
   }
 
-  getSignals(limit = 10): Promise<{ signals: SignalRow[] }> {
-    return this.get(`/api/signals?limit=${limit}`);
+  getSignals(limit = 10, timeframes: string[] = []): Promise<{ signals: SignalRow[] }> {
+    const filter = timeframes.length > 0 ? `&timeframe=${encodeURIComponent(timeframes.join(','))}` : '';
+    return this.get(`/api/signals?limit=${limit}${filter}`);
+  }
+
+  /**
+   * Which timeframes the worker will actually push alerts on, or null when
+   * it has not said.
+   *
+   * Read from /status rather than from this app's own environment: the
+   * arming lives on the worker, and a second copy of that setting here
+   * could disagree with it — which is precisely the confusion being fixed.
+   */
+  async getArmedTimeframes(): Promise<string[] | null> {
+    try {
+      const status = await this.get<{ worker?: { alertTimeframes?: { armed?: string[] } | null } | null }>('/api/status');
+      const armed = status.worker?.alertTimeframes?.armed;
+      return Array.isArray(armed) ? armed : null;
+    } catch {
+      // Never fatal: /signals still answers, it just says it could not
+      // narrow the list.
+      return null;
+    }
   }
 
   getGems(limit = 10): Promise<{ gems: GemRow[] }> {

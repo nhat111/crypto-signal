@@ -3,6 +3,7 @@ import { createLogger, loadConfig, type Logger } from '@crypto-signal/shared';
 import { ApiClient, ApiError } from './apiClient.js';
 import {
   buildHelpText,
+  escapeHtml,
   formatGemList,
   formatFlow,
   formatHeatmap,
@@ -16,6 +17,7 @@ import {
   formatWatchList,
 } from './formatting.js';
 import { isTradeSide } from './apiClient.js';
+import { parseSignalsArg, resolveSignalsScope } from './signalsScope.js';
 import { parseTimeframeArg, type TimeframeChoice } from './timeframeArg.js';
 
 async function main(): Promise<void> {
@@ -140,9 +142,18 @@ async function main(): Promise<void> {
   }
 
   bot.command('signals', async (ctx) => {
+    const scope = parseSignalsArg(ctx.message?.text, config.timeframes);
+    if ('error' in scope) {
+      await ctx.reply(scope.error);
+      return;
+    }
     try {
-      const { signals } = await api.getSignals(10);
-      await ctx.reply(formatSignalList(signals), { parse_mode: 'HTML' });
+      // The armed set only matters for the default scope, so an explicit
+      // request does not pay for a second HTTP call.
+      const armed = scope.kind === 'armed' ? await api.getArmedTimeframes() : null;
+      const resolved = resolveSignalsScope(scope, armed);
+      const { signals } = await api.getSignals(10, resolved.timeframes);
+      await ctx.reply(`${formatSignalList(signals)}\n\n<i>${escapeHtml(resolved.note)}</i>`, { parse_mode: 'HTML' });
     } catch (err) {
       logger.error({ err }, '/signals failed');
       await ctx.reply('Could not load recent signals right now — try again shortly.');
@@ -311,7 +322,7 @@ async function main(): Promise<void> {
       { command: 'status', description: `Sức khỏe thị trường (mặc định ${config.telegramDefaultTimeframe})` },
       { command: 'market', description: 'Heatmap across timeframes' },
       ...symbols.map((symbol) => ({ command: commandNameFor(symbol), description: `${symbol} detail` })),
-      { command: 'signals', description: 'Recent signals' },
+      { command: 'signals', description: 'Tín hiệu gần đây (mặc định: khung bot bắn alert)' },
       { command: 'gems', description: 'Small-cap candidates' },
       { command: 'watch', description: 'Track a position, get a sell alert' },
       { command: 'watches', description: 'List your active watches' },

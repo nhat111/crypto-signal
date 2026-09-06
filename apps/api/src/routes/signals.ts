@@ -14,7 +14,9 @@ export function registerSignalsRoute(app: FastifyInstance, deps: ApiDeps): void 
     const [rows, verdicts] = await Promise.all([
       getRecentSignals(deps.pool, {
         symbol: req.query.symbol?.toUpperCase(),
-        timeframe: req.query.timeframe,
+        // Comma-separated so one request can cover the armed set; a
+        // single value still works exactly as before.
+        timeframes: req.query.timeframe?.split(',').map((t) => t.trim()).filter(Boolean),
         signalType: req.query.signalType,
         limit: Math.min(500, Number(req.query.limit ?? 50)),
       }),

@@ -203,6 +203,13 @@ All filters optional. Returns `{ signals: [...] }`, same shape as the
 `signals` array above but across all symbols/timeframes matching the
 filter, most recent first, default limit 50, max 500.
 
+`timeframe` accepts a **comma-separated list** (`timeframe=1h,4h`) as well
+as a single value. An empty or absent value means no filter — never "match
+nothing", which is what `= ANY('{}')` would do and what would make a
+caller resolving an empty set report a quiet market that isn't. The
+Telegram bot uses this to list only the frames the worker is armed to
+alert on.
+
 Valid `signalType` values (spec §7/§15, exactly 9):
 `LEVERAGED_RALLY | SPOT_CONFIRMED_RALLY | SHORT_COVERING_POSSIBLE | SELLING_ABSORPTION_POSSIBLE | BULLISH_SPOT_DIVERGENCE | LONG_LIQUIDATION | SHORT_LIQUIDATION | LONG_CROWDING | SHORT_CROWDING | PRICE_SPIKE_UP | PRICE_SPIKE_DOWN`
 

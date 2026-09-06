@@ -380,6 +380,26 @@ it taught immediately:
   unknown as`, invented half the shape, and failed three tests against
   perfectly good code. Fixtures are typed now, with no `as` anywhere.
 
+### The bot listed signals it would never alert about
+
+`/signals` returned the ten most recent signals across every timeframe.
+The short frames fire far more often, so in practice the list was 5m and
+15m — while alerts were armed on 1h and 4h. The bot was showing a list
+with no relationship to what it would actually message about, and the
+obvious reading of that list ("so it alerts on 5m?") was wrong. That
+question was asked.
+
+`/signals` now defaults to the armed set, read from `/api/status` rather
+than from a second copy of ALERT_TIMEFRAMES in the bot's own environment —
+a second copy could disagree with the worker, which is the confusion being
+fixed. `/signals all` and `/signals 4h` override it, and every reply says
+which frames it used.
+
+Two states are kept apart because they need different fixes and both
+would otherwise render as an unexplained list: the arming could not be
+read (worker down, or too old to report it), and the worker is armed on
+nothing (ALERT_TIMEFRAMES naming frames the collector does not produce).
+
 ### Scoring
 
 Two independent 0-100 scores, mirroring Health vs Leverage Risk on the

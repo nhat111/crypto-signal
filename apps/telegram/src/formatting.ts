@@ -237,7 +237,7 @@ function windowLine(w: StablecoinFlowWindowDTO | null): string {
 }
 
 /** Token names/symbols come from on-chain metadata that anyone can set, so they're escaped before entering an HTML-parsed message. */
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
@@ -267,7 +267,7 @@ export function buildHelpText(symbols: string[]): string {
     '/status [khung] — sức khỏe thị trường, mặc định khung dài (vd: /status 1h)',
     '/market — full heatmap across timeframes',
     `${symbolCommands} [khung] — chi tiết một mã (vd: /btc 1h)`,
-    '/signals — recent signals',
+    '/signals — tín hiệu gần đây ở khung bot sẽ bắn alert · /signals all · /signals 4h',
     '/gems — small-cap candidates from DEX data',
     '/watch SYMBOL — track a position you bought, get a sell alert here',
     '/watches — list your active watches',

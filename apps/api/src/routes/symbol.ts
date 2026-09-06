@@ -42,7 +42,7 @@ export function registerSymbolRoute(app: FastifyInstance, deps: ApiDeps): void {
     const [latest, series, signals, recentCandles, verdicts] = await Promise.all([
       getLatestSymbolState(deps.pool, symbol, timeframe),
       getSymbolTimeseries(deps.pool, symbol, timeframe, limit),
-      getRecentSignals(deps.pool, { symbol, timeframe, limit: 20 }),
+      getRecentSignals(deps.pool, { symbol, timeframes: [timeframe], limit: 20 }),
       getRecentCandles(deps.pool, symbol, 'futures', timeframe, BOLLINGER_PERIOD),
       // Same conclusions the signals list carries, so a type flagged as
       // worse than the baseline is flagged wherever the signal is shown
