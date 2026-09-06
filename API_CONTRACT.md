@@ -198,6 +198,44 @@ Charts required (spec §18), all sourced from `series`:
 7. Health (`healthScore`)
 8. Risk (`riskScore`)
 
+## `GET /api/lookup?q=&timeframe=`
+
+On-demand analysis of a symbol or a contract address — the one route that
+calls out to Binance and DexScreener while the request is open, because
+its whole purpose is answering about things the collector never tracked.
+Nothing is persisted: a lookup is a question, not an observation, and
+writing it anywhere would mix unscreened tokens into the tables the
+performance numbers are computed from.
+
+`q` is split by **shape**, not by trying one and then the other:
+
+- `0x` + 40 hex → EVM contract address
+- 32-44 base58 characters → Solana contract address
+- 2-20 letters/digits → exchange ticker
+- anything else → `404` with a reason, before any request is spent
+
+A bare ticker is completed with `USDT`, `USDC`, `BTC` in that order and the
+first that returns candles wins; `triedSymbols` reports the attempts. A
+request that throws does not end the search — an unlisted symbol and a
+transient failure both come back 4xx from Binance, so one bad response
+must not declare a token unlisted.
+
+An address is searched across chains; the pair whose BASE token matches is
+kept (a pool where the address is the quote side is a different token
+being priced against it), and the deepest pool wins — the same rule the
+scanner uses, so the two cannot disagree. Other pools are listed in
+`otherPools`.
+
+`timeframe` must be one the collector configures; anything else silently
+falls back to `4h` rather than erroring, since it only changes the
+resolution of the answer.
+
+Returns `{ query, timeframe, result }` where `result.kind` is `exchange`
+or `onchain`, or `404 { error, query }`. `technical` is null for the
+on-chain kind: DexScreener's free API returns no candle history, so there
+is no chart to read, and that is stated rather than approximated from the
+handful of percentage changes it does return.
+
 ## `GET /api/signals?symbol=&timeframe=&signalType=&limit=`
 All filters optional. Returns `{ signals: [...] }`, same shape as the
 `signals` array above but across all symbols/timeframes matching the

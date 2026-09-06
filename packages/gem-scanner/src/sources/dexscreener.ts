@@ -56,6 +56,19 @@ type RawPair = z.infer<typeof pairSchema>;
 /** `/tokens/v1/{chainId}/{addresses}` returns a bare array of pairs. */
 const tokensResponseSchema = z.array(pairSchema);
 
+/**
+ * `/latest/dex/search?q=` wraps its results, and returns null rather than
+ * an empty array when nothing matches.
+ *
+ * Unlike `/tokens/v1`, this endpoint does not need the chain up front —
+ * which is the whole reason it is here. Somebody pasting a contract
+ * address into a search box has the address and usually not the chain, and
+ * asking them for it would be asking them to already know the answer.
+ */
+const searchResponseSchema = z.object({
+  pairs: z.array(pairSchema).nullish().transform((v) => v ?? []),
+});
+
 /** Token profile / boost feeds share a `tokenAddress` + `chainId` shape. */
 const tokenFeedSchema = z.array(
   z.object({
@@ -114,6 +127,23 @@ export class DexScreenerSource implements MarketDataSource {
     }
 
     return [...candidates.values()];
+  }
+
+  /**
+   * Every pair matching a free-text query, across all chains.
+   *
+   * Used for one-off lookups, never by the scanner: the scan path is
+   * chain-scoped and batched on purpose, and routing it through a search
+   * would make its API cost depend on what somebody typed.
+   */
+  async searchPairs(query: string): Promise<GemPair[]> {
+    const res = await fetchJsonValidated({
+      url: `${this.baseUrl}/latest/dex/search?q=${encodeURIComponent(query)}`,
+      schema: searchResponseSchema,
+      source: this.name,
+      logger: this.opts.logger,
+    });
+    return res.pairs.map(toGemPair);
   }
 
   async fetchPairsForTokens(chainId: ChainId, tokenAddresses: string[]): Promise<GemPair[]> {
