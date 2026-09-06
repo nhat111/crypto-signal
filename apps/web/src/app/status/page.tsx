@@ -19,6 +19,7 @@ import {
   describeAlertTimeframes,
   describeChainSources,
   describeFilteredSecurities,
+  describeTrackedObservations,
   diagnoseChain,
   collectorSummary,
   isHorizonStuck,
@@ -317,6 +318,7 @@ function GemChainCard({ chains, now }: { chains?: StatusGemChain[]; now: number 
       {diagnosed.map(({ chain, diagnosis }) => {
         const { tone, note } = CHAIN_TEXT[diagnosis];
         const filtered = describeFilteredSecurities(chain);
+        const tracked = describeTrackedObservations(chain);
         return (
           <div key={chain.chainId}>
             <Row
@@ -330,6 +332,15 @@ function GemChainCard({ chains, now }: { chains?: StatusGemChain[]; now: number 
             </p>
             {filtered && (
               <p className="-mt-0.5 pb-1 text-right text-[11px] leading-relaxed text-sky-300/70">{filtered}</p>
+            )}
+            {tracked && (
+              <p
+                className={`-mt-0.5 pb-1 text-right text-[11px] leading-relaxed ${
+                  tracked.tone === 'warn' ? 'text-amber-300/80' : 'text-slate-500'
+                }`}
+              >
+                {tracked.text}
+              </p>
             )}
             {note && (
               <p

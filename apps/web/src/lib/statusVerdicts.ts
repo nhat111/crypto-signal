@@ -477,3 +477,29 @@ export function describeFilteredSecurities(chain: {
   const more = count > names.length ? `, +${count - names.length} nữa` : '';
   return `đã lọc ${count} mã chứng khoán token hoá: ${shown}${more}`;
 }
+
+/**
+ * The watchlist line: how many already-seen tokens this chain re-priced
+ * beyond the ones it surfaced.
+ *
+ * Worth its own line because a zero here is invisible everywhere else. The
+ * scan still reports candidates and eligibles, the page still looks
+ * healthy, and the only symptom is a hole in a table nobody reads until
+ * months later — by which point the observations cannot be recovered.
+ *
+ * Undefined (an older worker) reads as no line rather than as zero.
+ */
+export function describeTrackedObservations(chain: {
+  trackedObserved?: number;
+  candidateCount: number;
+}): { text: string; tone: Verdict } | null {
+  const observed = chain.trackedObserved;
+  if (observed === undefined) return null;
+  if (observed > 0) return { text: `theo dõi tiếp ${observed} token đã từng đủ điều kiện`, tone: 'ok' };
+  // Nothing observed while the chain is otherwise finding tokens means the
+  // watchlist stopped, not that there is nothing to watch.
+  if (chain.candidateCount > 0) {
+    return { text: 'không theo dõi tiếp token nào — lịch sử giá đang ngừng ghi', tone: 'warn' };
+  }
+  return null;
+}

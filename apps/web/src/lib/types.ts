@@ -599,6 +599,8 @@ export interface StatusGemChain {
   /** Optional: added after the field rule at the top of this file — an old worker's row has neither. */
   securitiesFiltered?: number;
   securitiesSample?: StatusFilteredSecurity[];
+  /** Optional: added after this interface shipped, so an older worker's row has none. */
+  trackedObserved?: number;
 }
 
 export interface StatusFilteredSecurity {

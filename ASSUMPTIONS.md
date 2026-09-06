@@ -331,6 +331,33 @@ Three refusals are deliberate:
 - **The summary reports how many open positions its total covers.** A
   total over three of five is not a total, and looks exactly like one.
 
+### The data stopped exactly where the interesting part starts
+
+The scanner only ever recorded a token on scans where it passed the gate.
+A token that was surfaced and then fell — through the liquidity floor, out
+of the discovery feeds — simply stopped being observed. Its 24h and 7d
+outcomes were still priced, and after that: nothing.
+
+That is survivorship bias inside our own data, and it is not neutral about
+which rows it deletes. It deletes the population any "what happened after
+the crash" question is about. The claim that prompted this — a token
+dumps 60-95%, weak hands leave, then it recovers — was untestable here for
+a structural reason: the dump is the moment we looked away.
+
+`gem_price_observations` now records one row per tracked token per scan,
+eligible or not, with an `eligible` flag so a gap in the series never has
+to be interpreted. Only tokens that qualified at least once are tracked —
+those are the ones the scanner made a claim about; a token that never
+qualified has a baseline control row instead.
+
+Bounded on both axes, because it runs forever at one API call per 30
+addresses: `GEM_HISTORY_MAX_TOKENS` (120) and `GEM_HISTORY_MAX_AGE_DAYS`
+(120). Retention is a year, far longer than the scans' 30 days, since
+pruning on their schedule would recreate the hole.
+
+None of this can be backfilled, which is why it went in before any
+analysis that would use it.
+
 ### Scoring
 
 Two independent 0-100 scores, mirroring Health vs Leverage Risk on the

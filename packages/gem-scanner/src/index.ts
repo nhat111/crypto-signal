@@ -3,6 +3,7 @@ export * from './config.js';
 export * from './scoring.js';
 export * from './scanner.js';
 export * from './baseline.js';
+export * from './observation.js';
 export * from './watchEvaluator.js';
 export { DexScreenerSource, toGemPair } from './sources/dexscreener.js';
 export { GeckoTerminalSource, toGeckoNetwork, stripNetworkPrefix } from './sources/geckoterminal.js';

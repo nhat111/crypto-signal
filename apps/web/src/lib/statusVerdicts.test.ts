@@ -8,6 +8,7 @@ import {
   describeAlertTimeframes,
   describeChainSources,
   describeFilteredSecurities,
+  describeTrackedObservations,
   diagnoseChain,
   EMPTY_SCANS_BEFORE_SUSPECT,
   connectionVerdict,
@@ -588,5 +589,38 @@ describe('describeFilteredSecurities', () => {
     expect(describeFilteredSecurities({ securitiesFiltered: 3 })).toBe('đã lọc 3 mã chứng khoán token hoá');
     expect(describeFilteredSecurities({ securitiesFiltered: 3, securitiesSample: [{ symbol: '' }] }))
       .toBe('đã lọc 3 mã chứng khoán token hoá');
+  });
+});
+
+describe('describeTrackedObservations', () => {
+  it('reports how many already-seen tokens the scan re-priced', () => {
+    expect(describeTrackedObservations({ trackedObserved: 43, candidateCount: 39 })).toEqual({
+      text: 'theo dõi tiếp 43 token đã từng đủ điều kiện',
+      tone: 'ok',
+    });
+  });
+
+  /**
+   * The silence this line exists to break. A stopped watchlist changes
+   * nothing else on the page — candidates and eligibles still report — and
+   * the only symptom is a hole in a table nobody reads for months, by
+   * which time the observations are unrecoverable.
+   */
+  it('warns when a working chain observed nothing', () => {
+    const line = describeTrackedObservations({ trackedObserved: 0, candidateCount: 39 });
+    expect(line?.tone).toBe('warn');
+    expect(line?.text).toContain('ngừng ghi');
+  });
+
+  it('stays quiet on a chain that found nothing to begin with', () => {
+    // Nothing observed is expected there, and an amber line on a chain
+    // that is merely quiet would train the reader to ignore the colour.
+    expect(describeTrackedObservations({ trackedObserved: 0, candidateCount: 0 })).toBeNull();
+  });
+
+  it('says nothing for a worker too old to report it', () => {
+    // Absent is not zero: that worker had no watchlist, so there is no
+    // failure to warn about.
+    expect(describeTrackedObservations({ candidateCount: 39 })).toBeNull();
   });
 });

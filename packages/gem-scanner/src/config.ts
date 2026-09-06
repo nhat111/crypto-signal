@@ -20,6 +20,14 @@ export const gemEnvSchema = z.object({
     .default(false),
   GEM_CHAINS: z.string().default('solana'),
   GEM_SCAN_INTERVAL_MINUTES: numeric(30),
+  /**
+   * How many already-seen tokens to re-price per chain per scan, beyond
+   * the ones discovery surfaced. Each 30 costs one API call, on every scan
+   * forever, so this is a budget rather than a preference.
+   */
+  GEM_HISTORY_MAX_TOKENS: numeric(120),
+  /** Stop re-pricing a token this long after it was first seen. */
+  GEM_HISTORY_MAX_AGE_DAYS: numeric(120),
 
   /** Hard eligibility window — anything outside it isn't the kind of token this scanner is for. */
   GEM_MIN_LIQUIDITY_USD: numeric(50_000),
@@ -138,6 +146,9 @@ export interface GemConfig {
   enabled: boolean;
   chains: string[];
   scanIntervalMinutes: number;
+  /** Watchlist budget: tokens re-priced per chain per scan beyond discovery. */
+  historyMaxTokens: number;
+  historyMaxAgeDays: number;
   thresholds: GemThresholds;
   scoreWeights: GemScoreWeights;
   riskWeights: GemRiskWeights;
@@ -161,6 +172,8 @@ export function loadGemConfig(env: NodeJS.ProcessEnv = process.env): GemConfig {
     enabled: parsed.GEM_SCAN_ENABLED,
     chains: parsed.GEM_CHAINS.split(',').map((s) => s.trim()).filter(Boolean),
     scanIntervalMinutes: parsed.GEM_SCAN_INTERVAL_MINUTES,
+    historyMaxTokens: parsed.GEM_HISTORY_MAX_TOKENS,
+    historyMaxAgeDays: parsed.GEM_HISTORY_MAX_AGE_DAYS,
     thresholds: {
       minLiquidityUsd: parsed.GEM_MIN_LIQUIDITY_USD,
       maxLiquidityUsd: parsed.GEM_MAX_LIQUIDITY_USD,

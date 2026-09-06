@@ -6,8 +6,10 @@ import {
   GeckoTerminalSource,
   GoPlusSource,
   RugCheckSource,
+  observationsFromPairs,
   runScan,
   type GemConfig,
+  type GemPair,
   type ScoredGem,
 } from '@crypto-signal/gem-scanner';
 import {
@@ -15,11 +17,14 @@ import {
   getAllAlertSubscribers,
   getBaselinePendingOutcome,
   getGemsPendingOutcome,
+  getTrackedGemTokens,
+  insertGemPriceObservations,
   getLastGemAlert,
   insertGemAlertEvent,
   insertGemBaselineCandidates,
   insertGemScan,
   recordGemChainScan,
+  pruneGemPriceObservations,
   pruneOldGemScans,
   recordGemBaselineOutcome,
   recordGemOutcome,
@@ -44,6 +49,9 @@ export interface GemScanDeps {
  * lookup at both horizons against a rate-limited free API. At one scan
  * every 30 minutes this reaches the 20-sample threshold within a day.
  */
+/** A year of observations. Long enough that a slow recovery is still in the data when somebody looks for it. */
+const OBSERVATION_RETENTION_DAYS = 365;
+
 const BASELINE_SAMPLE_PER_SCAN = 5;
 
 /**
@@ -103,6 +111,12 @@ export async function runGemScanCycle(deps: GemScanDeps): Promise<void> {
         })),
       );
 
+      // Everything we have ever surfaced on this chain gets re-priced,
+      // qualifying or not. Without this the data set silently drops a
+      // token at the moment it falls — which is precisely the moment any
+      // "what happened after the dump" question needs (migration 022).
+      const trackedObserved = await observeTrackedTokens(deps, dexscreener, chainId, result);
+
       // Persisted, not just logged: a scan runs every thirty minutes, so an
       // in-memory record would be empty for half an hour after every deploy
       // — exactly when somebody goes looking for why a chain is silent.
@@ -114,6 +128,7 @@ export async function runGemScanCycle(deps: GemScanDeps): Promise<void> {
         sources: result.candidatesBySource,
         securitiesFiltered: result.filteredSecurities.length,
         securitiesSample: result.filteredSecurities,
+        trackedObserved,
       });
 
       logger.info(
@@ -123,6 +138,7 @@ export async function runGemScanCycle(deps: GemScanDeps): Promise<void> {
           eligible: result.eligible.length,
           rejected: result.rejectedCount,
           baselineKept,
+          trackedObserved,
         },
         'gem scan cycle complete',
       );
@@ -307,5 +323,58 @@ export async function runGemOutcomeTracker(deps: GemScanDeps): Promise<void> {
   if (gemConfig.enabled) {
     const pruned = await pruneOldGemScans(pool, 30);
     if (pruned > 0) logger.info({ pruned }, 'pruned old gem scan rows');
+
+    // Far longer than the scans' 30 days, and on purpose: this table's
+    // whole reason for existing is questions measured in weeks and months,
+    // so pruning it on the scans' schedule would recreate the hole it was
+    // added to close.
+    const prunedObservations = await pruneGemPriceObservations(pool, OBSERVATION_RETENTION_DAYS);
+    if (prunedObservations > 0) logger.info({ prunedObservations }, 'pruned old gem price observations');
+  }
+}
+
+/**
+ * Re-prices tokens this chain has surfaced before, including the ones that
+ * would no longer qualify, and records one observation each.
+ *
+ * The tokens that came back in THIS scan are recorded from the pairs the
+ * scan already fetched; only the missing ones cost an extra call, batched
+ * by the pair source. The watchlist is bounded by config on both count and
+ * age, because this runs forever and an unbounded one would eventually
+ * stop the cycle finishing.
+ *
+ * Failures here are logged and swallowed: losing an observation is a gap
+ * in a research log, and it must never take the scan down with it.
+ */
+async function observeTrackedTokens(
+  deps: GemScanDeps,
+  pairSource: DexScreenerSource,
+  chainId: string,
+  result: { scannedAt: number; eligible: Array<{ pair: GemPair }> },
+): Promise<number> {
+  const { pool, logger, gemConfig } = deps;
+
+  try {
+    const alreadyPriced = result.eligible.map((g) => g.pair);
+    const seen = new Set(alreadyPriced.map((p) => p.baseToken.address.toLowerCase()));
+
+    const tracked = await getTrackedGemTokens(pool, chainId, {
+      limit: gemConfig.historyMaxTokens,
+      maxAgeDays: gemConfig.historyMaxAgeDays,
+    });
+    const missing = tracked.filter((address) => !seen.has(address.toLowerCase()));
+
+    const extraPairs = missing.length > 0 ? await pairSource.fetchPairsForTokens(chainId, missing) : [];
+
+    const observations = observationsFromPairs(
+      chainId,
+      [...alreadyPriced, ...extraPairs],
+      gemConfig.thresholds,
+      result.scannedAt,
+    );
+    return await insertGemPriceObservations(pool, observations);
+  } catch (err) {
+    logger.warn({ err, chainId }, 'price-history observation failed, scan continues');
+    return 0;
   }
 }
