@@ -102,6 +102,10 @@ export class GeckoTerminalSource implements CandidateDiscoverySource {
  */
 const GECKO_NETWORK_BY_CHAIN: Record<string, string> = {
   solana: 'solana',
+  // Confirmed against geckoterminal.com/robinhood/pools, which prints its
+  // own network slug as "API-ID robinhood". Verified rather than assumed:
+  // DexScreener and GeckoTerminal agree here, and they often do not.
+  robinhood: 'robinhood',
 };
 
 export function toGeckoNetwork(chainId: ChainId): string | null {

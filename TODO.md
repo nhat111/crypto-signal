@@ -204,10 +204,11 @@ Check items as they land; each phase's commit message references the phase.
       skipped discovery feed records `'unsupported'` instead of `0`, a chain
       no feed covers is an error on the first scan, and `/status` names a
       chain that has scanned nothing for hours.
-- [ ] `GECKO_NETWORK_BY_CHAIN` still maps only `solana`, so every other
-      chain runs on one discovery feed. The page now says so instead of
-      hiding it; adding a mapping needs the slug verified against
-      GeckoTerminal first, never guessed.
+- [x] `GECKO_NETWORK_BY_CHAIN` now maps `robinhood` as well, verified from
+      geckoterminal.com/robinhood/pools which prints its own slug as
+      "API-ID robinhood". Every other chain still runs on one discovery
+      feed; the page says so instead of hiding it, and a new mapping needs
+      the slug read off that page rather than guessed.
 - [ ] EVM safety source (GoPlus-style honeypot simulation) — needed before
       HyperEVM tokens should be surfaced as anything but unverified.
 - [ ] Holder-growth and social signals.
