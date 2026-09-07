@@ -106,7 +106,7 @@ async function lookupExchange(deps: LookupDeps, symbol: string, timeframe: strin
 
   return {
     kind: 'not_found',
-    reason: `Không tìm thấy "${symbol}" trên Binance (đã thử ${tried.join(', ')}). Nếu là token on-chain, dán địa chỉ contract.`,
+    reason: `"${symbol}" is not listed on Binance (tried ${tried.join(', ')}). If it is an on-chain token, paste its contract address instead.`,
   };
 }
 
@@ -116,7 +116,7 @@ async function lookupAddress(deps: LookupDeps, address: string, now: number): Pr
     pairs = await deps.searchPairs(address);
   } catch (err) {
     deps.logger.warn({ err, address }, 'lookup: pair search failed');
-    return { kind: 'not_found', reason: 'Không tra được địa chỉ này lúc này — nguồn dữ liệu DEX đang không phản hồi.' };
+    return { kind: 'not_found', reason: 'Could not look this address up right now — the DEX data source is not responding.' };
   }
 
   // The search matches on more than the base token, so a pair where this
@@ -126,7 +126,7 @@ async function lookupAddress(deps: LookupDeps, address: string, now: number): Pr
   if (matching.length === 0) {
     return {
       kind: 'not_found',
-      reason: 'Không có pool nào cho địa chỉ này trên các DEX mà nguồn dữ liệu phủ. Kiểm tra lại địa chỉ và chain.',
+      reason: 'No pool for this address on any DEX the data source covers. Check the address and the chain.',
     };
   }
 

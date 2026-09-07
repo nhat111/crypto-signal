@@ -48,11 +48,11 @@ export function buildOnChainFundamentals(pair: GemPair, safety: SafetyReport | n
   const unknowns: string[] = [];
 
   const ageDays = pair.pairCreatedAt === null ? null : (now - pair.pairCreatedAt) / DAY_MS;
-  if (ageDays === null) unknowns.push('Tuổi pool (nguồn không trả về ngày tạo)');
-  if (pair.liquidityUsd === null) unknowns.push('Thanh khoản');
+  if (ageDays === null) unknowns.push('Pool age (the source returned no creation date)');
+  if (pair.liquidityUsd === null) unknowns.push('Liquidity');
   if (pair.fdvUsd === null) unknowns.push('FDV');
-  if (pair.marketCapUsd === null) unknowns.push('Vốn hoá lưu hành');
-  if (pair.volume.h24 === null) unknowns.push('Khối lượng 24h');
+  if (pair.marketCapUsd === null) unknowns.push('Circulating market cap');
+  if (pair.volume.h24 === null) unknowns.push('24h volume');
 
   // Ratios only where BOTH sides are real. A ratio computed against a
   // missing denominator is not a small number, it is not a number.
@@ -66,10 +66,10 @@ export function buildOnChainFundamentals(pair: GemPair, safety: SafetyReport | n
       : null;
 
   if (safety === null) {
-    unknowns.push('Kiểm định an toàn (chain này chưa có nguồn screen)');
+    unknowns.push('Safety screen (no source covers this chain)');
   } else {
-    if (safety.topHolderPct === null) unknowns.push('Tỉ lệ ví lớn nhất');
-    if (safety.lpLocked === null) unknowns.push('LP đã khoá hay chưa');
+    if (safety.topHolderPct === null) unknowns.push('Largest holder share');
+    if (safety.lpLocked === null) unknowns.push('Whether LP is locked');
   }
 
   return {
@@ -117,7 +117,7 @@ export interface ExchangeFundamentals {
 }
 
 export const EXCHANGE_FUNDAMENTAL_GAPS: readonly string[] = [
-  'Vốn hoá và nguồn cung lưu hành — chưa nối nguồn dữ liệu nào cho phần này',
-  'Lịch mở khoá token',
-  'Phân bố ví nắm giữ (chỉ đọc được với token on-chain)',
+  'Market cap and circulating supply — no data source is wired for these',
+  'Token unlock schedule',
+  'Holder distribution (readable only for on-chain tokens)',
 ];

@@ -17,12 +17,12 @@ export function LookupResultView({ result }: { result: LookupResult }) {
   if (result.kind === 'exchange') {
     return (
       <div className="space-y-4">
-        <Header title={result.symbol} subtitle={`Binance · khung ${result.timeframe} · ${result.technical.barCount} nến`} />
+        <Header title={result.symbol} subtitle={`Binance · ${result.timeframe} · ${result.technical.barCount} bars`} />
         <TechnicalPanel read={result.technical} />
         <UnknownsPanel
-          title="Phần cơ bản chưa có dữ liệu"
+          title="Fundamentals with no data source"
           items={result.fundamentals.unknowns}
-          note="Với mã trên sàn, dự án chưa nối nguồn nào cho cung/vốn hoá. Suy vốn hoá từ giá là con số bịa, nên không hiện."
+          note="For an exchange ticker this project has no supply or market-cap source wired. Deriving a market cap from a price would be a made-up number, so none is shown."
         />
       </div>
     );
@@ -37,33 +37,33 @@ export function LookupResultView({ result }: { result: LookupResult }) {
         badge={<SafetyBadge verdict={f.safetyVerdict} />}
       />
 
-      <Panel title="Cơ bản on-chain">
+      <Panel title="On-chain fundamentals">
         <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-4">
-          <Metric label="Giá" value={formatTokenPrice(f.priceUsd)} />
-          <Metric label="Thanh khoản" value={f.liquidityUsd === null ? '—' : formatUsd(f.liquidityUsd)} />
+          <Metric label="Price" value={formatTokenPrice(f.priceUsd)} />
+          <Metric label="Liquidity" value={f.liquidityUsd === null ? '—' : formatUsd(f.liquidityUsd)} />
           <Metric label="FDV" value={f.fdvUsd === null ? '—' : formatUsd(f.fdvUsd)} />
-          <Metric label="Vốn hoá" value={f.marketCapUsd === null ? '—' : formatUsd(f.marketCapUsd)} />
+          <Metric label="Market cap" value={f.marketCapUsd === null ? '—' : formatUsd(f.marketCapUsd)} />
           <Metric label="Vol 24h" value={f.volume24hUsd === null ? '—' : formatUsd(f.volume24hUsd)} />
-          <Metric label="Tuổi pool" value={f.ageDays === null ? '—' : `${Math.floor(f.ageDays)} ngày`} />
+          <Metric label="Pool age" value={f.ageDays === null ? '—' : `${Math.floor(f.ageDays)}d`} />
           <Metric
-            label="Thanh khoản / FDV"
+            label="Liquidity / FDV"
             value={f.liquidityToFdvPct === null ? '—' : `${f.liquidityToFdvPct.toFixed(2)}%`}
-            hint="Pool mỏng so với định giá thì giá dễ bị đẩy."
+            hint="A thin pool against the valuation means the price is easy to move."
           />
           <Metric
-            label="Vol / Thanh khoản"
+            label="Vol / liquidity"
             value={f.volumeToLiquidity === null ? '—' : `${f.volumeToLiquidity.toFixed(2)}×`}
-            hint="Rất cao là pool đang bị quay vòng; rất thấp là gần như không ai giao dịch."
+            hint="Very high means the pool is being churned; very low means almost nobody trades it."
           />
         </dl>
       </Panel>
 
-      <Panel title="Kiểm định hợp đồng">
+      <Panel title="Contract screen">
         <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-4">
-          <Metric label="Ví lớn nhất" value={f.topHolderPct === null ? '—' : `${(f.topHolderPct * 100).toFixed(1)}%`} />
-          <Metric label="LP đã khoá" value={yesNo(f.lpLocked)} />
-          <Metric label="Thu hồi quyền mint" value={yesNo(f.mintAuthorityRevoked)} />
-          <Metric label="Thu hồi quyền freeze" value={yesNo(f.freezeAuthorityRevoked)} />
+          <Metric label="Largest holder" value={f.topHolderPct === null ? '—' : `${(f.topHolderPct * 100).toFixed(1)}%`} />
+          <Metric label="LP locked" value={yesNo(f.lpLocked)} />
+          <Metric label="Mint revoked" value={yesNo(f.mintAuthorityRevoked)} />
+          <Metric label="Freeze revoked" value={yesNo(f.freezeAuthorityRevoked)} />
         </dl>
         {f.safetyFlags.length > 0 && (
           <ul className="mt-2 space-y-1 text-xs text-amber-300/80">
@@ -75,11 +75,11 @@ export function LookupResultView({ result }: { result: LookupResult }) {
       </Panel>
 
       {result.otherPools.length > 0 && (
-        <Panel title="Pool khác của token này">
+        <Panel title="Other pools for this token">
           <ul className="space-y-1 text-xs text-slate-400">
             {result.otherPools.map((p, i) => (
               <li key={i}>
-                {p.chainId} · {p.dexId} — {p.liquidityUsd === null ? 'thanh khoản không rõ' : formatUsd(p.liquidityUsd)}
+                {p.chainId} · {p.dexId} — {p.liquidityUsd === null ? 'liquidity unknown' : formatUsd(p.liquidityUsd)}
               </li>
             ))}
           </ul>
@@ -87,9 +87,9 @@ export function LookupResultView({ result }: { result: LookupResult }) {
       )}
 
       <UnknownsPanel
-        title="Chưa đọc được"
+        title="Could not be read"
         items={f.unknowns}
-        note="Số liệu kỹ thuật (RSI, EMA, hỗ trợ/kháng cự) cần lịch sử nến, mà nguồn DEX miễn phí không trả về — nên phần đó để trống thay vì ước lượng từ vài con số phần trăm."
+        note="The technical readings (RSI, EMA, support/resistance) need candle history, which the free DEX source does not return — so that half is left empty rather than approximated from a handful of percentage changes."
       />
     </div>
   );
@@ -97,36 +97,36 @@ export function LookupResultView({ result }: { result: LookupResult }) {
 
 function TechnicalPanel({ read }: { read: LookupTechnical }) {
   return (
-    <Panel title="Kỹ thuật">
+    <Panel title="Technical">
       <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-4">
-        <Metric label="Giá" value={formatTokenPrice(read.lastPrice)} />
+        <Metric label="Price" value={formatTokenPrice(read.lastPrice)} />
         <Metric label="RSI 14" value={read.rsi14 === null ? '—' : read.rsi14.toFixed(1)} />
         <Metric
-          label="Xu hướng"
+          label="Trend"
           value={read.trend === null ? '—' : trendLabel(read.trend.direction)}
-          hint={read.trend === null ? undefined : `EMA20 so EMA50: ${read.trend.separationPct.toFixed(2)}%`}
+          hint={read.trend === null ? undefined : `EMA20 vs EMA50: ${read.trend.separationPct.toFixed(2)}%`}
         />
-        <Metric label="Biên độ (ATR)" value={read.atrPct === null ? '—' : `${read.atrPct.toFixed(2)}%`} />
-        <Metric label="Đáy gần nhất" value={read.support === null ? '—' : formatTokenPrice(read.support)} />
-        <Metric label="Đỉnh gần nhất" value={read.resistance === null ? '—' : formatTokenPrice(read.resistance)} />
+        <Metric label="Range (ATR)" value={read.atrPct === null ? '—' : `${read.atrPct.toFixed(2)}%`} />
+        <Metric label="Nearest low" value={read.support === null ? '—' : formatTokenPrice(read.support)} />
+        <Metric label="Nearest high" value={read.resistance === null ? '—' : formatTokenPrice(read.resistance)} />
         <Metric
-          label="Vị trí trong biên"
+          label="Range position"
           value={read.rangePositionPct === null ? '—' : `${read.rangePositionPct.toFixed(0)}/100`}
-          hint="0 là đáy của cả khoảng đang xét, 100 là đỉnh."
+          hint="0 is the bottom of the window's range, 100 the top."
         />
         <Metric
-          label="Đổi qua 24 nến"
+          label="Change over 24 bars"
           value={read.changePct.last24Bars === null ? '—' : `${read.changePct.last24Bars >= 0 ? '+' : ''}${read.changePct.last24Bars.toFixed(2)}%`}
         />
       </dl>
       <p className="mt-2.5 text-[11px] leading-relaxed text-slate-500">
-        Đây là <span className="font-semibold text-slate-400">mô tả</span> giá đang đứng ở đâu so với chính lịch sử
-        gần đây của nó, không phải dự báo. Hệ thống này không có kết quả đã ghi nhận nào cho các chỉ báo trên, nên nó
-        không nói con nào nên mua hay bán.
+        This <span className="font-semibold text-slate-400">describes</span> where price sits relative to its own
+        recent history. It is not a forecast: this system has no recorded outcomes behind any of these readings, so
+        it does not say what to do about them.
       </p>
       {read.missing.length > 0 && (
         <p className="mt-1.5 text-[11px] leading-relaxed text-amber-300/80">
-          Chưa đủ lịch sử cho: {read.missing.join(' · ')}.
+          Not enough history for: {read.missing.join(' · ')}.
         </p>
       )}
     </Panel>
@@ -137,7 +137,7 @@ function UnknownsPanel({ title, items, note }: { title: string; items: string[];
   return (
     <Panel title={title}>
       {items.length === 0 ? (
-        <p className="text-xs text-slate-500">Đọc được hết.</p>
+        <p className="text-xs text-slate-500">Everything was readable.</p>
       ) : (
         <ul className="space-y-1 text-xs text-slate-400">
           {items.map((item, i) => (
@@ -178,14 +178,14 @@ function Metric({ label, value, hint }: { label: string; value: string; hint?: s
   );
 }
 
-/** Three states, never two: "chưa rõ" is not "không". */
+/** Three states, never two: "unknown" is not "no". */
 function yesNo(value: boolean | null): string {
-  if (value === null) return 'chưa rõ';
-  return value ? 'có' : 'không';
+  if (value === null) return 'unknown';
+  return value ? 'yes' : 'no';
 }
 
 function trendLabel(direction: 'up' | 'down' | 'sideways'): string {
   if (direction === 'up') return 'EMA20 > EMA50';
   if (direction === 'down') return 'EMA20 < EMA50';
-  return 'đi ngang';
+  return 'flat';
 }

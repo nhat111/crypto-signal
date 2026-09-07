@@ -36,7 +36,7 @@ export const QUOTE_FALLBACKS: readonly string[] = ['USDT', 'USDC', 'BTC'];
 
 export function resolveQuery(raw: string): LookupQuery {
   const trimmed = raw.trim();
-  if (trimmed === '') return { kind: 'invalid', reason: 'Chưa nhập gì.', raw };
+  if (trimmed === '') return { kind: 'invalid', reason: 'Nothing entered.', raw };
 
   if (EVM_ADDRESS.test(trimmed)) {
     // Case preserved: EVM addresses carry an optional checksum in their
@@ -55,7 +55,7 @@ export function resolveQuery(raw: string): LookupQuery {
     // a ticker would return nothing and blame the token.
     return {
       kind: 'invalid',
-      reason: `"${trimmed}" trông như địa chỉ EVM nhưng không đúng dạng (cần 0x + 40 ký tự hex, đang có ${Math.max(0, trimmed.length - 2)}).`,
+      reason: `"${trimmed}" looks like an EVM address but is malformed — 0x plus 40 hex characters, this has ${Math.max(0, trimmed.length - 2)}.`,
       raw,
     };
   }
@@ -66,7 +66,7 @@ export function resolveQuery(raw: string): LookupQuery {
 
   return {
     kind: 'invalid',
-    reason: `Không nhận ra "${trimmed}". Nhập mã sàn (BTC, ETHUSDT) hoặc địa chỉ contract.`,
+    reason: `Could not read "${trimmed}". Enter an exchange ticker (BTC, ETHUSDT) or a contract address.`,
     raw,
   };
 }

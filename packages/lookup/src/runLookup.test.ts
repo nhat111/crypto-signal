@@ -98,7 +98,7 @@ describe('runLookup — exchange path', () => {
     expect(result.kind).toBe('not_found');
     expect((result as { reason: string }).reason).toContain('NOPEUSDT');
     // And points at the other way in, since a DEX-only token has no ticker.
-    expect((result as { reason: string }).reason).toContain('contract');
+    expect((result as { reason: string }).reason).toContain('contract address');
   });
 
   it('honours an explicit timeframe', async () => {
@@ -109,7 +109,7 @@ describe('runLookup — exchange path', () => {
 
   it('reports the fundamental gaps rather than implying it has none', async () => {
     const result = await runLookup(deps(), 'BTC');
-    expect((result as { fundamentals: { unknowns: string[] } }).fundamentals.unknowns.join(' ')).toContain('Vốn hoá');
+    expect((result as { fundamentals: { unknowns: string[] } }).fundamentals.unknowns.join(' ')).toContain('Market cap');
   });
 });
 
@@ -157,7 +157,7 @@ describe('runLookup — address path', () => {
     // Unknown is a first-class outcome here, never a pass.
     const result = await runLookup(deps({ screen: async () => null }), SOL_ADDRESS);
     expect(result).toMatchObject({ kind: 'onchain', fundamentals: { safetyVerdict: null } });
-    expect((result as { fundamentals: { unknowns: string[] } }).fundamentals.unknowns.join(' ')).toContain('Kiểm định');
+    expect((result as { fundamentals: { unknowns: string[] } }).fundamentals.unknowns.join(' ')).toContain('Safety screen');
   });
 
   it('survives a screen that throws, and says nothing about safety', async () => {
@@ -169,12 +169,12 @@ describe('runLookup — address path', () => {
     // "This token does not exist" and "the source is down" send somebody
     // to two different places.
     const result = await runLookup(deps({ searchPairs: async () => { throw new Error('503'); } }), SOL_ADDRESS);
-    expect((result as { reason: string }).reason).toContain('không phản hồi');
+    expect((result as { reason: string }).reason).toContain('not responding');
   });
 
   it('says the token has no pool when the search comes back empty', async () => {
     const result = await runLookup(deps({ searchPairs: async () => [] }), SOL_ADDRESS);
-    expect((result as { reason: string }).reason).toContain('Không có pool');
+    expect((result as { reason: string }).reason).toContain('No pool');
   });
 });
 
@@ -191,6 +191,6 @@ describe('runLookup — refusals', () => {
 
   it('explains a truncated address instead of searching for it as a ticker', async () => {
     const result = await runLookup(deps(), '0x198dBa421A7DB566');
-    expect((result as { reason: string }).reason).toContain('40 ký tự hex');
+    expect((result as { reason: string }).reason).toContain('40 hex characters');
   });
 });

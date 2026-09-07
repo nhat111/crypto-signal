@@ -78,10 +78,10 @@ describe('buildOnChainFundamentals', () => {
     );
     const text = f.unknowns.join(' | ');
     expect(text).toContain('FDV');
-    expect(text).toContain('Thanh khoản');
-    expect(text).toContain('Tuổi pool');
-    expect(text).toContain('Khối lượng 24h');
-    expect(text).toContain('Kiểm định an toàn');
+    expect(text).toContain('Liquidity');
+    expect(text).toContain('Pool age');
+    expect(text).toContain('24h volume');
+    expect(text).toContain('Safety screen');
   });
 
   it('treats a missing safety screen as unknown, never as clean', () => {
@@ -91,14 +91,14 @@ describe('buildOnChainFundamentals', () => {
     expect(f.safetyVerdict).toBeNull();
     expect(f.lpLocked).toBeNull();
     expect(f.mintAuthorityRevoked).toBeNull();
-    expect(f.unknowns.join(' ')).toContain('Kiểm định an toàn');
+    expect(f.unknowns.join(' ')).toContain('Safety screen');
   });
 
   it('keeps an unreadable holder distribution distinct from a good one', () => {
     const partial: SafetyReport = { ...safety, topHolderPct: null, lpLocked: null };
     const f = buildOnChainFundamentals(pair(), partial, NOW);
     expect(f.topHolderPct).toBeNull();
-    expect(f.unknowns.join(' ')).toContain('ví lớn nhất');
+    expect(f.unknowns.join(' ')).toContain('Largest holder');
     expect(f.unknowns.join(' ')).toContain('LP');
   });
 

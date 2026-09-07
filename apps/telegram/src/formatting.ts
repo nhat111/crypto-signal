@@ -267,7 +267,7 @@ export function buildHelpText(symbols: string[]): string {
     '/status [khung] — sức khỏe thị trường, mặc định khung dài (vd: /status 1h)',
     '/market — full heatmap across timeframes',
     `${symbolCommands} [khung] — chi tiết một mã (vd: /btc 1h)`,
-    '/traccuu MÃ|ĐỊA_CHỈ — phân tích cơ bản + kỹ thuật theo yêu cầu',
+    '/lookup TICKER|ADDRESS — on-demand technical + on-chain fundamentals',
     '/signals — tín hiệu gần đây ở khung bot sẽ bắn alert · /signals all · /signals 4h',
     '/gems — small-cap candidates from DEX data',
     '/watch SYMBOL — track a position you bought, get a sell alert here',
@@ -298,37 +298,37 @@ export function formatLookup(data: LookupDTO): string {
 
   if (data.result.kind === 'exchange') {
     const { symbol, technical: t } = data.result;
-    lines.push(`🔎 <b>${escapeHtml(symbol)}</b> · Binance · khung ${escapeHtml(data.result.timeframe)}`);
-    lines.push(`Giá ${t.lastPrice}`);
-    if (t.trend) lines.push(`Cấu trúc: ${t.trend.direction === 'up' ? 'EMA20 &gt; EMA50' : t.trend.direction === 'down' ? 'EMA20 &lt; EMA50' : 'đi ngang'} (${t.trend.separationPct.toFixed(2)}%)`);
+    lines.push(`🔎 <b>${escapeHtml(symbol)}</b> · Binance · ${escapeHtml(data.result.timeframe)}`);
+    lines.push(`Price ${t.lastPrice}`);
+    if (t.trend) lines.push(`Structure: ${t.trend.direction === 'up' ? 'EMA20 &gt; EMA50' : t.trend.direction === 'down' ? 'EMA20 &lt; EMA50' : 'flat'} (${t.trend.separationPct.toFixed(2)}%)`);
     if (t.rsi14 !== null) lines.push(`RSI 14: ${t.rsi14.toFixed(1)}`);
-    if (t.atrPct !== null) lines.push(`Biên độ ATR: ${t.atrPct.toFixed(2)}%`);
+    if (t.atrPct !== null) lines.push(`ATR range: ${t.atrPct.toFixed(2)}%`);
     if (t.support !== null || t.resistance !== null) {
-      lines.push(`Đáy/đỉnh gần nhất: ${t.support ?? '—'} / ${t.resistance ?? '—'}`);
+      lines.push(`Nearest low/high: ${t.support ?? '—'} / ${t.resistance ?? '—'}`);
     }
-    if (t.rangePositionPct !== null) lines.push(`Vị trí trong biên ${t.barCount} nến: ${t.rangePositionPct.toFixed(0)}/100`);
-    if (t.missing.length > 0) lines.push(`<i>Chưa đủ lịch sử cho: ${escapeHtml(t.missing.join(', '))}</i>`);
+    if (t.rangePositionPct !== null) lines.push(`Position in the ${t.barCount}-bar range: ${t.rangePositionPct.toFixed(0)}/100`);
+    if (t.missing.length > 0) lines.push(`<i>Not enough history for: ${escapeHtml(t.missing.join(', '))}</i>`);
     lines.push('');
-    lines.push('<i>Mô tả giá đang ở đâu so với lịch sử của chính nó — không phải khuyến nghị.</i>');
+    lines.push('<i>Describes where price sits against its own history — not a recommendation.</i>');
     return lines.join('\n');
   }
 
   const f = data.result.fundamentals;
   lines.push(`🔎 <b>${escapeHtml(f.symbol)}</b> · ${escapeHtml(f.name)}`);
   lines.push(`${escapeHtml(f.chainId)} · ${escapeHtml(f.dexId)}`);
-  if (f.priceUsd !== null) lines.push(`Giá $${f.priceUsd}`);
-  if (f.liquidityUsd !== null) lines.push(`Thanh khoản $${Math.round(f.liquidityUsd).toLocaleString('en-US')}`);
+  if (f.priceUsd !== null) lines.push(`Price $${f.priceUsd}`);
+  if (f.liquidityUsd !== null) lines.push(`Liquidity $${Math.round(f.liquidityUsd).toLocaleString('en-US')}`);
   if (f.fdvUsd !== null) lines.push(`FDV $${Math.round(f.fdvUsd).toLocaleString('en-US')}`);
   if (f.volume24hUsd !== null) lines.push(`Vol 24h $${Math.round(f.volume24hUsd).toLocaleString('en-US')}`);
-  if (f.liquidityToFdvPct !== null) lines.push(`Thanh khoản/FDV: ${f.liquidityToFdvPct.toFixed(2)}%`);
-  if (f.ageDays !== null) lines.push(`Tuổi pool: ${Math.floor(f.ageDays)} ngày`);
-  lines.push(`Kiểm định: ${f.safetyVerdict === null ? '❔ chưa có nguồn screen cho chain này' : f.safetyVerdict}`);
-  if (f.topHolderPct !== null) lines.push(`Ví lớn nhất: ${(f.topHolderPct * 100).toFixed(1)}%`);
-  if (f.lpLocked !== null) lines.push(`LP khoá: ${f.lpLocked ? 'có' : 'KHÔNG'}`);
+  if (f.liquidityToFdvPct !== null) lines.push(`Liquidity/FDV: ${f.liquidityToFdvPct.toFixed(2)}%`);
+  if (f.ageDays !== null) lines.push(`Pool age: ${Math.floor(f.ageDays)}d`);
+  lines.push(`Screen: ${f.safetyVerdict === null ? '❔ no source covers this chain' : f.safetyVerdict}`);
+  if (f.topHolderPct !== null) lines.push(`Largest holder: ${(f.topHolderPct * 100).toFixed(1)}%`);
+  if (f.lpLocked !== null) lines.push(`LP locked: ${f.lpLocked ? 'yes' : 'NO'}`);
   for (const flag of f.safetyFlags) lines.push(`⚠️ ${escapeHtml(flag)}`);
   if (f.unknowns.length > 0) {
     lines.push('');
-    lines.push(`<i>Chưa đọc được: ${escapeHtml(f.unknowns.join(', '))}</i>`);
+    lines.push(`<i>Could not be read: ${escapeHtml(f.unknowns.join(', '))}</i>`);
   }
   return lines.join('\n');
 }

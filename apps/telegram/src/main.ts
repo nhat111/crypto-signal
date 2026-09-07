@@ -167,10 +167,10 @@ async function main(): Promise<void> {
    * Each call costs somebody else's API request, so there is no polling
    * and no prefetch — it runs when a person asks.
    */
-  bot.command('traccuu', async (ctx) => {
+  bot.command('lookup', async (ctx) => {
     const q = ctx.message.text.split(/\s+/).slice(1).join(' ').trim();
     if (q === '') {
-      await ctx.reply('Cách dùng: /traccuu BTC · /traccuu ETHUSDT · /traccuu <địa chỉ contract>');
+      await ctx.reply('Usage: /lookup BTC · /lookup ETHUSDT · /lookup <contract address>');
       return;
     }
     try {
@@ -181,8 +181,8 @@ async function main(): Promise<void> {
       }
       await ctx.reply(formatLookup(res.data), { parse_mode: 'HTML', link_preview_options: { is_disabled: true } });
     } catch (err) {
-      logger.error({ err, q }, '/traccuu failed');
-      await ctx.reply('Không tra cứu được lúc này — thử lại sau.');
+      logger.error({ err, q }, '/lookup failed');
+      await ctx.reply('Could not run that lookup right now — try again shortly.');
     }
   });
 
@@ -350,7 +350,7 @@ async function main(): Promise<void> {
       ...symbols.map((symbol) => ({ command: commandNameFor(symbol), description: `${symbol} detail` })),
       { command: 'signals', description: 'Tín hiệu gần đây (mặc định: khung bot bắn alert)' },
       { command: 'gems', description: 'Small-cap candidates' },
-      { command: 'traccuu', description: 'Phân tích một mã hoặc địa chỉ contract' },
+      { command: 'lookup', description: 'Analyse a ticker or contract address' },
       { command: 'watch', description: 'Track a position, get a sell alert' },
       { command: 'watches', description: 'List your active watches' },
       { command: 'unwatch', description: 'Stop tracking a position' },

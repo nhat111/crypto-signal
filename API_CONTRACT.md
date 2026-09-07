@@ -231,7 +231,7 @@ falls back to `4h` rather than erroring, since it only changes the
 resolution of the answer.
 
 Returns `{ query, timeframe, result }` where `result.kind` is `exchange`
-or `onchain`, or `404 { error, query }`. `technical` is null for the
+or `onchain`, or `404 { error, query }`. Failure reasons are English, like every other user-facing string in the web app and the API. `technical` is null for the
 on-chain kind: DexScreener's free API returns no candle history, so there
 is no chart to read, and that is stated rather than approximated from the
 handful of percentage changes it does return.

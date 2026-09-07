@@ -58,7 +58,7 @@ describe('buildTechnicalRead', () => {
     const read = buildTechnicalRead(rising);
     expect(read?.support).toBeNull();
     expect(read?.resistance).toBeNull();
-    expect(read?.missing.join(' ')).toContain('Hỗ trợ/kháng cự');
+    expect(read?.missing.join(' ')).toContain('Support/resistance');
   });
 
   it('finds levels on a series that actually swings', () => {
@@ -88,7 +88,7 @@ describe('describeTechnicalRead', () => {
     expect(text.length).toBeGreaterThan(0);
     // The whole point: this codebase does not tell anybody to trade, and a
     // technical panel is exactly where that would creep in.
-    for (const word of ['nên mua', 'nên bán', 'chốt lời', 'cắt lỗ', 'khuyến nghị', 'sẽ tăng', 'sẽ giảm']) {
+    for (const word of ['should buy', 'should sell', 'take profit', 'stop loss', 'recommend', 'will rise', 'will fall', 'buy now', 'sell now']) {
       expect(text, `must not contain "${word}"`).not.toContain(word);
     }
   });
@@ -102,6 +102,6 @@ describe('describeTechnicalRead', () => {
 
   it('flags an RSI past the conventional thresholds as a fact about the number', () => {
     const overbought = describeTechnicalRead(buildTechnicalRead(rising) as NonNullable<ReturnType<typeof buildTechnicalRead>>);
-    expect(overbought.join(' ')).toContain('trên ngưỡng 70');
+    expect(overbought.join(' ')).toContain('above the conventional 70');
   });
 });
