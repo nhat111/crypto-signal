@@ -624,18 +624,45 @@ export interface StatusResponse {
 
 /* ---------- On-demand lookup ---------- */
 
+export interface LookupLevel {
+  price: number;
+  distancePct: number;
+}
+
+export interface LookupWindowExtreme {
+  price: number;
+  barsAgo: number;
+  distancePct: number;
+}
+
 export interface LookupTechnical {
   barCount: number;
   lastPrice: number;
   rsi14: number | null;
+  /** Optional: added after this shipped, so an older API sends the reading without its context. */
+  rsi14Percentile?: number | null;
   trend: { direction: 'up' | 'down' | 'sideways'; separationPct: number } | null;
   atrPct: number | null;
-  support: number | null;
-  resistance: number | null;
+  atrPctPercentile?: number | null;
+  /** Optional and reshaped from a bare number to a level with a distance — an older API sends the old shape. */
+  support?: LookupLevel | number | null;
+  resistance?: LookupLevel | number | null;
+  aboveAllSwingHighs?: boolean;
+  belowAllSwingLows?: boolean;
   rangePositionPct: number | null;
+  windowHigh?: LookupWindowExtreme | null;
+  windowLow?: LookupWindowExtreme | null;
+  volumeRatio?: number | null;
   changePct: { last24Bars: number | null; last7Bars: number | null };
   /** Readings the history was too short for, in words. A blank field and an uncomputable one look identical otherwise. */
   missing: string[];
+}
+
+export interface LookupTimeframeGlance {
+  timeframe: string;
+  trend: { direction: 'up' | 'down' | 'sideways'; separationPct: number } | null;
+  rsi14: number | null;
+  changePct: number | null;
 }
 
 export interface LookupExchangeFundamentals {
@@ -681,6 +708,8 @@ export type LookupResult =
       technical: LookupTechnical;
       fundamentals: LookupExchangeFundamentals;
       triedSymbols: string[];
+      /** Optional: an API deployed before the multi-frame glance sends none. */
+      timeframes?: LookupTimeframeGlance[];
     }
   | {
       kind: 'onchain';

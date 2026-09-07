@@ -432,6 +432,32 @@ so it will fall" is a claim with no recorded outcomes behind it. A test
 asserts the generated text never recommends an action, because a technical
 panel is exactly where that creeps in.
 
+### A number without its own distribution is generic
+
+The first lookup printed RSI 75.7, ATR 4.09%, range position 93/100 — all
+correct, all unusable. 75.7 says nothing until you know whether the thing
+lives at 70 or has not been above 60 in months, and that is a question
+about the instrument, not about RSI.
+
+Every reading now carries where it sits in its own window: "higher than
+94% of the last 200 bars". Levels carry the distance, not just the price,
+because \$2.16 is a number and "11% below" is something a size can be
+built from. Volume is measured against the twenty bars BEFORE the latest
+one — including it pulls the baseline toward the very thing being
+measured.
+
+Two states that looked identical are now separated. A dash under
+"nearest high" meant both "no swing has formed" and "price cleared every
+one of them", which are opposite facts; the second says "cleared all".
+
+And one frame in isolation is the most generic thing a chart can say, so
+the other frames are read alongside it. When 4h and 1d disagree, that
+disagreement is usually the half that matters — and it cannot be seen
+from either one alone.
+
+None of this changes the rule: still descriptions, still no forecast, and
+the test asserting the wording never recommends an action still runs.
+
 ### Scoring
 
 Two independent 0-100 scores, mirroring Health vs Leverage Risk on the

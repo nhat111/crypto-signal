@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { computeAtr, computeAtrPct, computeTrueRange } from './volatility.js';
 import {
   TREND_DEADBAND_PCT,
+  atrPctSeries,
+  percentileOf,
+  rsiSeries,
+  volumeVsAverage,
+  windowExtremes,
   changePctOver,
   computeEma,
   computeRsi,
@@ -208,5 +214,105 @@ describe('rangePosition', () => {
   it('refuses when there is no range to be positioned inside', () => {
     expect(rangePosition([], 100)).toBeNull();
     expect(rangePosition([bar(1, 100, 100)], 100)).toBeNull();
+  });
+});
+
+describe('rsiSeries', () => {
+  it('gives one reading per bar that has enough history behind it', () => {
+    const closes = Array.from({ length: 40 }, (_, i) => 100 + (i % 3));
+    // 40 closes, period 14 → 39 changes, first reading after 14 of them.
+    expect(rsiSeries(closes, 14)).toHaveLength(40 - 14);
+  });
+
+  it('ends on the same value computeRsi reports', () => {
+    // The series and the single reading must not drift; the whole point of
+    // the series is placing that one value in its own distribution.
+    const closes = Array.from({ length: 80 }, (_, i) => 100 + Math.sin(i / 3) * 10);
+    const series = rsiSeries(closes, 14);
+    expect(series[series.length - 1]).toBeCloseTo(computeRsi(closes, 14) as number, 9);
+  });
+
+  it('omits the warm-up bars rather than zero-filling them', () => {
+    // Padding with zeros would drag every percentile toward the bottom and
+    // make ordinary readings look extreme.
+    expect(rsiSeries(Array(14).fill(100), 14)).toEqual([]);
+    expect(rsiSeries(Array(20).fill(100), 14).every((v) => v === 50)).toBe(true);
+  });
+});
+
+describe('atrPctSeries', () => {
+  it('ends on the same value the single ATR% computation gives', () => {
+    const bars = Array.from({ length: 60 }, (_, i) => bar(i, 100 + i + 2, 100 + i - 2, 100 + i));
+    const series = atrPctSeries(bars, 14);
+    const ranges = bars.map((b, i) => computeTrueRange(b, i === 0 ? undefined : (bars[i - 1] as OhlcvBar).close));
+    const expected = computeAtrPct(computeAtr(ranges.slice(-14)), bars[bars.length - 1]?.close as number);
+    expect(series[series.length - 1]).toBeCloseTo(expected, 6);
+  });
+
+  it('returns nothing when there is not a full window', () => {
+    expect(atrPctSeries(Array.from({ length: 10 }, (_, i) => bar(i, 10, 9)), 14)).toEqual([]);
+  });
+});
+
+describe('percentileOf', () => {
+  it('places a value inside its own distribution', () => {
+    expect(percentileOf(5, [1, 2, 3, 4, 5])).toBe(100);
+    expect(percentileOf(1, [1, 2, 3, 4, 5])).toBe(20);
+    expect(percentileOf(3, [1, 2, 3, 4, 5])).toBe(60);
+  });
+
+  it('counts a value above everything as the top', () => {
+    expect(percentileOf(99, [1, 2, 3])).toBe(100);
+    expect(percentileOf(0, [1, 2, 3])).toBe(0);
+  });
+
+  it('says nothing rather than "average" when there is no history', () => {
+    // 50 would be a measurement; null is the truth.
+    expect(percentileOf(5, [])).toBeNull();
+  });
+});
+
+describe('windowExtremes', () => {
+  const bars = [bar(1, 120, 100), bar(2, 118, 90), bar(3, 115, 95), bar(4, 116, 99)];
+
+  it('finds both extremes with how long ago and how far', () => {
+    const ext = windowExtremes(bars, 110);
+    expect(ext?.high.price).toBe(120);
+    expect(ext?.high.barsAgo).toBe(3);
+    expect(ext?.high.distancePct).toBeCloseTo(9.0909, 3);
+    expect(ext?.low.price).toBe(90);
+    expect(ext?.low.barsAgo).toBe(2);
+    expect(ext?.low.distancePct).toBeCloseTo(-18.1818, 3);
+  });
+
+  it('reports zero bars ago when the extreme is the latest bar', () => {
+    const climbing = [bar(1, 100, 90), bar(2, 110, 95), bar(3, 130, 99)];
+    expect(windowExtremes(climbing, 120)?.high.barsAgo).toBe(0);
+  });
+
+  it('refuses rather than dividing by a zero reference', () => {
+    expect(windowExtremes(bars, 0)).toBeNull();
+    expect(windowExtremes([], 100)).toBeNull();
+  });
+});
+
+describe('volumeVsAverage', () => {
+  const flat = (n: number, volume: number) =>
+    Array.from({ length: n }, (_, i) => ({ ...bar(i, 10, 9), volume }));
+
+  it('is 1 when the latest bar matches its baseline', () => {
+    expect(volumeVsAverage(flat(30, 100), 20)).toBeCloseTo(1, 9);
+  });
+
+  it('excludes the latest bar from its own baseline', () => {
+    // Including it would pull the average toward the very thing being
+    // measured, and a genuine spike would read as smaller than it is.
+    const bars = [...flat(20, 100), { ...bar(99, 10, 9), volume: 500 }];
+    expect(volumeVsAverage(bars, 20)).toBeCloseTo(5, 9);
+  });
+
+  it('refuses when there is no baseline to compare against', () => {
+    expect(volumeVsAverage(flat(5, 100), 20)).toBeNull();
+    expect(volumeVsAverage(flat(30, 0), 20)).toBeNull();
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { runLookup, type LookupDeps } from './runLookup.js';
+import { GLANCE_TIMEFRAMES, runLookup, type LookupDeps } from './runLookup.js';
 import type { OhlcvBar } from '@crypto-signal/indicators';
 import type { GemPair, SafetyReport } from '@crypto-signal/gem-scanner';
 
@@ -69,7 +69,27 @@ describe('runLookup — exchange path', () => {
 
     expect(result.kind).toBe('exchange');
     expect(result).toMatchObject({ symbol: 'BTCUSDT', timeframe: '4h' });
-    expect(fetchBars).toHaveBeenCalledTimes(1);
+    // One for the chosen frame, plus one per glance frame — bounded, and
+    // the reason the route is not something to hammer.
+    expect(fetchBars).toHaveBeenCalledTimes(1 + GLANCE_TIMEFRAMES.filter((tf) => tf !== '4h').length);
+  });
+
+  it('reads the other frames too, so one frame is never the whole answer', async () => {
+    const result = await runLookup(deps(), 'BTC', { timeframe: '4h' });
+    const frames = (result as { timeframes: Array<{ timeframe: string }> }).timeframes.map((t) => t.timeframe);
+    expect(frames).toEqual(['1h', '1d']);
+    expect(frames).not.toContain('4h');
+  });
+
+  it('drops a glance frame that failed instead of failing the lookup', async () => {
+    // Context beside the answer must never take the answer down with it.
+    const fetchBars = vi.fn(async (symbol: string, tf: string) => {
+      if (tf === '1d') throw new Error('boom');
+      return bars(120);
+    });
+    const result = await runLookup(deps({ fetchBars }), 'BTC', { timeframe: '4h' });
+    expect(result.kind).toBe('exchange');
+    expect((result as { timeframes: Array<{ timeframe: string }> }).timeframes.map((t) => t.timeframe)).toEqual(['1h']);
   });
 
   it('falls through to the next quote asset when the first is not listed', async () => {

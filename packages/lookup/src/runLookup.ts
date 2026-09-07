@@ -23,6 +23,14 @@ export interface LookupDeps {
   logger: Logger;
 }
 
+/** One frame's headline, for saying whether the frames agree. */
+export interface TimeframeGlance {
+  timeframe: string;
+  trend: TechnicalRead['trend'];
+  rsi14: number | null;
+  changePct: number | null;
+}
+
 export interface ExchangeLookup {
   kind: 'exchange';
   /** What was actually found on the exchange, which may differ from what was typed. */
@@ -32,6 +40,14 @@ export interface ExchangeLookup {
   fundamentals: ExchangeFundamentals;
   /** Symbols tried before this one matched, so a surprising result is explainable. */
   triedSymbols: string[];
+  /**
+   * The same read on the other frames.
+   *
+   * One frame in isolation is the most generic thing a chart can say.
+   * "4h is up but 1d is down" is a fact about disagreement, and it is
+   * usually the more useful half.
+   */
+  timeframes: TimeframeGlance[];
 }
 
 export interface OnChainLookup {
@@ -52,6 +68,15 @@ export type LookupResult = ExchangeLookup | OnChainLookup | LookupFailure;
 
 /** Enough for EMA50 with room to spare, and one Binance request. */
 export const DEFAULT_BAR_LIMIT = 200;
+
+/**
+ * Frames glanced at alongside the chosen one.
+ *
+ * Bounded deliberately: each is one more request on a route a person can
+ * hit repeatedly, so this is a fixed short list rather than everything the
+ * collector knows about.
+ */
+export const GLANCE_TIMEFRAMES: readonly string[] = ['1h', '4h', '1d'];
 
 export async function runLookup(
   deps: LookupDeps,
@@ -91,6 +116,7 @@ async function lookupExchange(deps: LookupDeps, symbol: string, timeframe: strin
       symbol: candidate,
       timeframe,
       technical,
+      timeframes: await glanceOtherTimeframes(deps, candidate, timeframe),
       fundamentals: {
         symbol: candidate,
         spotListed: true,
@@ -148,4 +174,29 @@ async function lookupAddress(deps: LookupDeps, address: string, now: number): Pr
     technical: null,
     otherPools: sorted.slice(1, 6).map((p) => ({ chainId: p.chainId, dexId: p.dexId, liquidityUsd: p.liquidityUsd })),
   };
+}
+
+/**
+ * A one-line read of each other frame.
+ *
+ * Failures are dropped rather than surfaced: this is context beside the
+ * real answer, and a frame that could not be fetched should quietly not
+ * appear rather than turn a working lookup into an error.
+ */
+async function glanceOtherTimeframes(deps: LookupDeps, symbol: string, chosen: string): Promise<TimeframeGlance[]> {
+  const frames = GLANCE_TIMEFRAMES.filter((tf) => tf !== chosen);
+  const glances = await Promise.all(
+    frames.map(async (tf): Promise<TimeframeGlance | null> => {
+      try {
+        const bars = await deps.fetchBars(symbol, tf, DEFAULT_BAR_LIMIT);
+        const read = buildTechnicalRead(bars);
+        if (read === null) return null;
+        return { timeframe: tf, trend: read.trend, rsi14: read.rsi14, changePct: read.changePct.last24Bars };
+      } catch (err) {
+        deps.logger.warn({ err, symbol, tf }, 'lookup: glance timeframe failed, omitting it');
+        return null;
+      }
+    }),
+  );
+  return glances.filter((g): g is TimeframeGlance => g !== null);
 }

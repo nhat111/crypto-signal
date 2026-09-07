@@ -188,3 +188,126 @@ export function rangePosition(bars: OhlcvBar[], reference: number): number | nul
   const clamped = Math.min(Math.max(reference, low), high);
   return ((clamped - low) / (high - low)) * 100;
 }
+
+/**
+ * The same indicator at every bar, so a reading can be placed against its
+ * own history.
+ *
+ * "RSI is 75.7" is a fact nobody can act on without knowing whether 75.7
+ * is unusual for this instrument. A number beside its own distribution
+ * stops being generic: "higher than 94% of the last 200 bars" says
+ * something 75.7 alone does not.
+ *
+ * The first `period` bars have no reading and are omitted rather than
+ * zero-filled — padding would drag every percentile toward the bottom.
+ */
+export function rsiSeries(closes: number[], period = 14): number[] {
+  if (closes.length < period + 1) return [];
+
+  const out: number[] = [];
+  let gains = 0;
+  let losses = 0;
+  for (let i = 1; i <= period; i += 1) {
+    const change = (closes[i] as number) - (closes[i - 1] as number);
+    if (change >= 0) gains += change;
+    else losses -= change;
+  }
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+  out.push(rsiFrom(avgGain, avgLoss));
+
+  for (let i = period + 1; i < closes.length; i += 1) {
+    const change = (closes[i] as number) - (closes[i - 1] as number);
+    avgGain = (avgGain * (period - 1) + Math.max(change, 0)) / period;
+    avgLoss = (avgLoss * (period - 1) + Math.max(-change, 0)) / period;
+    out.push(rsiFrom(avgGain, avgLoss));
+  }
+  return out;
+}
+
+function rsiFrom(avgGain: number, avgLoss: number): number {
+  if (avgLoss === 0) return avgGain === 0 ? 50 : 100;
+  return 100 - 100 / (1 + avgGain / avgLoss);
+}
+
+/** ATR as a percentage of close, at every bar that has `period` ranges behind it. */
+export function atrPctSeries(bars: OhlcvBar[], period = 14): number[] {
+  if (bars.length < period + 1) return [];
+
+  const ranges: number[] = [];
+  for (let i = 1; i < bars.length; i += 1) {
+    ranges.push(computeTrueRangeFor(bars[i] as OhlcvBar, (bars[i - 1] as OhlcvBar).close));
+  }
+
+  const out: number[] = [];
+  for (let i = period - 1; i < ranges.length; i += 1) {
+    const window = ranges.slice(i - period + 1, i + 1);
+    const atr = window.reduce((a, b) => a + b, 0) / period;
+    const close = (bars[i + 1] as OhlcvBar).close;
+    out.push(close === 0 ? 0 : (atr / close) * 100);
+  }
+  return out;
+}
+
+function computeTrueRangeFor(bar: OhlcvBar, previousClose: number): number {
+  return Math.max(bar.high - bar.low, Math.abs(bar.high - previousClose), Math.abs(bar.low - previousClose));
+}
+
+/**
+ * How much of `series` sits at or below `value`, 0-100.
+ *
+ * Null for an empty series rather than 50: "we have no history to compare
+ * against" and "this is exactly average" are different answers, and only
+ * one of them is a measurement.
+ */
+export function percentileOf(value: number, series: number[]): number | null {
+  if (series.length === 0) return null;
+  const atOrBelow = series.filter((v) => v <= value).length;
+  return (atOrBelow / series.length) * 100;
+}
+
+export interface WindowExtreme {
+  price: number;
+  /** How many bars back it happened — "3 bars ago" and "180 bars ago" are different facts. */
+  barsAgo: number;
+  /** Percentage distance from the reference price to it. */
+  distancePct: number;
+}
+
+/** Highest high and lowest low of the window, with when and how far. */
+export function windowExtremes(
+  bars: OhlcvBar[],
+  reference: number,
+): { high: WindowExtreme; low: WindowExtreme } | null {
+  if (bars.length === 0 || reference <= 0) return null;
+
+  let highIdx = 0;
+  let lowIdx = 0;
+  for (let i = 1; i < bars.length; i += 1) {
+    if ((bars[i] as OhlcvBar).high > (bars[highIdx] as OhlcvBar).high) highIdx = i;
+    if ((bars[i] as OhlcvBar).low < (bars[lowIdx] as OhlcvBar).low) lowIdx = i;
+  }
+
+  const last = bars.length - 1;
+  const high = (bars[highIdx] as OhlcvBar).high;
+  const low = (bars[lowIdx] as OhlcvBar).low;
+  return {
+    high: { price: high, barsAgo: last - highIdx, distancePct: ((high - reference) / reference) * 100 },
+    low: { price: low, barsAgo: last - lowIdx, distancePct: ((low - reference) / reference) * 100 },
+  };
+}
+
+/**
+ * Latest volume against the average of the bars before it.
+ *
+ * The latest bar is excluded from its own baseline: including it pulls the
+ * average toward whatever just happened, which is exactly the thing being
+ * measured.
+ */
+export function volumeVsAverage(bars: OhlcvBar[], lookback = 20): number | null {
+  if (bars.length < lookback + 1) return null;
+  const recent = bars.slice(-(lookback + 1), -1);
+  const average = recent.reduce((sum, b) => sum + b.volume, 0) / recent.length;
+  if (average <= 0) return null;
+  return (bars[bars.length - 1] as OhlcvBar).volume / average;
+}

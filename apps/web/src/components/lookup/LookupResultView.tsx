@@ -1,4 +1,4 @@
-import type { LookupResult, LookupTechnical } from '@/lib/types';
+import type { LookupLevel, LookupResult, LookupTechnical, LookupTimeframeGlance } from '@/lib/types';
 import { SafetyBadge } from '@/components/gems/SafetyBadge';
 import { formatTokenPrice, formatUsd } from '@/lib/format';
 
@@ -19,6 +19,9 @@ export function LookupResultView({ result }: { result: LookupResult }) {
       <div className="space-y-4">
         <Header title={result.symbol} subtitle={`Binance · ${result.timeframe} · ${result.technical.barCount} bars`} />
         <TechnicalPanel read={result.technical} />
+        {result.timeframes && result.timeframes.length > 0 && (
+          <TimeframePanel chosen={result.timeframe} glances={result.timeframes} />
+        )}
         <UnknownsPanel
           title="Fundamentals with no data source"
           items={result.fundamentals.unknowns}
@@ -95,28 +98,82 @@ export function LookupResultView({ result }: { result: LookupResult }) {
   );
 }
 
+/** An older API sent a bare number here; a newer one sends the level with its distance. */
+function asLevel(value: LookupLevel | number | null | undefined): LookupLevel | null {
+  if (value === null || value === undefined) return null;
+  return typeof value === 'number' ? { price: value, distancePct: 0 } : value;
+}
+
+function levelText(level: LookupLevel | null, missingNote: string): string {
+  if (level === null) return missingNote;
+  if (level.distancePct === 0) return formatTokenPrice(level.price);
+  return `${formatTokenPrice(level.price)} · ${level.distancePct >= 0 ? '+' : ''}${level.distancePct.toFixed(1)}%`;
+}
+
 function TechnicalPanel({ read }: { read: LookupTechnical }) {
+  const support = asLevel(read.support);
+  const resistance = asLevel(read.resistance);
   return (
     <Panel title="Technical">
       <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-4">
         <Metric label="Price" value={formatTokenPrice(read.lastPrice)} />
-        <Metric label="RSI 14" value={read.rsi14 === null ? '—' : read.rsi14.toFixed(1)} />
+        <Metric
+          label="RSI 14"
+          value={read.rsi14 === null ? '—' : read.rsi14.toFixed(1)}
+          sub={pct(read.rsi14Percentile, 'higher than {v} of window')}
+        />
         <Metric
           label="Trend"
           value={read.trend === null ? '—' : trendLabel(read.trend.direction)}
-          hint={read.trend === null ? undefined : `EMA20 vs EMA50: ${read.trend.separationPct.toFixed(2)}%`}
+          sub={read.trend === null ? undefined : `EMA gap ${read.trend.separationPct.toFixed(2)}%`}
         />
-        <Metric label="Range (ATR)" value={read.atrPct === null ? '—' : `${read.atrPct.toFixed(2)}%`} />
-        <Metric label="Nearest low" value={read.support === null ? '—' : formatTokenPrice(read.support)} />
-        <Metric label="Nearest high" value={read.resistance === null ? '—' : formatTokenPrice(read.resistance)} />
+        <Metric
+          label="Range (ATR)"
+          value={read.atrPct === null ? '—' : `${read.atrPct.toFixed(2)}%`}
+          sub={pct(read.atrPctPercentile, 'wider than {v} of window')}
+        />
+        <Metric
+          label="Nearest low"
+          value={levelText(support, read.belowAllSwingLows ? 'below all' : '—')}
+          hint="Nearest swing low below price, and how far away it is."
+        />
+        <Metric
+          label="Nearest high"
+          value={levelText(resistance, read.aboveAllSwingHighs ? 'cleared all' : '—')}
+          hint="Nearest swing high above price. 'cleared all' means price is above every swing high in the window — not missing data."
+        />
         <Metric
           label="Range position"
           value={read.rangePositionPct === null ? '—' : `${read.rangePositionPct.toFixed(0)}/100`}
+          sub={
+            read.windowLow && read.windowHigh
+              ? `${formatTokenPrice(read.windowLow.price)} – ${formatTokenPrice(read.windowHigh.price)}`
+              : undefined
+          }
           hint="0 is the bottom of the window's range, 100 the top."
+        />
+        <Metric
+          label="Volume vs avg"
+          value={read.volumeRatio === null || read.volumeRatio === undefined ? '—' : `${read.volumeRatio.toFixed(2)}×`}
+          hint="Latest bar's volume against the 20 before it. 1× is ordinary."
+        />
+        <Metric
+          label="Window high"
+          value={read.windowHigh ? `${read.windowHigh.distancePct >= 0 ? '+' : ''}${read.windowHigh.distancePct.toFixed(1)}%` : '—'}
+          sub={read.windowHigh ? `${read.windowHigh.barsAgo} bars ago` : undefined}
+        />
+        <Metric
+          label="Window low"
+          value={read.windowLow ? `${read.windowLow.distancePct.toFixed(1)}%` : '—'}
+          sub={read.windowLow ? `${read.windowLow.barsAgo} bars ago` : undefined}
         />
         <Metric
           label="Change over 24 bars"
           value={read.changePct.last24Bars === null ? '—' : `${read.changePct.last24Bars >= 0 ? '+' : ''}${read.changePct.last24Bars.toFixed(2)}%`}
+        />
+        <Metric
+          label="Change over 7 bars"
+          value={read.changePct.last7Bars === null ? '—' : `${read.changePct.last7Bars >= 0 ? '+' : ''}${read.changePct.last7Bars.toFixed(2)}%`}
         />
       </dl>
       <p className="mt-2.5 text-[11px] leading-relaxed text-slate-500">
@@ -169,12 +226,53 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
-function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Metric({ label, value, hint, sub }: { label: string; value: string; hint?: string; sub?: string }) {
   return (
     <div className="rounded-md border border-slate-800/70 bg-slate-950/40 px-2 py-1.5" title={hint}>
       <dt className="text-[10px] uppercase tracking-wide text-slate-500">{label}</dt>
       <dd className="tabular-nums text-slate-200">{value}</dd>
+      {/* The context line is what stops a number being generic: 75.7 says
+          nothing until you know this thing rarely goes above 60. */}
+      {sub && <dd className="text-[10px] leading-tight text-slate-500">{sub}</dd>}
     </div>
+  );
+}
+
+function pct(value: number | null | undefined, template: string): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  return template.replace('{v}', `${value.toFixed(0)}%`);
+}
+
+/**
+ * Whether the frames agree.
+ *
+ * One frame in isolation is the most generic thing a chart can say. Two
+ * frames pointing opposite ways is a specific, checkable fact — and it is
+ * usually the half that changes a decision.
+ */
+function TimeframePanel({ chosen, glances }: { chosen: string; glances: LookupTimeframeGlance[] }) {
+  return (
+    <Panel title="Other timeframes">
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-3">
+        {glances.map((g) => (
+          <Metric
+            key={g.timeframe}
+            label={g.timeframe}
+            value={g.trend === null ? '—' : trendLabel(g.trend.direction)}
+            sub={[
+              g.rsi14 === null ? null : `RSI ${g.rsi14.toFixed(0)}`,
+              g.changePct === null ? null : `${g.changePct >= 0 ? '+' : ''}${g.changePct.toFixed(1)}% / 24 bars`,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          />
+        ))}
+      </dl>
+      <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+        Shown beside <span className="font-semibold text-slate-400">{chosen}</span> because one frame on its own
+        cannot say whether the frames agree — and when they disagree, that is usually the more useful fact.
+      </p>
+    </Panel>
   );
 }
 

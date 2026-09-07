@@ -100,8 +100,41 @@ describe('describeTechnicalRead', () => {
     expect(text).not.toContain('EMA');
   });
 
-  it('flags an RSI past the conventional thresholds as a fact about the number', () => {
-    const overbought = describeTechnicalRead(buildTechnicalRead(rising) as NonNullable<ReturnType<typeof buildTechnicalRead>>);
-    expect(overbought.join(' ')).toContain('above the conventional 70');
+  it('places each reading against this instrument’s own history', () => {
+    // The fix for "these numbers are generic": 75.7 alone says nothing
+    // without knowing whether this thing lives at 70.
+    const lines = describeTechnicalRead(buildTechnicalRead(rising) as NonNullable<ReturnType<typeof buildTechnicalRead>>);
+    const text = lines.join(' ');
+    expect(text).toContain('higher than');
+    expect(text).toContain('of the last 120 bars');
+    expect(text).toContain('wider than');
+  });
+
+  it('says price broke above the swings rather than leaving a blank', () => {
+    // A monotonic climb has pivots below and none above. "—" would read
+    // as "no data" when the fact is the opposite: it cleared them all.
+    const zig = series([100, 108, 120, 108, 90, 96, 118, 104, 99, 103, 140, 150, 160]);
+    const lines = describeTechnicalRead(buildTechnicalRead(zig) as NonNullable<ReturnType<typeof buildTechnicalRead>>);
+    expect(lines.join(' ')).toContain('above every swing high');
+  });
+
+  it('reports how far each level is, not just where it is', () => {
+    const zig = series([100, 108, 120, 108, 90, 96, 118, 104, 99, 103, 111, 107]);
+    const read = buildTechnicalRead(zig);
+    const level = read?.support ?? read?.resistance;
+    expect(level).not.toBeUndefined();
+    expect(typeof level?.distancePct).toBe('number');
+  });
+
+  it('measures the latest bar against the ones before it', () => {
+    const read = buildTechnicalRead(rising);
+    expect(read?.volumeRatio).toBeCloseTo(1, 6);
+    expect(describeTechnicalRead(read as NonNullable<typeof read>).join(' ')).toContain('the previous 20 bars');
+  });
+
+  it('reports the window high and low with how long ago they were', () => {
+    const read = buildTechnicalRead(rising);
+    expect(read?.windowHigh?.barsAgo).toBe(0);
+    expect(read?.windowLow?.distancePct).toBeLessThan(0);
   });
 });
