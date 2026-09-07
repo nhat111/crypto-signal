@@ -49,6 +49,20 @@ const pairSchema = z.object({
   priceChange: z.object({ m5: numericString, h1: numericString, h6: numericString, h24: numericString }).nullish(),
   txns: z.object({ h1: txnWindowSchema, h24: txnWindowSchema }).nullish(),
   pairCreatedAt: z.number().nullish(),
+  /**
+   * Links the token's own team submitted to DexScreener.
+   *
+   * The only non-guessable source for "where is this project's site" that
+   * this app has. Everything here is nullish and defaulted to empty: it is
+   * absent far more often than not, and a token with no links is the
+   * normal case rather than a parse failure.
+   */
+  info: z
+    .object({
+      websites: z.array(z.object({ label: z.string().nullish(), url: z.string() })).nullish(),
+      socials: z.array(z.object({ type: z.string().nullish(), url: z.string() })).nullish(),
+    })
+    .nullish(),
 });
 
 type RawPair = z.infer<typeof pairSchema>;
@@ -189,6 +203,11 @@ export function toGemPair(raw: RawPair): GemPair {
     txns: { h1: raw.txns?.h1 ?? null, h24: raw.txns?.h24 ?? null },
     pairCreatedAt: raw.pairCreatedAt ?? null,
     url: raw.url ?? null,
+    // Empty arrays rather than null: "this token submitted no links" is
+    // the ordinary case, and a caller should not have to tell it apart
+    // from a parse failure to render a list.
+    websites: (raw.info?.websites ?? []).map((w) => ({ label: w.label ?? null, url: w.url })),
+    socials: (raw.info?.socials ?? []).map((x) => ({ type: x.type ?? null, url: x.url })),
     fetchedAt: Date.now(),
   };
 }

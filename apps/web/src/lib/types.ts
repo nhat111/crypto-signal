@@ -672,6 +672,8 @@ export interface LookupExchangeFundamentals {
   quoteVolume24hUsd: number | null;
   fundingRate: number | null;
   openInterest: number | null;
+  /** Optional: added after this shipped, so an older API sends none. */
+  exchangeUrl?: string | null;
   unknowns: string[];
 }
 
@@ -697,6 +699,11 @@ export interface LookupOnChainFundamentals {
   lpLocked: boolean | null;
   mintAuthorityRevoked: boolean | null;
   freezeAuthorityRevoked: boolean | null;
+  /** All optional: added after this interface shipped, and an older API sends none of them. */
+  explorer?: { name: string; url: string } | null;
+  dexScreenerUrl?: string | null;
+  websites?: Array<{ label: string | null; url: string }>;
+  socials?: Array<{ type: string | null; url: string }>;
   unknowns: string[];
 }
 

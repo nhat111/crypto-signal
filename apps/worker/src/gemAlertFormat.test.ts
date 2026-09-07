@@ -18,6 +18,8 @@ function pair(): GemPair {
     txns: { h1: { buys: 60, sells: 40 }, h24: { buys: 412, sells: 380 } },
     pairCreatedAt: 0,
     url: null,
+    websites: [],
+    socials: [],
     fetchedAt: 0,
   };
 }

@@ -37,6 +37,8 @@ function pair(address: string, name: string, symbol: string, overrides: Partial<
     txns: { h1: { buys: 40, sells: 30 }, h24: { buys: 500, sells: 450 } },
     pairCreatedAt: NOW - 44 * DAY,
     url: null,
+    websites: [],
+    socials: [],
     fetchedAt: NOW,
     ...overrides,
   };

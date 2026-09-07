@@ -34,6 +34,8 @@ function pair(overrides: Partial<GemPair> = {}): GemPair {
     txns: { h1: null, h24: { buys: 10, sells: 5 } },
     pairCreatedAt: NOW - 30 * DAY,
     url: null,
+    websites: [],
+    socials: [],
     fetchedAt: NOW,
     ...overrides,
   };

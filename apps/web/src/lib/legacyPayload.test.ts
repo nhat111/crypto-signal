@@ -5,10 +5,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { GemCard } from '@/components/gems/GemCard';
+import { LookupResultView } from '@/components/lookup/LookupResultView';
 import { GemPerformancePanel } from '@/components/gems/PerformancePanels';
 import { JournalSummary } from '@/components/journal/JournalSummary';
 import { TradeTable } from '@/components/journal/TradeTable';
-import type { Gem, GemPerformance, Trade, TradeSummary } from './types';
+import type { Gem, GemPerformance, LookupOnChainFundamentals, Trade, TradeSummary } from './types';
 
 /**
  * The rule at the top of lib/types.ts, enforced instead of merely written
@@ -212,6 +213,35 @@ const fullPerformance: GemPerformance = {
   },
 };
 
+const fullOnChain: LookupOnChainFundamentals = {
+  chainId: 'solana',
+  tokenAddress: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
+  symbol: 'BONK',
+  name: 'Bonk',
+  dexId: 'raydium',
+  priceUsd: 0.000021,
+  liquidityUsd: 900_000,
+  fdvUsd: 40_000_000,
+  marketCapUsd: 30_000_000,
+  volume24hUsd: 1_200_000,
+  ageDays: 400,
+  liquidityToFdvPct: 2.25,
+  volumeToLiquidity: 1.33,
+  buys24h: 900,
+  sells24h: 700,
+  safetyVerdict: 'safe',
+  safetyFlags: [],
+  topHolderPct: 0.04,
+  lpLocked: true,
+  mintAuthorityRevoked: true,
+  freezeAuthorityRevoked: true,
+  explorer: { name: 'Solscan', url: 'https://solscan.io/token/x' },
+  dexScreenerUrl: 'https://dexscreener.com/solana/x',
+  websites: [{ label: 'Site', url: 'https://example.org' }],
+  socials: [{ type: 'twitter', url: 'https://x.com/example' }],
+  unknowns: [],
+};
+
 describe('optionalFieldsOf', () => {
   it('finds the fields the split-deploy rule is about', () => {
     // If this ever returns [], every test below would pass vacuously while
@@ -299,6 +329,21 @@ describe('pages render against an older API payload', () => {
       renderToStaticMarkup(createElement(GemPerformancePanel, { data: null, loading: false, error: 'boom' })),
     ).toContain('boom');
   });
+
+  it.each(legacyVariants(fullOnChain, 'LookupOnChainFundamentals'))(
+    'renders an on-chain lookup — $label',
+    ({ payload }) => {
+      // The link block and the explorer were added late; an older API
+      // sends the figures with none of them.
+      const html = renderToStaticMarkup(
+        createElement(LookupResultView, {
+          result: { kind: 'onchain', fundamentals: payload, technical: null, otherPools: [] },
+        }),
+      );
+      expect(html).toContain('BONK');
+      expect(html).toContain('On-chain fundamentals');
+    },
+  );
 
   it('covers more than one payload shape, so the loop is not vacuous', () => {
     // If optionalFieldsOf ever returned [], every it.each above would

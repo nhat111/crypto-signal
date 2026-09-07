@@ -43,6 +43,8 @@ function pair(overrides: Partial<GemPair> = {}): GemPair {
     txns: { h1: { buys: 60, sells: 40 }, h24: { buys: 700, sells: 500 } },
     pairCreatedAt: NOW - 45 * DAY,
     url: 'https://dexscreener.com/solana/pair1',
+    websites: [],
+    socials: [],
     fetchedAt: NOW,
     ...overrides,
   };

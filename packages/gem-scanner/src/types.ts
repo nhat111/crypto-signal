@@ -42,6 +42,9 @@ export interface GemPair {
   /** Pool creation time (UTC ms). Null when the source omits it — age-based scoring is then unavailable rather than assumed. */
   pairCreatedAt: number | null;
   url: string | null;
+  /** Links the token's team submitted to the data source. Empty is normal, not a failure. */
+  websites: Array<{ label: string | null; url: string }>;
+  socials: Array<{ type: string | null; url: string }>;
   fetchedAt: number;
 }
 

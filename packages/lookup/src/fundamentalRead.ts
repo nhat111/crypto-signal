@@ -1,4 +1,5 @@
 import type { GemPair, SafetyReport } from '@crypto-signal/gem-scanner';
+import { explorerFor, type ExplorerLink } from './explorers.js';
 
 /**
  * What can honestly be said about a token beyond its chart.
@@ -39,6 +40,17 @@ export interface OnChainFundamentals {
   lpLocked: boolean | null;
   mintAuthorityRevoked: boolean | null;
   freezeAuthorityRevoked: boolean | null;
+  /**
+   * Where to go and check any of this. Null when the chain's explorer URL
+   * shape has not been verified — a wrong link makes the reader doubt the
+   * address, which was the one thing that was definitely right.
+   */
+  explorer: ExplorerLink | null;
+  /** The pool's page on the data source, for the chart and the trade history. */
+  dexScreenerUrl: string | null;
+  /** Links the token's own team submitted. Empty is the ordinary case. */
+  websites: Array<{ label: string | null; url: string }>;
+  socials: Array<{ type: string | null; url: string }>;
   unknowns: string[];
 }
 
@@ -64,6 +76,14 @@ export function buildOnChainFundamentals(pair: GemPair, safety: SafetyReport | n
     pair.volume.h24 !== null && pair.liquidityUsd !== null && pair.liquidityUsd > 0
       ? pair.volume.h24 / pair.liquidityUsd
       : null;
+
+  if (explorerFor(pair.chainId, pair.baseToken.address) === null) {
+    // Said out loud rather than rendered as a missing link: "we have no
+    // verified explorer for this chain" is a fact about our coverage, and
+    // a silently absent button reads as the token having nothing to show.
+    unknowns.push(`Block explorer link (no verified explorer for "${pair.chainId}")`);
+  }
+  if (pair.websites.length === 0) unknowns.push('Project website (the token submitted none to the data source)');
 
   if (safety === null) {
     unknowns.push('Safety screen (no source covers this chain)');
@@ -94,6 +114,10 @@ export function buildOnChainFundamentals(pair: GemPair, safety: SafetyReport | n
     lpLocked: safety?.lpLocked ?? null,
     mintAuthorityRevoked: safety?.mintAuthorityRevoked ?? null,
     freezeAuthorityRevoked: safety?.freezeAuthorityRevoked ?? null,
+    explorer: explorerFor(pair.chainId, pair.baseToken.address),
+    dexScreenerUrl: pair.url,
+    websites: pair.websites,
+    socials: pair.socials,
     unknowns,
   };
 }
@@ -113,6 +137,8 @@ export interface ExchangeFundamentals {
   quoteVolume24hUsd: number | null;
   fundingRate: number | null;
   openInterest: number | null;
+  /** The exchange's own page for the pair — the venue the candles came from. */
+  exchangeUrl: string | null;
   unknowns: string[];
 }
 

@@ -20,7 +20,9 @@ function pair(overrides: Partial<GemPair> = {}): GemPair {
     priceChangePct: { m5: 0, h1: 1, h6: 3, h24: 8 },
     txns: { h1: { buys: 10, sells: 8 }, h24: { buys: 300, sells: 220 } },
     pairCreatedAt: NOW - 30 * DAY,
-    url: null,
+    url: 'https://dexscreener.com/solana/pool-1',
+    websites: [{ label: 'Website', url: 'https://example.org' }],
+    socials: [{ type: 'twitter', url: 'https://x.com/example' }],
     fetchedAt: NOW,
     ...overrides,
   };
@@ -109,5 +111,30 @@ describe('buildOnChainFundamentals', () => {
 
   it('has no gaps to report when everything was readable', () => {
     expect(buildOnChainFundamentals(pair(), safety, NOW).unknowns).toEqual([]);
+  });
+
+  it('carries the links needed to go and check the numbers', () => {
+    // A token page that shows figures and no way to verify them asks to be
+    // taken on trust, which is the opposite of what this project is for.
+    const f = buildOnChainFundamentals(pair(), safety, NOW);
+    expect(f.explorer?.url).toContain('solscan.io');
+    expect(f.dexScreenerUrl).toContain('dexscreener.com');
+    expect(f.websites.map((w) => w.url)).toEqual(['https://example.org']);
+    expect(f.socials).toHaveLength(1);
+  });
+
+  it('names the missing explorer instead of just omitting the button', () => {
+    // A silently absent link reads as the token having nothing to show,
+    // when the truth is that WE have no verified explorer for that chain.
+    const f = buildOnChainFundamentals(pair({ chainId: 'robinhood' }), safety, NOW);
+    expect(f.explorer).toBeNull();
+    expect(f.unknowns.join(' ')).toContain('robinhood');
+    expect(f.unknowns.join(' ')).toContain('explorer');
+  });
+
+  it('reports a token that submitted no links as a gap, not as an empty list', () => {
+    const f = buildOnChainFundamentals(pair({ websites: [], socials: [] }), safety, NOW);
+    expect(f.websites).toEqual([]);
+    expect(f.unknowns.join(' ')).toContain('Project website');
   });
 });

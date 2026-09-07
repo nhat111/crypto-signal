@@ -1,6 +1,7 @@
 import type { LookupLevel, LookupResult, LookupTechnical, LookupTimeframeGlance } from '@/lib/types';
 import { SafetyBadge } from '@/components/gems/SafetyBadge';
 import { formatTokenPrice, formatUsd } from '@/lib/format';
+import { Glossary, ONCHAIN_GLOSSARY, TECHNICAL_GLOSSARY } from './Glossary';
 
 /**
  * The answer to one lookup.
@@ -22,6 +23,14 @@ export function LookupResultView({ result }: { result: LookupResult }) {
         {result.timeframes && result.timeframes.length > 0 && (
           <TimeframePanel chosen={result.timeframe} glances={result.timeframes} />
         )}
+        <LinkRow
+          links={[
+            result.fundamentals.exchangeUrl
+              ? { label: `${result.symbol} on Binance`, url: result.fundamentals.exchangeUrl }
+              : null,
+          ]}
+        />
+        <Glossary title="What these readings mean" items={TECHNICAL_GLOSSARY} />
         <UnknownsPanel
           title="Fundamentals with no data source"
           items={result.fundamentals.unknowns}
@@ -88,6 +97,17 @@ export function LookupResultView({ result }: { result: LookupResult }) {
           </ul>
         </Panel>
       )}
+
+      <LinkRow
+        links={[
+          f.explorer ? { label: `Contract on ${f.explorer.name}`, url: f.explorer.url } : null,
+          f.dexScreenerUrl ? { label: 'Pool on DexScreener', url: f.dexScreenerUrl } : null,
+          ...(f.websites ?? []).map((w) => ({ label: w.label?.trim() || 'Project website', url: w.url })),
+          ...(f.socials ?? []).map((x) => ({ label: x.type?.trim() || 'Social', url: x.url })),
+        ]}
+      />
+
+      <Glossary title="What these figures mean" items={ONCHAIN_GLOSSARY} />
 
       <UnknownsPanel
         title="Could not be read"
@@ -204,6 +224,34 @@ function UnknownsPanel({ title, items, note }: { title: string; items: string[];
       )}
       <p className="mt-2 text-[11px] leading-relaxed text-slate-500">{note}</p>
     </Panel>
+  );
+}
+
+/**
+ * Somewhere to go and check.
+ *
+ * Rendered as buttons rather than inline text because they are the main
+ * reason to leave this page, and on a phone a 16px text link is not a
+ * target. Externals get rel="noreferrer": these URLs come from a token's
+ * own submission to a third party and are not ours to vouch for.
+ */
+function LinkRow({ links }: { links: Array<{ label: string; url: string } | null> }) {
+  const present = links.filter((l): l is { label: string; url: string } => l !== null);
+  if (present.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {present.map((l) => (
+        <a
+          key={l.url}
+          href={l.url}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="inline-flex min-h-[40px] items-center rounded-md border border-slate-700 px-3 text-xs font-medium text-slate-300 transition-colors hover:border-slate-600 hover:text-slate-100"
+        >
+          {l.label} →
+        </a>
+      ))}
+    </div>
   );
 }
 

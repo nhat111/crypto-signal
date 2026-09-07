@@ -2,7 +2,8 @@ import type { Logger } from '@crypto-signal/shared';
 import type { OhlcvBar } from '@crypto-signal/indicators';
 import type { GemPair, SafetyReport } from '@crypto-signal/gem-scanner';
 import { buildOnChainFundamentals, EXCHANGE_FUNDAMENTAL_GAPS, type ExchangeFundamentals, type OnChainFundamentals } from './fundamentalRead.js';
-import { candidateSymbols, resolveQuery } from './resolveQuery.js';
+import { binanceTradeUrl } from './explorers.js';
+import { QUOTE_FALLBACKS, candidateSymbols, resolveQuery } from './resolveQuery.js';
 import { buildTechnicalRead, type TechnicalRead } from './technicalRead.js';
 
 /**
@@ -124,6 +125,7 @@ async function lookupExchange(deps: LookupDeps, symbol: string, timeframe: strin
         quoteVolume24hUsd: null,
         fundingRate: null,
         openInterest: null,
+        exchangeUrl: binanceTradeUrl(candidate, QUOTE_FALLBACKS),
         unknowns: [...EXCHANGE_FUNDAMENTAL_GAPS],
       },
       triedSymbols: tried,

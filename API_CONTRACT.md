@@ -230,6 +230,15 @@ scanner uses, so the two cannot disagree. Other pools are listed in
 falls back to `4h` rather than erroring, since it only changes the
 resolution of the answer.
 
+An on-chain result also carries links: `explorer` (null for a chain whose
+explorer URL shape has not been verified — a wrong link makes the reader
+doubt the address), `dexScreenerUrl`, and `websites`/`socials` exactly as
+the token submitted them to the data source. An exchange result carries
+`exchangeUrl`, the venue the candles came from. A missing explorer or
+website is listed in `unknowns` rather than silently omitted: a blank
+space reads as the token having nothing to show, when the fact is that we
+have no verified explorer for that chain.
+
 Returns `{ query, timeframe, result }` where `result.kind` is `exchange`
 or `onchain`, or `404 { error, query }`. Failure reasons are English, like every other user-facing string in the web app and the API. `technical` is null for the
 on-chain kind: DexScreener's free API returns no candle history, so there
