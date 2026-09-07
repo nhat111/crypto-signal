@@ -198,9 +198,13 @@ async function main(): Promise<void> {
 
   bot.command('watch', async (ctx) => {
     const chatId = String(ctx.chat.id);
-    const symbol = ctx.message.text.split(' ')[1]?.toUpperCase();
+    // Sent as typed: a contract address is the only identifier that always
+    // works — a ticker can be Chinese characters or emoji, which a phone
+    // keyboard will not reproduce — and upper-casing would destroy a
+    // base58 Solana address.
+    const symbol = ctx.message.text.split(/\s+/)[1];
     if (!symbol) {
-      await ctx.reply('Usage: /watch SYMBOL — e.g. /watch DINGER (must be a symbol you\'ve seen in /gems).');
+      await ctx.reply('Usage: /watch TICKER or CONTRACT_ADDRESS — e.g. /watch DINGER, or paste the address for a token whose ticker you cannot type.');
       return;
     }
     try {

@@ -1,9 +1,10 @@
 import type { FastifyInstance } from 'fastify';
-import { closeGemWatchForChat, getActiveWatch, getActiveWatchesForChat, getLatestGemBySymbol, insertGemWatch } from '@crypto-signal/db';
+import { closeGemWatchForChat, getActiveWatch, getActiveWatchesForChat, insertGemWatch, resolveGemRef } from '@crypto-signal/db';
 import type { ApiDeps } from '../deps.js';
 
 interface CreateWatchBody {
   chatId: string;
+  /** A ticker or a contract address — see resolveGemRef for why both. */
   symbol: string;
 }
 
@@ -23,10 +24,23 @@ export function registerWatchRoutes(app: FastifyInstance, deps: ApiDeps): void {
     const { chatId, symbol } = req.body;
     if (!chatId || !symbol) return reply.code(400).send({ error: 'chatId and symbol are required' });
 
-    const gem = await getLatestGemBySymbol(deps.pool, symbol);
-    if (!gem) {
-      return reply.code(404).send({ error: `no recent scan found for "${symbol}" — check /gems first` });
+    const resolved = await resolveGemRef(deps.pool, symbol);
+    if (resolved.kind === 'ambiguous') {
+      // Naming the candidates instead of picking one: two tokens sharing a
+      // ticker is exactly where a silent choice would start watching the
+      // wrong asset, and the caller has the address that settles it.
+      const list = resolved.matches.map((m) => `${m.symbol} on ${m.chainId} (${m.tokenAddress})`).join('; ');
+      return reply.code(409).send({
+        error: `"${symbol}" matches more than one token — use the contract address instead. Candidates: ${list}`,
+        matches: resolved.matches,
+      });
     }
+    if (resolved.kind === 'not_found') {
+      return reply.code(404).send({
+        error: `no recent scan found for "${symbol}" — check /gems first, or paste the contract address`,
+      });
+    }
+    const gem = resolved.gem;
     if (gem.priceUsd === null) {
       return reply.code(422).send({ error: `"${symbol}" has no known price to set as entry` });
     }

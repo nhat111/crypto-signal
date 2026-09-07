@@ -198,29 +198,82 @@ export async function getGemByAddress(pool: Pool, chainId: string, tokenAddress:
 }
 
 /**
- * Resolves a "/watch SYMBOL" command to the most recently scanned token
- * carrying that ticker, across all chains — good enough while only one
- * chain is enabled. Symbols aren't unique on-chain (anyone can name a
- * token "DINGER"), so this is "most recently seen," not a guarantee of
- * which token the caller meant.
+ * One token, named either way.
+ *
+ * `/watch` used to take a ticker only, which failed two ways at once. A
+ * ticker can be unusable — Chinese characters, emoji, anything a phone
+ * keyboard will not produce on demand — while the contract address is
+ * always copy-pasteable. And a ticker is not unique: two tokens on two
+ * chains can share one, so matching the most recently scanned row would
+ * silently start watching a DIFFERENT token than the one somebody holds.
+ *
+ * So: address wins outright when it matches, ticker resolves only when
+ * exactly one token carries it, and a shared ticker is refused by name
+ * rather than guessed at.
  */
-export async function getLatestGemBySymbol(pool: Pool, symbol: string): Promise<GemRow | undefined> {
-  const { rows } = await pool.query(
-    `SELECT s.scan_id, s.chain_id, s.token_address, s.gem_score, s.gem_components, s.risk_score,
-            s.risk_components, s.reasons, s.price_usd, s.liquidity_usd, s.volume_24h_usd, s.fdv_usd,
-            s.price_change_24h_pct, s.buys_24h, s.sells_24h, s.age_days, s.safety_verdict,
-            s.safety_flags, s.top_holder_pct, s.lp_locked,
-            extract(epoch from s.scanned_at)*1000 AS ts,
-            t.symbol, t.name, t.dex_id, t.dexscreener_url
+export type GemRefMatch = { chainId: string; tokenAddress: string; symbol: string };
+
+export type GemRefResolution =
+  | { kind: 'found'; gem: GemRow }
+  | { kind: 'not_found' }
+  | { kind: 'ambiguous'; matches: GemRefMatch[] };
+
+const GEM_ROW_COLUMNS = `
+  s.scan_id, s.chain_id, s.token_address, s.gem_score, s.gem_components, s.risk_score,
+  s.risk_components, s.reasons, s.price_usd, s.liquidity_usd, s.volume_24h_usd, s.fdv_usd,
+  s.price_change_24h_pct, s.buys_24h, s.sells_24h, s.age_days, s.safety_verdict,
+  s.safety_flags, s.top_holder_pct, s.lp_locked,
+  extract(epoch from s.scanned_at)*1000 AS ts,
+  t.symbol, t.name, t.dex_id, t.dexscreener_url
+`;
+
+export async function resolveGemRef(pool: Pool, ref: string): Promise<GemRefResolution> {
+  const trimmed = ref.trim();
+  if (trimmed === '') return { kind: 'not_found' };
+
+  // Address first, and case-insensitively: an EVM address gets pasted in
+  // whatever casing the explorer showed it in.
+  const byAddress = await pool.query(
+    `SELECT ${GEM_ROW_COLUMNS}
      FROM gem_scans s
      JOIN gem_tokens t ON t.chain_id = s.chain_id AND t.token_address = s.token_address
-     WHERE lower(t.symbol) = lower($1)
+     WHERE lower(s.token_address) = lower($1)
      ORDER BY s.scanned_at DESC
      LIMIT 1`,
-    [symbol],
+    [trimmed],
   );
-  const row = rows[0];
-  return row ? toGemRow(row) : undefined;
+  if (byAddress.rows[0]) return { kind: 'found', gem: toGemRow(byAddress.rows[0]) };
+
+  const distinct = await pool.query(
+    `SELECT DISTINCT t.chain_id, t.token_address, t.symbol
+     FROM gem_tokens t
+     WHERE lower(t.symbol) = lower($1)
+       AND EXISTS (SELECT 1 FROM gem_scans s WHERE s.chain_id = t.chain_id AND s.token_address = t.token_address)`,
+    [trimmed],
+  );
+  if (distinct.rows.length === 0) return { kind: 'not_found' };
+  if (distinct.rows.length > 1) {
+    return {
+      kind: 'ambiguous',
+      matches: distinct.rows.map((r) => ({
+        chainId: String(r.chain_id),
+        tokenAddress: String(r.token_address),
+        symbol: String(r.symbol),
+      })),
+    };
+  }
+
+  const only = distinct.rows[0];
+  const latest = await pool.query(
+    `SELECT ${GEM_ROW_COLUMNS}
+     FROM gem_scans s
+     JOIN gem_tokens t ON t.chain_id = s.chain_id AND t.token_address = s.token_address
+     WHERE s.chain_id = $1 AND s.token_address = $2
+     ORDER BY s.scanned_at DESC
+     LIMIT 1`,
+    [only.chain_id, only.token_address],
+  );
+  return latest.rows[0] ? { kind: 'found', gem: toGemRow(latest.rows[0]) } : { kind: 'not_found' };
 }
 
 function toGemRow(r: Record<string, unknown>): GemRow {
