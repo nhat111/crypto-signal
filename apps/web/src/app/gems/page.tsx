@@ -46,7 +46,7 @@ export default function GemsPage() {
                 type="button"
                 onClick={() => setHorizon(h)}
                 className={cx(
-                  'rounded-md px-2.5 py-1 text-xs font-semibold transition-colors',
+                  'inline-flex min-h-[32px] items-center rounded-md px-3 text-xs font-semibold transition-colors sm:min-h-0 sm:px-2.5 sm:py-1',
                   h === horizon ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200',
                 )}
               >

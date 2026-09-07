@@ -214,16 +214,19 @@ export function ScoreEdgePanel({ edge }: { edge?: GemScoreEdge }) {
         </p>
       )}
 
+      {/* No min-width and two columns hidden below sm: six columns needed
+          480px, which on a 390px phone meant the table with the answer in
+          it was the one thing you had to swipe sideways to read. */}
       <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[30rem] text-left text-xs">
+        <table className="w-full text-left text-xs sm:min-w-[30rem]">
           <thead className="text-[10px] uppercase tracking-wide text-slate-500">
             <tr>
               <th className="pb-1 font-semibold">Bậc điểm</th>
               <th className="pb-1 text-right font-semibold">Mẫu</th>
               <th className="pb-1 text-right font-semibold">Đi lên</th>
               <th className="pb-1 text-right font-semibold">Đủ bù phí</th>
-              <th className="pb-1 text-right font-semibold">Trung vị</th>
-              <th className="pb-1 text-right font-semibold">Cạn TK</th>
+              <th className="hidden pb-1 text-right font-semibold sm:table-cell">Trung vị</th>
+              <th className="hidden pb-1 text-right font-semibold sm:table-cell">Cạn TK</th>
             </tr>
           </thead>
           <tbody className="text-slate-300">
@@ -237,10 +240,10 @@ export function ScoreEdgePanel({ edge }: { edge?: GemScoreEdge }) {
                 <td className="py-1.5 text-right font-semibold tabular-nums">
                   {band.sufficientData && band.netPositiveMovePct !== null ? `${band.netPositiveMovePct}%` : '—'}
                 </td>
-                <td className="py-1.5 text-right tabular-nums">
+                <td className="hidden py-1.5 text-right tabular-nums sm:table-cell">
                   {band.sufficientData && band.medianMovePct !== null ? `${band.medianMovePct}%` : '—'}
                 </td>
-                <td className="py-1.5 text-right tabular-nums">
+                <td className="hidden py-1.5 text-right tabular-nums sm:table-cell">
                   {band.liquidityCollapsePct === null ? '—' : `${band.liquidityCollapsePct}%`}
                 </td>
               </tr>

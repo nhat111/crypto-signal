@@ -80,7 +80,7 @@ export function TradeForm({ onCreated, prefill }: TradeFormProps) {
         <Field label="Symbol">
           <input
             className={cx(inputClass, 'w-44')}
-            placeholder="BTCUSDT hoặc địa chỉ contract"
+            placeholder="BTCUSDT or contract address"
             value={symbol}
             onChange={(e) => setSymbol(e.target.value)}
           />

@@ -22,7 +22,7 @@ describe('markPriceNote', () => {
   it('shows the price it used and how old that price is', () => {
     const note = markPriceNote({ markPrice: 0.00042, markPriceAt: NOW - 4 * 60_000, markPriceUnknownReason: null }, NOW);
     expect(note).toContain('0.00042');
-    expect(note).toContain('4 phút trước');
+    expect(note).toContain('4m ago');
   });
 
   it('shows the price without an age when the API sent no clock', () => {
@@ -34,13 +34,13 @@ describe('markPriceNote', () => {
 
   it('names the ambiguity, because that one has a fix', () => {
     const note = markPriceNote({ markPrice: null, markPriceAt: null, markPriceUnknownReason: 'ambiguous_ticker' }, NOW);
-    expect(note).toContain('địa chỉ contract');
+    expect(note).toContain('contract address');
   });
 
   it('distinguishes "no source" from "ambiguous"', () => {
     const note = markPriceNote({ markPrice: null, markPriceAt: null, markPriceUnknownReason: 'not_found' }, NOW);
-    expect(note).toContain('chưa có nguồn giá');
-    expect(note).not.toContain('trùng ticker');
+    expect(note).toContain('no price source');
+    expect(note).not.toContain('share this ticker');
   });
 
   it('says nothing at all for an API that predates mark pricing', () => {

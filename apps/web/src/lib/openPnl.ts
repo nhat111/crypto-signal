@@ -1,6 +1,6 @@
 import type { Trade } from './types';
-import { formatTokenPrice } from './format';
-import { ago } from '@/components/status/StatusBlocks';
+import { formatRelativeTime, formatTokenPrice } from './format';
+
 
 /**
  * How an open position's estimated P&L is worded.
@@ -35,15 +35,17 @@ export function markPriceNote(
     const known = nowMs !== null && trade.markPriceAt !== null && trade.markPriceAt !== undefined;
     // No clock from the server means no age — better a bare price than one
     // aged against the phone's clock, which can be minutes out.
-    const age = known ? ago(nowMs - (trade.markPriceAt as number)) : null;
+    // The journal is English; the status page's `ago` is Vietnamese, and
+    // borrowing it put "11 phút trước" inside an English table.
+    const age = known ? formatRelativeTime(trade.markPriceAt as number, nowMs as number) : null;
     return age === null ? formatTokenPrice(trade.markPrice) : `${formatTokenPrice(trade.markPrice)} · ${age}`;
   }
 
   switch (trade.markPriceUnknownReason) {
     case 'ambiguous_ticker':
-      return 'nhiều token trùng ticker — ghi bằng địa chỉ contract để tính được';
+      return 'several tokens share this ticker — log the contract address to price it';
     case 'not_found':
-      return 'chưa có nguồn giá cho mã này';
+      return 'no price source for this symbol';
     default:
       // Undefined reason means an API that predates this feature, not a
       // failed lookup. Saying nothing is the honest rendering.

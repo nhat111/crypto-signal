@@ -159,7 +159,7 @@ export function TradeRow({ trade, onChanged, nowMs }: TradeRowProps) {
               unrealized !== null ? (
                 <span
                   className={cx('text-xs', (trade.unrealizedPnlPct ?? 0) >= 0 ? 'text-emerald-400/70' : 'text-rose-400/70')}
-                  title="Tạm tính theo giá hiện tại — chưa chốt lệnh."
+                  title="Estimated at the current price — the position is still open."
                 >
                   {unrealized}
                   {trade.unrealizedPnlUsd !== null && trade.unrealizedPnlUsd !== undefined && (

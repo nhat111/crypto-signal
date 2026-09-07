@@ -1,4 +1,5 @@
 import type { Trade } from '@/lib/types';
+import { TradeCard } from './TradeCard';
 import { TradeRow } from './TradeRow';
 
 interface TradeTableProps {
@@ -18,7 +19,17 @@ export function TradeTable({ trades, onChanged, nowMs }: TradeTableProps) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-800 bg-slate-900/40">
+    <>
+      {/* Cards below sm: the table needs 720px for eight columns, so on a
+          390px phone the page whose job is being read was 458px of
+          sideways swiping. */}
+      <div className="space-y-3 sm:hidden">
+        {trades.map((trade) => (
+          <TradeCard key={trade.id} trade={trade} onChanged={onChanged} nowMs={nowMs} />
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-lg border border-slate-800 bg-slate-900/40 sm:block">
       <table className="w-full min-w-[720px] text-left text-sm">
         <thead>
           <tr className="border-b border-slate-800 text-[11px] uppercase tracking-wide text-slate-500">
@@ -38,6 +49,7 @@ export function TradeTable({ trades, onChanged, nowMs }: TradeTableProps) {
           ))}
         </tbody>
       </table>
-    </div>
+      </div>
+    </>
   );
 }

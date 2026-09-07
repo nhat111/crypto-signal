@@ -78,13 +78,13 @@ export function GemCard({ gem }: GemCardProps) {
             href={gem.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs font-medium text-sky-400 hover:text-sky-300"
+            className="inline-flex min-h-[36px] items-center text-xs font-medium text-sky-400 hover:text-sky-300"
           >
             View chart on DexScreener →
           </a>
         )}
-        <Link href={journalPrefillHref(gem)} className="text-xs font-medium text-slate-400 hover:text-slate-200">
-          Ghi vào journal →
+        <Link href={journalPrefillHref(gem)} className="inline-flex min-h-[36px] items-center text-xs font-medium text-slate-400 hover:text-slate-200">
+          Log in journal →
         </Link>
       </div>
     </article>
@@ -116,7 +116,7 @@ function ContractAddress({ address }: { address: string }) {
       type="button"
       onClick={handleCopy}
       title={copied ? 'Copied!' : `Copy contract address: ${address}`}
-      className="mt-0.5 flex items-center gap-1.5 rounded text-[11px] text-slate-500 hover:text-slate-300"
+      className="mt-0.5 flex min-h-[32px] items-center gap-1.5 rounded text-[11px] text-slate-500 hover:text-slate-300"
     >
       <span className="font-mono tabular-nums">
         {address.slice(0, 4)}…{address.slice(-4)}

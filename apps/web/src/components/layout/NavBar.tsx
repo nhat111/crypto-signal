@@ -24,7 +24,7 @@ export function NavBar() {
 
   return (
     <header className="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/95 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 sm:gap-x-6 sm:gap-y-2 sm:px-4 sm:py-3">
         <Link href="/" className="flex items-center gap-2 text-sm font-bold tracking-tight text-slate-100">
           <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-400" />
           Market Health Monitor
@@ -42,7 +42,9 @@ export function NavBar() {
                 key={link.href}
                 href={link.href}
                 className={cx(
-                  'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                  // Tighter on a phone: this header is sticky, so every
+                  // pixel it takes is a pixel of content gone for good.
+                  'inline-flex min-h-[32px] items-center rounded-md px-2.5 text-[13px] font-medium transition-colors sm:min-h-0 sm:px-3 sm:py-1.5 sm:text-sm',
                   active
                     ? 'bg-slate-800 text-slate-100'
                     : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200',
@@ -70,7 +72,7 @@ export function NavBar() {
                 key={symbol}
                 href={`/symbol/${symbol}`}
                 className={cx(
-                  'rounded-md border px-2.5 py-1 text-xs font-semibold tabular-nums transition-colors',
+                  'rounded-md border px-2 py-0.5 text-[11px] font-semibold tabular-nums transition-colors sm:px-2.5 sm:py-1 sm:text-xs',
                   active
                     ? 'border-sky-500/40 bg-sky-500/10 text-sky-300'
                     : 'border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200',

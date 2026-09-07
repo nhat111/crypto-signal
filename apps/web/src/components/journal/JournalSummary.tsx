@@ -33,17 +33,17 @@ export function JournalSummary({ summary }: JournalSummaryProps) {
       <Stat label="Open positions" value={String(openCount)} />
       {openCount > 0 && (
         <Stat
-          label="P&L đang mở"
+          label="Open P&L"
           // Deliberately its own tile, never folded into Total P&L: that
           // one is realized and settled, this one moves on its own every
           // time the page polls.
           value={openPnl === null || openPnl === undefined ? '—' : formatUsd(openPnl, false)}
           detail={
             openPnl === null || openPnl === undefined
-              ? 'tạm tính — chưa có giá'
+              ? 'estimate — no price yet'
               : priced < openCount
-                ? `tạm tính · ${priced}/${openCount} vị thế có giá`
-                : 'tạm tính'
+                ? `estimate · ${priced}/${openCount} positions priced`
+                : 'estimate'
           }
           tone={openPnl === null || openPnl === undefined ? undefined : openPnl >= 0 ? 'emerald' : 'rose'}
         />
