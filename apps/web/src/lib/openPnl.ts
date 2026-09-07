@@ -52,3 +52,24 @@ export function markPriceNote(
       return null;
   }
 }
+
+/**
+ * Whether the API answering is older than this page.
+ *
+ * A dash currently means two different things: "we computed this and there
+ * is nothing to show" and "the server never sent this field". The second
+ * happens on every release — Vercel and Railway finish minutes apart — and
+ * it renders as a panel of blanks that looks like a broken token rather
+ * than a deploy still in flight.
+ *
+ * Absent is the tell. `null` is a computed answer; `undefined` is a field
+ * that was never in the payload, so a reading that is undefined across the
+ * board means the response predates them all.
+ */
+export function apiPredatesReadings(read: {
+  volumeRatio?: number | null;
+  windowHigh?: unknown;
+  rsi14Percentile?: number | null;
+}): boolean {
+  return read.volumeRatio === undefined && read.windowHigh === undefined && read.rsi14Percentile === undefined;
+}

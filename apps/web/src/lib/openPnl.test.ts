@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { markPriceNote, unrealizedLabel } from './openPnl';
+import { apiPredatesReadings, markPriceNote, unrealizedLabel } from './openPnl';
 
 const NOW = 1_700_000_000_000;
 
@@ -55,5 +55,26 @@ describe('markPriceNote', () => {
     const note = markPriceNote({ markPrice: 0.000000123, markPriceAt: NOW, markPriceUnknownReason: null }, NOW);
     expect(note).toContain('123');
     expect(note).not.toContain('$0.00 ');
+  });
+});
+
+describe('apiPredatesReadings', () => {
+  it('spots a response that predates the newer readings', () => {
+    // Every one absent, not null: the fields were never in the payload.
+    expect(apiPredatesReadings({})).toBe(true);
+  });
+
+  it('does not call a computed-but-empty reading an old API', () => {
+    // null is an answer — "we looked and there is nothing" — and blaming
+    // the deploy for it would send somebody to redeploy for no reason.
+    expect(apiPredatesReadings({ volumeRatio: null, windowHigh: null, rsi14Percentile: null })).toBe(false);
+  });
+
+  it('needs all of them missing, not just one', () => {
+    // A single absent field is a gap in one reading; all of them absent is
+    // a different response shape.
+    expect(apiPredatesReadings({ volumeRatio: 1.2 })).toBe(false);
+    expect(apiPredatesReadings({ rsi14Percentile: 30 })).toBe(false);
+    expect(apiPredatesReadings({ windowHigh: { price: 1 } })).toBe(false);
   });
 });

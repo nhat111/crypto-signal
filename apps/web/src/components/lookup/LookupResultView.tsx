@@ -1,6 +1,7 @@
 import type { LookupLevel, LookupResult, LookupTechnical, LookupTimeframeGlance } from '@/lib/types';
 import { SafetyBadge } from '@/components/gems/SafetyBadge';
 import { formatTokenPrice, formatUsd } from '@/lib/format';
+import { apiPredatesReadings } from '@/lib/openPnl';
 import { Glossary, ONCHAIN_GLOSSARY, TECHNICAL_GLOSSARY } from './Glossary';
 
 /**
@@ -204,6 +205,15 @@ function TechnicalPanel({ read }: { read: LookupTechnical }) {
       {read.missing.length > 0 && (
         <p className="mt-1.5 text-[11px] leading-relaxed text-amber-300/80">
           Not enough history for: {read.missing.join(' · ')}.
+        </p>
+      )}
+      {/* Without this, a deploy still in flight looks like a broken token:
+          the API and the web ship separately, and for a few minutes the
+          newer fields simply are not in the response. */}
+      {apiPredatesReadings(read) && (
+        <p className="mt-1.5 text-[11px] leading-relaxed text-amber-300/80">
+          Some readings are blank because the API answering this page is older than the page itself — a deploy still
+          catching up, not a problem with this symbol. Check the service commits on Status.
         </p>
       )}
     </Panel>
