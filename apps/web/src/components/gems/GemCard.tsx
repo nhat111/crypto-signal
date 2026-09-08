@@ -46,9 +46,14 @@ export function GemCard({ gem }: GemCardProps) {
         </div>
       </div>
 
-      <dl className="mb-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs sm:grid-cols-4">
+      <dl className="mb-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs sm:grid-cols-3">
         <Metric label="Liquidity" value={gem.liquidityUsd === null ? '—' : formatUsd(gem.liquidityUsd)} />
         <Metric label="Vol 24h" value={gem.volume24hUsd === null ? '—' : formatUsd(gem.volume24hUsd)} />
+        <Metric
+          label="FDV"
+          value={gem.fdvUsd === null ? '—' : formatUsd(gem.fdvUsd)}
+          title="Fully diluted valuation — the small-cap ceiling gate uses this, not circulating market cap."
+        />
         <Metric
           label="24h"
           value={gem.priceChange24hPct === null ? '—' : formatPct(gem.priceChange24hPct, 1)}
@@ -126,9 +131,19 @@ function ContractAddress({ address }: { address: string }) {
   );
 }
 
-function Metric({ label, value, className }: { label: string; value: string; className?: string }) {
+function Metric({
+  label,
+  value,
+  className,
+  title,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+  title?: string;
+}) {
   return (
-    <div className="rounded bg-slate-950/60 px-2 py-1">
+    <div className="rounded bg-slate-950/60 px-2 py-1" title={title}>
       <dt className="text-[11px] text-slate-500">{label}</dt>
       <dd className={cx('font-semibold tabular-nums text-slate-200', className)}>{value}</dd>
     </div>
