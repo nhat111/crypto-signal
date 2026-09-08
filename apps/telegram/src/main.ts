@@ -19,6 +19,7 @@ import {
 } from './formatting.js';
 import { isTradeSide } from './apiClient.js';
 import { botBuildLine } from './botBuildLine.js';
+import { launchWithHandover } from './launchWithHandover.js';
 import { parseSignalsArg, resolveSignalsScope } from './signalsScope.js';
 import { parseTimeframeArg, type TimeframeChoice } from './timeframeArg.js';
 
@@ -400,11 +401,28 @@ async function main(): Promise<void> {
     logger.warn({ err }, 'setMyCommands failed (non-fatal)');
   }
 
-  await bot.launch();
-  logger.info({ symbols }, 'telegram bot started');
+  // Registered BEFORE launch, which is the whole point: with long polling
+  // Telegraf's launch() resolves only once polling STOPS, so anything
+  // after it never runs. These two lines sat below it and were therefore
+  // never installed — the process took SIGTERM with no handler, died
+  // without closing its getUpdates, and the container replacing it was met
+  // with a 409 and gave up. The deploy then reported Active while the old
+  // build kept answering.
+  //
+  // stop() throws if the bot is not running, and a shutdown that throws on
+  // the way out is how a container gets killed instead of exiting.
+  const stop = (signal: 'SIGINT' | 'SIGTERM') => {
+    try {
+      bot.stop(signal);
+    } catch (err) {
+      logger.warn({ err, signal }, 'bot was not running at shutdown');
+    }
+  };
+  process.once('SIGINT', () => stop('SIGINT'));
+  process.once('SIGTERM', () => stop('SIGTERM'));
 
-  process.once('SIGINT', () => bot.stop('SIGINT'));
-  process.once('SIGTERM', () => bot.stop('SIGTERM'));
+  logger.info({ symbols }, 'telegram bot starting');
+  await launchWithHandover({ launch: () => bot.launch(), logger });
 }
 
 /** "BTCUSDT" -> "btc". Telegram commands are lowercase and can't contain most punctuation. */
