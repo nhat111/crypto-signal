@@ -75,6 +75,11 @@ describe.skipIf(!hasTestDatabase)('baseline announcement cycle', () => {
     await pool.query('DELETE FROM gem_scans');
     await pool.query('DELETE FROM gem_tokens');
     await pool.query("DELETE FROM bot_users WHERE chat_id LIKE 'baseline-%'");
+    // The cycle sends to every opted-in subscriber, so a chat this test
+    // did not create would land in its recipient list and break a count it
+    // has no reason to own. Any row here is left over from another run
+    // against this database.
+    await pool.query('UPDATE bot_settings SET alerts_enabled = FALSE');
   });
   afterAll(async () => {
     await pool.query('DELETE FROM gem_baseline_announcements');

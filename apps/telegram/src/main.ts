@@ -1,5 +1,5 @@
 import { Telegraf } from 'telegraf';
-import { createLogger, loadConfig, type Logger, formatBaselineReport } from '@crypto-signal/shared';
+import { createLogger, loadConfig, type Logger, formatBaselineReport, resolveBuildInfo } from '@crypto-signal/shared';
 import { ApiClient, ApiError } from './apiClient.js';
 import {
   buildHelpText,
@@ -18,12 +18,16 @@ import {
   formatWatchList,
 } from './formatting.js';
 import { isTradeSide } from './apiClient.js';
+import { botBuildLine } from './botBuildLine.js';
 import { parseSignalsArg, resolveSignalsScope } from './signalsScope.js';
 import { parseTimeframeArg, type TimeframeChoice } from './timeframeArg.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger('telegram', config.logLevel);
+  // Read once at boot, not per reply: startedAt is meant to be the process
+  // start, and re-reading it would make every /status say "vừa xong".
+  const build = resolveBuildInfo();
 
   if (!config.telegramBotToken) {
     logger.warn('TELEGRAM_BOT_TOKEN not set — telegram bot will not start. This is fine for local dev without a bot.');
@@ -103,7 +107,12 @@ async function main(): Promise<void> {
         return;
       }
       const overview = await api.getOverview();
-      await ctx.reply(formatOverview(overview.rows, picked.timeframe), { parse_mode: 'HTML' });
+      // The bot's own build travels with the answer: it is the one service
+      // the web status page cannot see, and a reply that looks out of date
+      // is exactly when somebody needs to know which half is stale.
+      await ctx.reply(`${formatOverview(overview.rows, picked.timeframe)}\n\n<i>${botBuildLine(build)}</i>`, {
+        parse_mode: 'HTML',
+      });
     } catch (err) {
       logger.error({ err }, '/status failed');
       await ctx.reply('Could not load market status right now — try again shortly.');
