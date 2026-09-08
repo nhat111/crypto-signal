@@ -3,7 +3,7 @@ import { HealthBadge } from '@/components/HealthBadge';
 import { RiskBadge } from '@/components/RiskBadge';
 import { StatePanel } from '@/components/StatePanel';
 import type { OverviewRow, Signal, SymbolLatest } from '@/lib/types';
-import { cx, formatPct, formatRelativeTime, formatSignedUsd, formatUsd, isStale } from '@/lib/format';
+import { cx, formatCompactNumber, formatPct, formatRelativeTime, formatSignedUsd, formatUsd, isStale } from '@/lib/format';
 
 interface SymbolCardProps {
   symbol: string;
@@ -96,7 +96,12 @@ export function SymbolCard({ symbol, overviewRow, snapshot, activeSignalCount, l
       <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
         <Metric label="Spot CVD" value={snapshot?.spotCvd != null ? formatSignedUsd(snapshot.spotCvd) : '—'} />
         <Metric label="Futures CVD" value={snapshot ? formatSignedUsd(snapshot.futuresCvd) : '—'} />
-        <Metric label="Open Interest" value={snapshot ? formatUsd(snapshot.openInterest) : '—'} />
+        {/*
+          openInterest is Binance sumOpenInterest (contracts / base-asset
+          units), not sumOpenInterestValue. formatUsd made a six-figure
+          contract count read as a six-figure dollar amount.
+        */}
+        <Metric label="OI (contracts)" value={snapshot ? formatCompactNumber(snapshot.openInterest) : '—'} />
         <Metric label="Funding" value={snapshot ? formatPct(snapshot.fundingRatePct, 3) : '—'} />
         <Metric label="Liq. Long" value={snapshot ? formatUsd(snapshot.liquidationLongUsd) : '—'} tone="rose" />
         <Metric label="Liq. Short" value={snapshot ? formatUsd(snapshot.liquidationShortUsd) : '—'} tone="emerald" />
