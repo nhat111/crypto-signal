@@ -17,6 +17,9 @@ interface GemCardProps {
  * good on merit and still be dangerous, and that is precisely the case a
  * reader must be able to see. Reasons are shown inline rather than behind a
  * click — the explanation is the product here, not a detail view.
+ *
+ * Metrics include FDV because the small-cap ceiling gate is FDV-based;
+ * circulating market cap is not what the scanner filters on.
  */
 export function GemCard({ gem }: GemCardProps) {
   const priceUp = (gem.priceChange24hPct ?? 0) >= 0;
