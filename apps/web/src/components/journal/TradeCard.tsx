@@ -3,6 +3,7 @@
 import type { Trade } from '@/lib/types';
 import { cx, formatDateTime, formatTokenPrice, formatUsd } from '@/lib/format';
 import { markPriceNote, unrealizedLabel } from '@/lib/openPnl';
+import { DecimalInput } from './DecimalInput';
 import { useTradeActions } from './useTradeActions';
 
 /**
@@ -49,33 +50,24 @@ export function TradeCard({ trade, onChanged, nowMs }: { trade: Trade; onChanged
       {a.mode === 'editing' ? (
         <div className="mt-3 space-y-2">
           <Field label="Entry price">
-            <input
+            <DecimalInput
               className={inputClass}
-              type="number"
-              step="any"
-              inputMode="decimal"
               value={a.editDraft.entryPrice}
-              onChange={(e) => a.setEditDraft((d) => ({ ...d, entryPrice: e.target.value }))}
+              onValueChange={(v) => a.setEditDraft((d) => ({ ...d, entryPrice: v }))}
             />
           </Field>
           <Field label="Exit price (blank = still open)">
-            <input
+            <DecimalInput
               className={inputClass}
-              type="number"
-              step="any"
-              inputMode="decimal"
               value={a.editDraft.exitPrice}
-              onChange={(e) => a.setEditDraft((d) => ({ ...d, exitPrice: e.target.value }))}
+              onValueChange={(v) => a.setEditDraft((d) => ({ ...d, exitPrice: v }))}
             />
           </Field>
           <Field label="Size">
-            <input
+            <DecimalInput
               className={inputClass}
-              type="number"
-              step="any"
-              inputMode="decimal"
               value={a.editDraft.size}
-              onChange={(e) => a.setEditDraft((d) => ({ ...d, size: e.target.value }))}
+              onValueChange={(v) => a.setEditDraft((d) => ({ ...d, size: v }))}
             />
           </Field>
           <Field label="Note">
@@ -119,15 +111,12 @@ export function TradeCard({ trade, onChanged, nowMs }: { trade: Trade; onChanged
       {a.mode === 'closing' && (
         <div className="mt-3">
           <Field label="Exit price">
-            <input
+            <DecimalInput
               autoFocus
               className={inputClass}
-              type="number"
-              step="any"
-              inputMode="decimal"
               placeholder="what you sold at"
               value={a.exitDraft}
-              onChange={(e) => a.setExitDraft(e.target.value)}
+              onValueChange={a.setExitDraft}
             />
           </Field>
         </div>
@@ -176,7 +165,7 @@ export function TradeCard({ trade, onChanged, nowMs }: { trade: Trade; onChanged
           <>
             <button
               onClick={a.handleSaveEdit}
-              disabled={a.busy}
+              disabled={a.busy || !a.canSaveEdit}
               className={cx(actionClass, 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 disabled:opacity-40')}
             >
               Save

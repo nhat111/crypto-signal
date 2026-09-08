@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { deleteTrade, updateTrade } from '@/lib/api';
+import { parsePriceInput, parseSizeInput } from '@/lib/parseDecimal';
 import type { Trade } from '@/lib/types';
 
 export type TradeMode = 'view' | 'closing' | 'editing';
@@ -21,6 +22,10 @@ export interface TradeEditDraft {
  * writes on the page: two copies would eventually disagree about what
  * counts as a valid exit price or which errors are shown, and the copy a
  * phone user hits is the one nobody tests by hand.
+ *
+ * Every price here goes through parsePriceInput, never Number(): a comma
+ * decimal has to survive, and `Number('')` is 0, which as an exit price
+ * books a total loss and as an entry price divides by zero.
  */
 export function useTradeActions(trade: Trade, onChanged: () => void) {
   const [mode, setMode] = useState<TradeMode>('view');
@@ -50,6 +55,13 @@ export function useTradeActions(trade: Trade, onChanged: () => void) {
     }
   }
 
+  const parsedExit = parsePriceInput(exitDraft);
+  const parsedEditEntry = parsePriceInput(editDraft.entryPrice);
+  // Blank is a legitimate value for both — it means "still open" and "not
+  // recorded" — so only a non-blank field that will not parse is invalid.
+  const editExitValid = editDraft.exitPrice.trim() === '' || parsePriceInput(editDraft.exitPrice) !== null;
+  const editSizeValid = editDraft.size.trim() === '' || parseSizeInput(editDraft.size) !== null;
+
   return {
     mode,
     setMode,
@@ -59,22 +71,29 @@ export function useTradeActions(trade: Trade, onChanged: () => void) {
     setExitDraft,
     editDraft,
     setEditDraft,
-    canClose: exitDraft.trim() !== '',
+    canClose: parsedExit !== null,
     handleClose: () =>
-      exitDraft.trim() === ''
+      parsedExit === null
         ? undefined
-        : run(() => updateTrade(trade.id, { exitPrice: Number(exitDraft) }), 'Could not close trade.'),
-    handleSaveEdit: () =>
-      run(
+        : run(() => updateTrade(trade.id, { exitPrice: parsedExit }), 'Could not close trade.'),
+    canSaveEdit: parsedEditEntry !== null && editExitValid && editSizeValid,
+    handleSaveEdit: () => {
+      // Guarded rather than clamped: a price we cannot read is a question
+      // for the person who typed it, not something to substitute a value
+      // for. The button is disabled on the same condition, so this is the
+      // backstop, not the message.
+      if (parsedEditEntry === null || !editExitValid || !editSizeValid) return undefined;
+      return run(
         () =>
           updateTrade(trade.id, {
-            entryPrice: Number(editDraft.entryPrice),
-            exitPrice: editDraft.exitPrice.trim() === '' ? null : Number(editDraft.exitPrice),
-            size: editDraft.size.trim() === '' ? null : Number(editDraft.size),
+            entryPrice: parsedEditEntry,
+            exitPrice: editDraft.exitPrice.trim() === '' ? null : parsePriceInput(editDraft.exitPrice),
+            size: editDraft.size.trim() === '' ? null : parseSizeInput(editDraft.size),
             note: editDraft.note.trim() === '' ? null : editDraft.note.trim(),
           }),
         'Could not save changes.',
-      ),
+      );
+    },
     handleDelete: () => {
       if (!window.confirm(`Delete this ${trade.symbol} entry? This can't be undone.`)) return;
       return run(() => deleteTrade(trade.id), 'Could not delete trade.', true);

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { deleteTrade, updateTrade } from '@/lib/api';
 import type { Trade } from '@/lib/types';
 import { cx, formatDateTime, formatTokenPrice, formatUsd } from '@/lib/format';
 import { markPriceNote, unrealizedLabel } from '@/lib/openPnl';
+import { DecimalInput } from './DecimalInput';
+import { useTradeActions } from './useTradeActions';
 
 interface TradeRowProps {
   trade: Trade;
@@ -12,8 +12,6 @@ interface TradeRowProps {
   /** The server's clock, passed in rather than read here — Date.now() in render is impure. Null when the API sends none. */
   nowMs: number | null;
 }
-
-type Mode = 'view' | 'closing' | 'editing';
 
 /** Spot is its own colour: reading it as a long at a glance is the mistake worth preventing. */
 const SIDE_BADGE: Record<Trade['side'], string> = {
@@ -26,64 +24,12 @@ const inputClass =
   'rounded border border-slate-700 bg-slate-950/60 px-1.5 py-1 text-xs text-slate-200 focus:border-sky-500/60 focus:outline-none';
 
 export function TradeRow({ trade, onChanged, nowMs }: TradeRowProps) {
-  const [mode, setMode] = useState<Mode>('view');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const [exitDraft, setExitDraft] = useState('');
-  const [editDraft, setEditDraft] = useState(() => ({
-    entryPrice: String(trade.entryPrice),
-    exitPrice: trade.exitPrice === null ? '' : String(trade.exitPrice),
-    size: trade.size === null ? '' : String(trade.size),
-    note: trade.note ?? '',
-  }));
-
-  async function handleClose() {
-    if (exitDraft.trim() === '') return;
-    setBusy(true);
-    setError(null);
-    try {
-      await updateTrade(trade.id, { exitPrice: Number(exitDraft) });
-      setMode('view');
-      onChanged();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not close trade.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleSaveEdit() {
-    setBusy(true);
-    setError(null);
-    try {
-      await updateTrade(trade.id, {
-        entryPrice: Number(editDraft.entryPrice),
-        exitPrice: editDraft.exitPrice.trim() === '' ? null : Number(editDraft.exitPrice),
-        size: editDraft.size.trim() === '' ? null : Number(editDraft.size),
-        note: editDraft.note.trim() === '' ? null : editDraft.note.trim(),
-      });
-      setMode('view');
-      onChanged();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save changes.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleDelete() {
-    if (!window.confirm(`Delete this ${trade.symbol} entry? This can't be undone.`)) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await deleteTrade(trade.id);
-      onChanged();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not delete trade.');
-      setBusy(false);
-    }
-  }
+  // Close/edit/delete live in useTradeActions, shared with the mobile card.
+  // This row used to carry its own copy, and the copies had already drifted:
+  // the card validated an exit price, the row parsed it with Number(), so
+  // the same typed comma behaved differently depending on screen width.
+  const a = useTradeActions(trade, onChanged);
+  const { mode, setMode, busy, error, exitDraft, setExitDraft, editDraft, setEditDraft } = a;
 
   const pnlTone = trade.pnlPct === null ? undefined : trade.pnlPct >= 0 ? 'text-emerald-400' : 'text-rose-400';
   const unrealized = trade.status === 'open' ? unrealizedLabel(trade) : null;
@@ -101,32 +47,29 @@ export function TradeRow({ trade, onChanged, nowMs }: TradeRowProps) {
       {mode === 'editing' ? (
         <>
           <td className="py-2 pr-3">
-            <input
+            <DecimalInput
+              aria-label="Entry price"
               className={cx(inputClass, 'w-24')}
-              type="number"
-              step="any"
               value={editDraft.entryPrice}
-              onChange={(e) => setEditDraft((d) => ({ ...d, entryPrice: e.target.value }))}
+              onValueChange={(v) => setEditDraft((d) => ({ ...d, entryPrice: v }))}
             />
           </td>
           <td className="py-2 pr-3">
-            <input
+            <DecimalInput
+              aria-label="Exit price"
               className={cx(inputClass, 'w-24')}
-              type="number"
-              step="any"
               placeholder="open"
               value={editDraft.exitPrice}
-              onChange={(e) => setEditDraft((d) => ({ ...d, exitPrice: e.target.value }))}
+              onValueChange={(v) => setEditDraft((d) => ({ ...d, exitPrice: v }))}
             />
           </td>
           <td className="py-2 pr-3">
-            <input
+            <DecimalInput
+              aria-label="Size"
               className={cx(inputClass, 'w-20')}
-              type="number"
-              step="any"
               placeholder="—"
               value={editDraft.size}
-              onChange={(e) => setEditDraft((d) => ({ ...d, size: e.target.value }))}
+              onValueChange={(v) => setEditDraft((d) => ({ ...d, size: v }))}
             />
           </td>
           <td className="py-2 pr-3 text-slate-600">—</td>
@@ -203,7 +146,7 @@ export function TradeRow({ trade, onChanged, nowMs }: TradeRowProps) {
               <button onClick={() => setMode('editing')} className="text-xs font-medium text-slate-400 hover:text-slate-200">
                 Edit
               </button>
-              <button onClick={handleDelete} disabled={busy} className="text-xs font-medium text-rose-500/80 hover:text-rose-400">
+              <button onClick={a.handleDelete} disabled={busy} className="text-xs font-medium text-rose-500/80 hover:text-rose-400">
                 Delete
               </button>
             </>
@@ -211,16 +154,15 @@ export function TradeRow({ trade, onChanged, nowMs }: TradeRowProps) {
 
           {mode === 'closing' && (
             <div className="flex items-center gap-1">
-              <input
+              <DecimalInput
                 autoFocus
+                aria-label="Exit price"
                 className={cx(inputClass, 'w-24')}
-                type="number"
-                step="any"
                 placeholder="exit price"
                 value={exitDraft}
-                onChange={(e) => setExitDraft(e.target.value)}
+                onValueChange={setExitDraft}
               />
-              <button onClick={handleClose} disabled={busy || exitDraft.trim() === ''} className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 disabled:text-slate-600">
+              <button onClick={a.handleClose} disabled={busy || !a.canClose} className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 disabled:text-slate-600">
                 Confirm
               </button>
               <button onClick={() => setMode('view')} className="text-xs text-slate-500 hover:text-slate-300">
@@ -231,7 +173,7 @@ export function TradeRow({ trade, onChanged, nowMs }: TradeRowProps) {
 
           {mode === 'editing' && (
             <div className="flex items-center gap-1.5">
-              <button onClick={handleSaveEdit} disabled={busy} className="text-xs font-semibold text-emerald-400 hover:text-emerald-300">
+              <button onClick={a.handleSaveEdit} disabled={busy || !a.canSaveEdit} className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 disabled:text-slate-600">
                 Save
               </button>
               <button onClick={() => setMode('view')} className="text-xs text-slate-500 hover:text-slate-300">

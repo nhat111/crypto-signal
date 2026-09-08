@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { createTrade } from '@/lib/api';
 import type { TradeSide } from '@/lib/types';
 import { cx } from '@/lib/format';
+import { parsePriceInput, parseSizeInput } from '@/lib/parseDecimal';
+import { DecimalInput } from './DecimalInput';
 import type { TradePrefill } from '@/lib/journalPrefill';
 
 interface TradeFormProps {
@@ -44,7 +46,11 @@ export function TradeForm({ onCreated, prefill }: TradeFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = symbol.trim().length > 0 && entryPrice.trim().length > 0 && !submitting;
+  // A price that will not parse blocks the submit rather than reaching
+  // Number(), which reads a blank field as 0 and a comma decimal as NaN.
+  const parsedEntry = parsePriceInput(entryPrice);
+  const sizeValid = size.trim() === '' || parseSizeInput(size) !== null;
+  const canSubmit = symbol.trim().length > 0 && parsedEntry !== null && sizeValid && !submitting;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -57,8 +63,8 @@ export function TradeForm({ onCreated, prefill }: TradeFormProps) {
         // address is base58 and upper-casing it stores a different token.
         symbol: symbol.trim(),
         side,
-        entryPrice: Number(entryPrice),
-        size: size.trim() === '' ? null : Number(size),
+        entryPrice: parsedEntry,
+        size: size.trim() === '' ? null : parseSizeInput(size),
         note: note.trim() === '' ? null : note.trim(),
       });
       setSymbol('');
@@ -105,24 +111,20 @@ export function TradeForm({ onCreated, prefill }: TradeFormProps) {
         </Field>
 
         <Field label="Entry price">
-          <input
+          <DecimalInput
             className={cx(inputClass, 'w-28')}
-            type="number"
-            step="any"
             placeholder="78000"
             value={entryPrice}
-            onChange={(e) => setEntryPrice(e.target.value)}
+            onValueChange={setEntryPrice}
           />
         </Field>
 
         <Field label="Size (optional)">
-          <input
+          <DecimalInput
             className={cx(inputClass, 'w-24')}
-            type="number"
-            step="any"
             placeholder="0.1"
             value={size}
-            onChange={(e) => setSize(e.target.value)}
+            onValueChange={setSize}
           />
         </Field>
 

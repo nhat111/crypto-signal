@@ -45,6 +45,21 @@ interface TradesQuery {
  * signal engine produced on its own. The web dashboard has no login, so
  * chatId is optional there; Telegram always sends its chat id.
  */
+/**
+ * A price the caller supplied, or a reason it cannot be one.
+ *
+ * The browser is not the only writer here (Telegram posts to the same
+ * route), and JSON.stringify turns NaN into null, so a client that fumbled
+ * a parse arrives looking like an omitted field rather than an error. Both
+ * get refused: a price of 0 books a total loss, and a negative or
+ * non-finite one has no meaning the P&L maths can carry.
+ */
+function invalidPrice(value: unknown, field: string): string | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return `${field} must be a number`;
+  if (value <= 0) return `${field} must be greater than zero`;
+  return null;
+}
+
 export function registerJournalRoutes(app: FastifyInstance, deps: ApiDeps): void {
   app.post<{ Body: CreateTradeBody }>('/api/journal', async (req, reply) => {
     const { chatId, symbol, side, entryPrice } = req.body;
@@ -53,6 +68,12 @@ export function registerJournalRoutes(app: FastifyInstance, deps: ApiDeps): void
     }
     if (!isTradeSide(side)) {
       return reply.code(400).send({ error: 'side must be "spot", "long" or "short"' });
+    }
+    const entryProblem = invalidPrice(entryPrice, 'entryPrice');
+    if (entryProblem) return reply.code(400).send({ error: entryProblem });
+    if (req.body.size !== undefined && req.body.size !== null) {
+      const sizeProblem = invalidPrice(req.body.size, 'size');
+      if (sizeProblem) return reply.code(400).send({ error: sizeProblem });
     }
     const trade = await insertTrade(deps.pool, {
       chatId,
@@ -87,6 +108,18 @@ export function registerJournalRoutes(app: FastifyInstance, deps: ApiDeps): void
   });
 
   app.patch<{ Params: { id: string }; Body: UpdateTradeBody }>('/api/journal/:id', async (req, reply) => {
+    // null is meaningful on a patch — it reopens a trade, or clears a size —
+    // so only a supplied non-null value is checked.
+    for (const [field, value] of [
+      ['entryPrice', req.body.entryPrice],
+      ['exitPrice', req.body.exitPrice],
+      ['size', req.body.size],
+    ] as const) {
+      if (value === undefined || value === null) continue;
+      const problem = invalidPrice(value, field);
+      if (problem) return reply.code(400).send({ error: problem });
+    }
+
     const trade = await updateTrade(deps.pool, req.params.id, req.body);
     if (!trade) return reply.code(404).send({ error: 'unknown trade' });
     return { trade };
