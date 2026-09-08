@@ -60,6 +60,8 @@ export function registerWatchRoutes(app: FastifyInstance, deps: ApiDeps): void {
       entryRiskScore: gem.riskScore,
       entrySafetyVerdict: gem.safetyVerdict,
       stopLossPct: deps.gemConfig.watch.stopLossPct,
+      trailingStopPct: deps.gemConfig.watch.trailingStopPct,
+      trailingArmPct: deps.gemConfig.watch.trailingArmPct,
       takeProfitPct: deps.gemConfig.watch.takeProfitPct,
       liquidityCollapsePct: deps.gemConfig.watch.liquidityCollapsePct,
       riskScoreAlert: deps.gemConfig.watch.riskScoreAlert,

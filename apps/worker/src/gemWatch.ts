@@ -1,7 +1,7 @@
 import type { Pool } from 'pg';
 import type { Logger } from '@crypto-signal/shared';
 import { DexScreenerSource, describeWatchReason, evaluateWatch, type SafetyVerdict, type WatchTriggerReason } from '@crypto-signal/gem-scanner';
-import { closeGemWatch, getAllActiveWatches, getGemByAddress, type GemWatchRow } from '@crypto-signal/db';
+import { closeGemWatch, getAllActiveWatches, getGemByAddress, raiseGemWatchPeak, type GemWatchRow } from '@crypto-signal/db';
 import type { TelegramNotifier } from './telegramNotifier.js';
 
 export interface GemWatchDeps {
@@ -53,6 +53,16 @@ export async function runGemWatchCycle(deps: GemWatchDeps): Promise<void> {
           continue;
         }
 
+        // Record the high before judging against it, so a pass that sees a
+        // new high uses that high. The trailing stop cannot fire on this
+        // same pass — price equals peak, so the giveback is zero — which is
+        // the intended reading: a new high is not a sell signal.
+        //
+        // The peak comes back from the write rather than being inferred
+        // from it: watch.peakPrice was read at the top of the cycle and
+        // another pass may have raised it since.
+        const peakPrice = await raiseGemWatchPeak(pool, watch.id, pair.priceUsd);
+
         const latestScan = await getGemByAddress(pool, watch.chainId, watch.tokenAddress);
 
         // Thresholds come from the watch row itself, not the worker's live
@@ -61,7 +71,7 @@ export async function runGemWatchCycle(deps: GemWatchDeps): Promise<void> {
         // goalposts on a position someone already armed (see migration
         // 005's comment).
         const reasons = evaluateWatch(
-          { entryPrice: watch.entryPrice, entryLiquidityUsd: watch.entryLiquidityUsd },
+          { entryPrice: watch.entryPrice, entryLiquidityUsd: watch.entryLiquidityUsd, peakPrice },
           {
             priceUsd: pair.priceUsd,
             liquidityUsd: pair.liquidityUsd,
@@ -70,6 +80,11 @@ export async function runGemWatchCycle(deps: GemWatchDeps): Promise<void> {
           },
           {
             stopLossPct: watch.stopLossPct,
+            // Undefined, not a fallback number: a watch armed before
+            // migration 023 never agreed to a trailing stop, and defaulting
+            // one in would apply a trigger its owner did not set.
+            trailingStopPct: watch.trailingStopPct ?? undefined,
+            trailingArmPct: watch.trailingArmPct ?? undefined,
             takeProfitPct: watch.takeProfitPct,
             liquidityCollapsePct: watch.liquidityCollapsePct,
             riskScoreAlert: watch.riskScoreAlert,

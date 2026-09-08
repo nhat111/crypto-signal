@@ -97,6 +97,15 @@ export interface GemWatchDTO {
   entryPrice: number;
   entryLiquidityUsd: number | null;
   stopLossPct: number;
+  /**
+   * Optional for the same reason the web types are: the bot and the API
+   * deploy separately, so for a stretch after each release the bot runs
+   * new code against the old payload. Null additionally means a watch
+   * armed before migration 023, which has no trailing stop at all.
+   */
+  trailingStopPct?: number | null;
+  trailingArmPct?: number | null;
+  peakPrice?: number | null;
   takeProfitPct: number;
   liquidityCollapsePct: number;
   riskScoreAlert: number;

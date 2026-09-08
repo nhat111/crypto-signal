@@ -65,6 +65,11 @@ export const gemEnvSchema = z.object({
   /** Alert if price has risen this many percent from entry. */
   GEM_WATCH_TAKE_PROFIT_PCT: numeric(50),
   /** Alert if liquidity has fallen to this % or less of what it was at entry. */
+  // Paired on purpose: armed at +25% with a 20% trailing distance, the
+  // earliest trigger is 20% below a peak of 125 — the entry price. See
+  // migration 023 for why a wider distance would miss the case it is for.
+  GEM_WATCH_TRAILING_STOP_PCT: numeric(20),
+  GEM_WATCH_TRAILING_ARM_PCT: numeric(25),
   GEM_WATCH_LIQUIDITY_COLLAPSE_PCT: numeric(50),
   /** Alert if the risk score (from the token's latest regular scan, if any) reaches this — matches the web dashboard's own "very weak" red band. */
   GEM_WATCH_RISK_SCORE_ALERT: numeric(80),
@@ -137,6 +142,8 @@ export const GEM_RISK_WEIGHTS: GemRiskWeights = {
 export interface GemWatchConfig {
   checkIntervalMinutes: number;
   stopLossPct: number;
+  trailingStopPct: number;
+  trailingArmPct: number;
   takeProfitPct: number;
   liquidityCollapsePct: number;
   riskScoreAlert: number;
@@ -193,6 +200,8 @@ export function loadGemConfig(env: NodeJS.ProcessEnv = process.env): GemConfig {
     watch: {
       checkIntervalMinutes: parsed.GEM_WATCH_CHECK_INTERVAL_MINUTES,
       stopLossPct: parsed.GEM_WATCH_STOP_LOSS_PCT,
+      trailingStopPct: parsed.GEM_WATCH_TRAILING_STOP_PCT,
+      trailingArmPct: parsed.GEM_WATCH_TRAILING_ARM_PCT,
       takeProfitPct: parsed.GEM_WATCH_TAKE_PROFIT_PCT,
       liquidityCollapsePct: parsed.GEM_WATCH_LIQUIDITY_COLLAPSE_PCT,
       riskScoreAlert: parsed.GEM_WATCH_RISK_SCORE_ALERT,

@@ -114,6 +114,27 @@ export function formatGemList(gems: GemRow[]): string {
   return lines.join('\n');
 }
 
+/**
+ * Says nothing at all for a watch armed before the trailing stop existed.
+ * Listing a trigger that will not fire is worse than listing none: someone
+ * reading it would believe the position is protected when it is not.
+ */
+function trailingLine(watch: GemWatchDTO): string[] {
+  if (watch.trailingStopPct === null || watch.trailingStopPct === undefined) return [];
+  if (watch.trailingArmPct === null || watch.trailingArmPct === undefined) return [];
+  return [
+    `• once it is up ${watch.trailingArmPct}%, price then falls ${watch.trailingStopPct}% from its high (trailing stop)`,
+  ];
+}
+
+/** Only shown once the position has actually been above entry — before that the peak is the entry price and repeating it says nothing. */
+function peakSuffix(w: GemWatchDTO): string {
+  if (w.peakPrice === null || w.peakPrice === undefined) return '';
+  if (w.peakPrice <= w.entryPrice) return '';
+  const gainPct = ((w.peakPrice - w.entryPrice) / w.entryPrice) * 100;
+  return ` · high $${w.peakPrice} (+${gainPct.toFixed(0)}%)`;
+}
+
 export function formatWatchConfirmation(watch: GemWatchDTO): string {
   return [
     `👀 Watching <b>${escapeHtml(watch.symbol)}</b>`,
@@ -123,6 +144,7 @@ export function formatWatchConfirmation(watch: GemWatchDTO): string {
     `Sell alert if:`,
     `• price falls ${watch.stopLossPct}% (stop-loss)`,
     `• price rises ${watch.takeProfitPct}% (take-profit)`,
+    ...trailingLine(watch),
     `• liquidity drops to ${watch.liquidityCollapsePct}% of entry`,
     `• risk score reaches ${watch.riskScoreAlert}/100, or safety turns dangerous`,
     '',
@@ -141,6 +163,9 @@ export function formatWatchList(watches: GemWatchDTO[]): string {
       `<b>${escapeHtml(w.symbol)}</b> · ${w.chainId} — entry $${w.entryPrice}`,
       `<code>${escapeHtml(w.tokenAddress)}</code>`,
       `stop-loss ${w.stopLossPct}% · take-profit ${w.takeProfitPct}% · liq floor ${w.liquidityCollapsePct}%`,
+      ...(w.trailingStopPct !== null && w.trailingStopPct !== undefined && w.trailingArmPct !== null && w.trailingArmPct !== undefined
+        ? [`trailing ${w.trailingStopPct}% once up ${w.trailingArmPct}%${peakSuffix(w)}`]
+        : []),
       '',
     );
   }
