@@ -386,6 +386,8 @@ export interface GemPerformance {
   sampleCount: number;
   positiveMovePct: number | null;
   negativeMovePct: number | null;
+  /** Share that cleared the round-trip cost — the figure the baseline comparison is made on. Optional: an API predating it sends nothing. */
+  netPositiveMovePct?: number | null;
   medianMovePct: number | null;
   liquidityCollapsePct: number | null;
   sufficientData: boolean;

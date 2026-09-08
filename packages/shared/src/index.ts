@@ -4,3 +4,4 @@ export * from './version.js';
 export * from './time.js';
 export * from './logger.js';
 export * from './httpJson.js';
+export * from './baselineReport.js';

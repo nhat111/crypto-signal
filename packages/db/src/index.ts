@@ -16,6 +16,7 @@ export * from './queries.js';
 export * from './gems.js';
 export * from './gemWatches.js';
 export * from './gemPriceHistory.js';
+export * from './gemBaselineAnnounce.js';
 export * from './markPrice.js';
 export * from './tradeJournal.js';
 export * from './stablecoinSupply.js';

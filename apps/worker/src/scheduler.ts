@@ -15,6 +15,7 @@ import { ALL_SIGNAL_TYPES, type SignalType } from '@crypto-signal/signal-engine'
 import { processMatchedCandles } from './pipeline.js';
 import { runGemOutcomeTracker, runGemScanCycle, type GemScanDeps } from './gemScan.js';
 import { runGemWatchCycle, type GemWatchDeps } from './gemWatch.js';
+import { runBaselineAnnounceCycle, type BaselineAnnounceDeps } from './baselineAnnounce.js';
 import { runHealthAlertCycle } from './healthAlerts.js';
 import { runAlertSelfTest } from './alertSelfTest.js';
 import { runStablecoinFlowCycle } from './stablecoinFlow.js';
@@ -159,6 +160,25 @@ export function startSchedulers(ctx: WorkerContext): () => void {
     const watchDeps: GemWatchDeps = { pool: ctx.pool, logger: ctx.logger, notifier: ctx.notifier };
     const watchIntervalMs = ctx.gemConfig.watch.checkIntervalMinutes * 60_000;
     timers.push(setInterval(() => void runGemWatchCycle(watchDeps).catch((err) => ctx.logger.error({ err }, 'gem watch cycle failed')), watchIntervalMs));
+
+    // Does the scanner beat the tokens it threw away? Hourly is not about
+    // catching the moment it changes — the verdict moves on the timescale
+    // outcomes are recorded, which is days. It is about not depending on
+    // anyone remembering to look, and the cycle is a no-op unless the
+    // verdict is new or has changed.
+    const baselineDeps: BaselineAnnounceDeps = {
+      pool: ctx.pool,
+      logger: ctx.logger,
+      notifier: ctx.notifier,
+      telegramAlertChatIds: ctx.config.telegramAlertChatIds,
+      alertMinScore: ctx.gemConfig.alert.minScore,
+    };
+    timers.push(
+      setInterval(
+        () => void runBaselineAnnounceCycle(baselineDeps).catch((err) => ctx.logger.error({ err }, 'baseline announce failed')),
+        60 * 60_000,
+      ),
+    );
   }
 
   // Macro context, not part of the Binance pipeline — its own timer and

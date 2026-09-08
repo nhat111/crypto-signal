@@ -1,3 +1,4 @@
+import type { BaselineReportInput } from '@crypto-signal/shared';
 /**
  * Every command hits apps/api over HTTP — the bot never touches Postgres
  * or Binance directly (rule 8 "Telegram và Web dùng chung API/domain
@@ -300,6 +301,15 @@ export class ApiClient {
 
   getGems(limit = 10): Promise<{ gems: GemRow[] }> {
     return this.get(`/api/gems?limit=${limit}`);
+  }
+
+  /**
+   * Typed as the shared report's input rather than a full GemPerformance
+   * mirror: this call exists only to be read out loud, and the bot has no
+   * business asserting fields it never looks at.
+   */
+  getGemPerformance(horizon = '7d'): Promise<BaselineReportInput> {
+    return this.get(`/api/gems/performance?horizon=${encodeURIComponent(horizon)}`);
   }
 
   watchGem(chatId: string, symbol: string): Promise<{ watch: GemWatchDTO }> {

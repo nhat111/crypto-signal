@@ -1,5 +1,5 @@
 import { Telegraf } from 'telegraf';
-import { createLogger, loadConfig, type Logger } from '@crypto-signal/shared';
+import { createLogger, loadConfig, type Logger, formatBaselineReport } from '@crypto-signal/shared';
 import { ApiClient, ApiError } from './apiClient.js';
 import {
   buildHelpText,
@@ -193,6 +193,27 @@ async function main(): Promise<void> {
     } catch (err) {
       logger.error({ err }, '/gems failed');
       await ctx.reply('Could not load small-cap candidates right now — try again shortly.');
+    }
+  });
+
+  /**
+   * The same verdict the worker pushes on its own, on demand.
+   *
+   * It shares the worker's formatter rather than writing its own, so
+   * "what the bot said when I asked" and "what arrived unprompted" cannot
+   * drift apart — and asking before the data is ready gives the honest
+   * count instead of a percentage.
+   */
+  bot.command('baseline', async (ctx) => {
+    try {
+      const performance = await api.getGemPerformance('7d');
+      await ctx.reply(formatBaselineReport(performance).join('\n'), {
+        parse_mode: 'HTML',
+        link_preview_options: { is_disabled: true },
+      });
+    } catch (err) {
+      logger.error({ err }, '/baseline failed');
+      await ctx.reply('Could not read the scanner baseline right now — try again shortly.');
     }
   });
 

@@ -410,6 +410,17 @@ export interface GemPerformance {
   sampleCount: number;
   positiveMovePct: number | null;
   negativeMovePct: number | null;
+  /**
+   * Share that moved up further than a round trip costs.
+   *
+   * The comparison against the control has always been made on this, but
+   * it was computed and thrown away instead of returned, so any consumer
+   * that wanted the scanner's side of that comparison had nothing to
+   * print — while the control's net figure sat right next to it. Reaching
+   * for positiveMovePct to fill the gap would have compared a gross hit
+   * rate against a net one and manufactured an edge out of arithmetic.
+   */
+  netPositiveMovePct: number | null;
   medianMovePct: number | null;
   /** Share of surfaced tokens whose liquidity fell below 20% of what it was at scan time — the rug-ish outcome. 7d only. */
   liquidityCollapsePct: number | null;
@@ -476,7 +487,7 @@ export async function getGemPerformance(
   const sampleCount = moves.length;
 
   if (sampleCount === 0) {
-    return { horizon, sampleCount: 0, positiveMovePct: null, negativeMovePct: null, medianMovePct: null, liquidityCollapsePct: null, sufficientData: false };
+    return { horizon, sampleCount: 0, positiveMovePct: null, negativeMovePct: null, netPositiveMovePct: null, medianMovePct: null, liquidityCollapsePct: null, sufficientData: false };
   }
 
   const positive = moves.filter((m) => m > 0).length;
@@ -505,6 +516,7 @@ export async function getGemPerformance(
     sampleCount,
     positiveMovePct: Math.round((positive / sampleCount) * 1000) / 10,
     negativeMovePct: Math.round((negative / sampleCount) * 1000) / 10,
+    netPositiveMovePct: netPositivePct,
     medianMovePct: medianPct,
     liquidityCollapsePct,
     sufficientData: sampleCount >= MIN_GEM_SAMPLES,

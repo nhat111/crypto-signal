@@ -295,6 +295,7 @@ export function buildHelpText(symbols: string[]): string {
     '/lookup TICKER|ADDRESS — on-demand technical + on-chain fundamentals',
     '/signals — tín hiệu gần đây ở khung bot sẽ bắn alert · /signals all · /signals 4h',
     '/gems — small-cap candidates from DEX data',
+    '/baseline — does the scanner beat the tokens it rejected?',
     '/watch SYMBOL — track a position you bought, get a sell alert here',
     '/watches — list your active watches',
     '/unwatch SYMBOL — stop tracking one',
