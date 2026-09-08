@@ -20,6 +20,7 @@ import {
 import { isTradeSide } from './apiClient.js';
 import { botBuildLine } from './botBuildLine.js';
 import { launchWithHandover } from './launchWithHandover.js';
+import { retryOn429 } from './retryAfter.js';
 import { parseSignalsArg, resolveSignalsScope } from './signalsScope.js';
 import { parseTimeframeArg, type TimeframeChoice } from './timeframeArg.js';
 
@@ -378,28 +379,35 @@ async function main(): Promise<void> {
 
   // Populates Telegram's own command menu so /hype (and any future symbol)
   // is discoverable without reading /help.
-  try {
-    await bot.telegram.setMyCommands([
-      { command: 'status', description: `Sức khỏe thị trường (mặc định ${config.telegramDefaultTimeframe})` },
-      { command: 'market', description: 'Heatmap across timeframes' },
-      ...symbols.map((symbol) => ({ command: commandNameFor(symbol), description: `${symbol} detail` })),
-      { command: 'signals', description: 'Tín hiệu gần đây (mặc định: khung bot bắn alert)' },
-      { command: 'gems', description: 'Small-cap candidates' },
-      { command: 'lookup', description: 'Analyse a ticker or contract address' },
-      { command: 'watch', description: 'Track a position, get a sell alert' },
-      { command: 'watches', description: 'List your active watches' },
-      { command: 'unwatch', description: 'Stop tracking a position' },
-      { command: 'trade', description: 'Log a trade you took' },
-      { command: 'close', description: 'Close a logged trade' },
-      { command: 'journal', description: 'Your trade log + P&L summary' },
-      { command: 'flow', description: 'Stablecoin supply / macro flow' },
-      { command: 'alerts', description: 'Toggle alerts for this chat' },
-      { command: 'id', description: 'Chat ID của chat này (để bật cảnh báo)' },
-      { command: 'help', description: 'Show help' },
-    ]);
-  } catch (err) {
-    logger.warn({ err }, 'setMyCommands failed (non-fatal)');
-  }
+  //
+  // Every entry a command handler answers belongs here. A command missing
+  // from this list still works when typed, which is what makes the gap
+  // easy to miss: it is simply invisible to anyone navigating by the Menu
+  // button, and that is most people.
+  await retryOn429({
+    logger,
+    attempt: async () => {
+      await bot.telegram.setMyCommands([
+        { command: 'status', description: `Sức khỏe thị trường (mặc định ${config.telegramDefaultTimeframe})` },
+        { command: 'market', description: 'Heatmap across timeframes' },
+        ...symbols.map((symbol) => ({ command: commandNameFor(symbol), description: `${symbol} detail` })),
+        { command: 'signals', description: 'Tín hiệu gần đây (mặc định: khung bot bắn alert)' },
+        { command: 'gems', description: 'Small-cap candidates' },
+        { command: 'baseline', description: 'Scanner có thắng đám nó loại không?' },
+        { command: 'lookup', description: 'Analyse a ticker or contract address' },
+        { command: 'watch', description: 'Track a position, get a sell alert' },
+        { command: 'watches', description: 'List your active watches' },
+        { command: 'unwatch', description: 'Stop tracking a position' },
+        { command: 'trade', description: 'Log a trade you took' },
+        { command: 'close', description: 'Close a logged trade' },
+        { command: 'journal', description: 'Your trade log + P&L summary' },
+        { command: 'flow', description: 'Stablecoin supply / macro flow' },
+        { command: 'alerts', description: 'Toggle alerts for this chat' },
+        { command: 'id', description: 'Chat ID của chat này (để bật cảnh báo)' },
+        { command: 'help', description: 'Show help' },
+      ]);
+    },
+  });
 
   // Registered BEFORE launch, which is the whole point: with long polling
   // Telegraf's launch() resolves only once polling STOPS, so anything
