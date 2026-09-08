@@ -396,6 +396,8 @@ export interface GemPerformance {
   componentEdges?: GemComponentEdge[];
   /** What tokens the scanner REJECTED did over the same window. Optional for the same reason. */
   baseline?: GemBaselineComparison;
+  /** Whether controls are being collected at all. Present even when `baseline` is not — that is when it matters. Optional: an older API sends nothing. */
+  baselineCollection?: { pendingCount: number; pricedCount?: number; oldestPendingAgeDays?: number | null };
 }
 
 export interface GemBaselineComparison {

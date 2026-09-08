@@ -100,7 +100,7 @@ describe.skipIf(!hasTestDatabase)('baseline announcement cycle', () => {
 
     expect(d.send).toBe(true);
     expect(sent).toHaveLength(1);
-    expect(sent[0]?.text).toMatch(/SCANNER vs ITS OWN REJECTS/);
+    expect(sent[0]?.text).toMatch(/SCANNER SO VỚI CHÍNH ĐÁM NÓ LOẠI/);
 
     const recorded = await getLastBaselineAnnouncement(pool, '7d');
     expect(recorded?.verdict).toBe(d.send ? d.verdict : undefined);
@@ -155,7 +155,7 @@ describe.skipIf(!hasTestDatabase)('baseline announcement cycle', () => {
     for (let i = 45; i < 50; i++) await controlOutcome(false, i, 'low_liquidity');
 
     await runBaselineAnnounceCycle(deps(['baseline-chat']));
-    expect(sent[0]?.text).toMatch(/90% of the control was rejected for/);
+    expect(sent[0]?.text).toMatch(/90% nhóm đối chứng bị loại vì/);
     expect(sent[0]?.text).toMatch(/extreme_pump/);
   });
 });

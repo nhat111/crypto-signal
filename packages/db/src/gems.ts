@@ -425,6 +425,8 @@ export interface GemPerformance {
   /** Share of surfaced tokens whose liquidity fell below 20% of what it was at scan time — the rug-ish outcome. 7d only. */
   liquidityCollapsePct: number | null;
   sufficientData: boolean;
+  /** Whether controls are being collected at all, and how close the oldest is to its outcome. Present even when `baseline` is not. */
+  baselineCollection?: GemBaselineCollection;
   /**
    * The same figures for tokens the scanner REJECTED, plus the verdict on
    * the gap. Undefined when no control has been priced yet.
@@ -487,7 +489,22 @@ export async function getGemPerformance(
   const sampleCount = moves.length;
 
   if (sampleCount === 0) {
-    return { horizon, sampleCount: 0, positiveMovePct: null, negativeMovePct: null, netPositiveMovePct: null, medianMovePct: null, liquidityCollapsePct: null, sufficientData: false };
+    // Still reports how collection is going. This early return is the most
+    // likely state on a young deploy — the scanner has no outcomes either —
+    // and returning nothing here left the one message that explains why
+    // unable to tell "nothing has been recorded" from "nothing is old
+    // enough yet", which is exactly what it exists to say.
+    return {
+      horizon,
+      sampleCount: 0,
+      positiveMovePct: null,
+      negativeMovePct: null,
+      netPositiveMovePct: null,
+      medianMovePct: null,
+      liquidityCollapsePct: null,
+      sufficientData: false,
+      baselineCollection: await getGemBaselineCollection(pool, horizon),
+    };
   }
 
   const positive = moves.filter((m) => m > 0).length;
@@ -521,6 +538,9 @@ export async function getGemPerformance(
     liquidityCollapsePct,
     sufficientData: sampleCount >= MIN_GEM_SAMPLES,
     baseline: buildBaselineComparison(await getGemBaseline(pool, horizon), netPositivePct, sampleCount, medianPct),
+    // Sent even when `baseline` is undefined — that is exactly when it is
+    // needed, to say whether the control is missing or merely young.
+    baselineCollection: await getGemBaselineCollection(pool, horizon),
   };
 }
 
@@ -764,6 +784,49 @@ export async function recordGemBaselineOutcome(
      WHERE candidate_id = $3`,
     params,
   );
+}
+
+/**
+ * How collection of the control group is going, which is a different
+ * question from how the control performed.
+ *
+ * It exists because sampleCount 0 has two meanings a reader cannot tell
+ * apart, and they call for opposite responses: nothing recorded at all
+ * means something is broken, while plenty recorded and none old enough
+ * yet means wait — and says roughly how long. The performance block is
+ * deliberately undefined in that state, so this cannot live inside it.
+ */
+export interface GemBaselineCollection {
+  pendingCount: number;
+  /**
+   * Controls that DO have an outcome at this horizon.
+   *
+   * Needed separately from the performance block because that block is not
+   * built at all when the scanner itself has no outcomes — and in that
+   * state a report reading only `pendingCount` would announce "none has
+   * matured yet" while priced controls sat in the table. The missing side
+   * there is the scanner, and the message should say so.
+   */
+  pricedCount: number;
+  /** Age of the oldest unpriced control, in days — how close the first outcome is. Null when nothing is pending. */
+  oldestPendingAgeDays: number | null;
+}
+
+export async function getGemBaselineCollection(pool: Pool, horizon: GemHorizon): Promise<GemBaselineCollection> {
+  const moveCol = HORIZON_MOVE_COLUMN[horizon];
+  const { rows } = await pool.query(
+    `SELECT count(*) FILTER (WHERE ${moveCol} IS NULL)::int AS pending,
+            count(*) FILTER (WHERE ${moveCol} IS NOT NULL)::int AS priced,
+            max(extract(epoch from (now() - observed_at)) / 86400)
+              FILTER (WHERE ${moveCol} IS NULL) AS oldest_days
+     FROM gem_baseline_candidates`,
+  );
+  const oldest = rows[0]?.oldest_days;
+  return {
+    pendingCount: Number(rows[0]?.pending ?? 0),
+    pricedCount: Number(rows[0]?.priced ?? 0),
+    oldestPendingAgeDays: oldest === null || oldest === undefined ? null : Math.round(Number(oldest) * 10) / 10,
+  };
 }
 
 /** What the control group did, in the same shape the scanner's own figures are reported in. */

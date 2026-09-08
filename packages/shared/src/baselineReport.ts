@@ -23,6 +23,13 @@ export interface BaselineReportInput {
   netPositiveMovePct?: number | null;
   medianMovePct: number | null;
   sufficientData: boolean;
+  /**
+   * Present even when `baseline` is absent, which is the only time it
+   * changes the answer: it says whether controls are missing or merely
+   * young. Optional so an API predating it degrades to the old wording
+   * rather than claiming a count of zero it never sent.
+   */
+  baselineCollection?: { pendingCount: number; pricedCount?: number; oldestPendingAgeDays?: number | null };
   baseline?: {
     sampleCount: number;
     netPositiveMovePct: number | null;
@@ -36,8 +43,13 @@ export interface BaselineReportInput {
 }
 
 export type BaselineReadiness =
-  /** No control group priced yet — not "the baseline was zero". */
-  | { state: 'no_control' }
+  /**
+   * No control priced yet. `pending` separates the two reasons, because
+   * they call for opposite responses: nothing recorded at all means the
+   * collection is broken, while a stack of candidates too young to have
+   * outcomes means wait, and roughly how long.
+   */
+  | { state: 'no_control'; pending: number | null; priced: number | null; oldestPendingAgeDays: number | null }
   /** Outcomes exist but one side is still too thin to compare. */
   | { state: 'waiting'; scannerSamples: number; baselineSamples: number; needed: number }
   | { state: 'ready'; verdict: BaselineVerdict };
@@ -45,7 +57,17 @@ export type BaselineReadiness =
 export const MIN_BASELINE_SAMPLES = 20;
 
 export function baselineReadiness(input: BaselineReportInput): BaselineReadiness {
-  if (!input.baseline || input.baseline.sampleCount === 0) return { state: 'no_control' };
+  if (!input.baseline || input.baseline.sampleCount === 0) {
+    return {
+      state: 'no_control',
+      // null, not 0: an API that never sent the field has not told us the
+      // count is zero, and reporting "nothing recorded" off a missing
+      // field would raise a false alarm about a broken pipeline.
+      pending: input.baselineCollection?.pendingCount ?? null,
+      priced: input.baselineCollection?.pricedCount ?? null,
+      oldestPendingAgeDays: input.baselineCollection?.oldestPendingAgeDays ?? null,
+    };
+  }
   if (!input.sufficientData || input.baseline.sampleCount < MIN_BASELINE_SAMPLES) {
     return {
       state: 'waiting',
@@ -85,56 +107,103 @@ export function controlConcentration(
 export const CONCENTRATION_WARN_PCT = 60;
 
 function pct(v: number | null | undefined): string {
-  return v === null || v === undefined ? 'n/a' : `${v}%`;
+  return v === null || v === undefined ? 'chưa có' : `${v}%`;
 }
 
 function signed(v: number | null): string {
-  if (v === null) return 'n/a';
+  if (v === null) return 'chưa có';
   return `${v >= 0 ? '+' : ''}${v}`;
 }
+
+const TITLE = '📊 <b>SCANNER SO VỚI CHÍNH ĐÁM NÓ LOẠI</b>';
 
 /**
  * The whole message, as plain lines. HTML escaping is the caller's job —
  * every value here is a number or a reason slug the scanner itself
  * produced, never user text.
+ *
+ * Written in Vietnamese, the reader's language, for the same reason the
+ * lookup glossary is: this is the message that decides whether to keep
+ * running the gem scanner, and it is worth nothing if it is not
+ * understood. The scoring vocabulary the panels print — the horizon, the
+ * rejection slugs — stays as it appears elsewhere.
  */
 export function formatBaselineReport(input: BaselineReportInput): string[] {
   const readiness = baselineReadiness(input);
 
   if (readiness.state === 'no_control') {
+    // Two different problems wearing the same sentence, so they get
+    // different messages: one says wait, the other says go and look.
+    // Priced controls with no comparison block means the scanner is the
+    // empty side, not the control. Saying "no control has matured yet"
+    // here would name the wrong half as the thing that is missing.
+    if (readiness.priced !== null && readiness.priced > 0) {
+      return [
+        TITLE,
+        '',
+        `Nhóm đối chứng đã có ${readiness.priced} kết quả, nhưng scanner thì chưa có lần gọi tên nào được chốt.`,
+        '',
+        `Bên thiếu là scanner, không phải đối chứng. Mốc ${input.horizon} tính từ lúc quét ra, nên chỉ những con được gọi tên đủ lâu mới lên số.`,
+      ];
+    }
+
+    if (readiness.pending !== null && readiness.pending > 0) {
+      const age =
+        readiness.oldestPendingAgeDays === null
+          ? ''
+          : ` Con cũ nhất đã ghi được ${readiness.oldestPendingAgeDays} ngày.`;
+      return [
+        TITLE,
+        '',
+        `Đã ghi ${readiness.pending} token bị loại, nhưng chưa con nào tới hạn chốt kết quả.${age}`,
+        '',
+        `Mốc ${input.horizon} tính từ lúc ghi nhận, nên phải chờ đủ ngần đó thời gian rồi mới có số đầu tiên. Đang chạy đúng, chỉ là chưa tới lúc.`,
+      ];
+    }
+
+    if (readiness.pending === 0) {
+      return [
+        TITLE,
+        '',
+        'Chưa ghi được token bị loại nào.',
+        '',
+        'Cái này khác với "đám bị loại không đi đâu cả" — nghĩa là bộ quét chưa lưu lại con nào để đối chứng. Nếu tình trạng này kéo dài qua vài lần quét thì là hỏng, không phải chờ: xem /status để biết các chain có quét ra được ứng viên nào không.',
+      ];
+    }
+
     return [
-      '📊 <b>SCANNER vs ITS OWN REJECTS</b>',
+      TITLE,
       '',
-      'No control group priced yet.',
+      'Chưa có nhóm đối chứng nào được chốt giá.',
       '',
-      'This is not "the rejects did nothing" — it is that no rejected token has been followed to an outcome so far. Until some have, there is nothing to compare the scanner against.',
+      'Cái này khác với "đám bị loại không đi đâu cả" — nghĩa là chưa token bị loại nào được theo tới kết quả cuối. Chừng nào chưa có, không có gì để đem scanner ra so.',
     ];
   }
 
   if (readiness.state === 'waiting') {
     return [
-      '📊 <b>SCANNER vs ITS OWN REJECTS</b>',
+      TITLE,
       '',
-      `Not enough outcomes yet — scanner ${readiness.scannerSamples}/${readiness.needed}, control ${readiness.baselineSamples}/${readiness.needed}.`,
+      `Chưa đủ kết quả để trả lời — scanner ${readiness.scannerSamples}/${readiness.needed}, đối chứng ${readiness.baselineSamples}/${readiness.needed}.`,
       '',
-      'No percentages until both sides clear the threshold. A hit rate off a handful of outcomes reads like a finding and is noise.',
+      'Chưa đủ ngưỡng thì không đưa ra phần trăm nào. Một tỷ lệ thắng tính trên vài mẫu trông như một phát hiện, nhưng thực chất là nhiễu.',
       '',
-      "<i>You'll get this message unprompted the moment it can be answered.</i>",
+      '<i>Đủ mẫu là bot tự nhắn, bro không cần hỏi lại.</i>',
     ];
   }
 
   const b = input.baseline as NonNullable<BaselineReportInput['baseline']>;
   const lines = [
-    '📊 <b>SCANNER vs ITS OWN REJECTS</b>',
+    TITLE,
     '',
-    `Horizon: ${input.horizon}`,
-    `Scanner: ${pct(input.netPositiveMovePct)} net winners over ${input.sampleCount} calls`,
-    `Rejects: ${pct(b.netPositiveMovePct)} over ${b.sampleCount}`,
-    `Gap: ${signed(b.deltaPp)}pp${b.marginPp === null ? '' : ` (needs ±${b.marginPp}pp to be real)`}`,
+    `Mốc thời gian: ${input.horizon}`,
+    `Scanner: ${pct(input.netPositiveMovePct)} số lần thắng ròng, trên ${input.sampleCount} lần gọi tên`,
+    `Đám bị loại: ${pct(b.netPositiveMovePct)} trên ${b.sampleCount} con`,
+    `Chênh lệch: ${signed(b.deltaPp)}pp${b.marginPp === null ? '' : ` (phải hơn ±${b.marginPp}pp mới coi là thật)`}`,
   ];
 
   if (b.medianDeltaPp !== null) {
-    lines.push(`Median move vs control: ${signed(b.medianDeltaPp)}pp`);
+    lines.push(`Mức biến động trung vị so với đối chứng: ${signed(b.medianDeltaPp)}pp`);
   }
 
   lines.push('', `<b>${verdictHeadline(b.verdict)}</b>`, verdictMeaning(b.verdict));
@@ -143,11 +212,11 @@ export function formatBaselineReport(input: BaselineReportInput): string[] {
   if (concentration && concentration.sharePct >= CONCENTRATION_WARN_PCT) {
     lines.push(
       '',
-      `⚠️ ${concentration.sharePct}% of the control was rejected for <code>${concentration.reason}</code>.`,
+      `⚠️ ${concentration.sharePct}% nhóm đối chứng bị loại vì <code>${concentration.reason}</code>.`,
       // Phrased without a direction: the same caveat applies whichever way
       // the verdict went, and an earlier version hardcoded "beats", so a
       // losing verdict was captioned "beats tokens rejected for ...".
-      `So this compares the scanner against tokens rejected for ${concentration.reason}, which is narrower than a comparison against the market.`,
+      `Nên đây là so scanner với đám bị loại vì ${concentration.reason}, hẹp hơn nhiều so với "so với thị trường".`,
     );
   }
 
@@ -157,21 +226,21 @@ export function formatBaselineReport(input: BaselineReportInput): string[] {
 function verdictHeadline(verdict: BaselineVerdict): string {
   switch (verdict) {
     case 'beats':
-      return 'The scanner beats its rejects.';
+      return 'Scanner thắng đám nó loại.';
     case 'worse':
-      return 'The scanner LOSES to its rejects.';
+      return 'Scanner THUA đám nó loại.';
     case 'indistinguishable':
-      return 'No difference that the data can support.';
+      return 'Chênh lệch chưa đủ để kết luận.';
   }
 }
 
 function verdictMeaning(verdict: BaselineVerdict): string {
   switch (verdict) {
     case 'beats':
-      return 'The gap is larger than the margin, so picking is doing something the rejects were not. Costs are already deducted from both sides.';
+      return 'Chênh lệch lớn hơn sai số, nên việc chọn lọc có làm được điều gì đó mà đám bị loại không làm được. Chi phí giao dịch đã trừ ở cả hai bên.';
     case 'worse':
-      return 'Buying what it rejected would have done better. The honest move is to switch gem alerts off, not to retune weights — tuning a signal that loses to its own control optimises the losing.';
+      return 'Mua đúng những con nó loại ra thì còn lãi hơn. Việc đúng đắn là tắt alert gem, không phải chỉnh lại trọng số — tinh chỉnh một tín hiệu đang thua chính nhóm đối chứng của nó chỉ là tối ưu hoá cái thua.';
     case 'indistinguishable':
-      return 'The gap is inside the margin. That is not evidence of no edge, it is an absence of evidence either way — more outcomes, or a bigger gap, would be needed to tell.';
+      return 'Chênh lệch nằm trong sai số. Đây không phải bằng chứng là không có lợi thế, mà là chưa có bằng chứng cho cả hai chiều — cần thêm kết quả, hoặc một khoảng cách lớn hơn, mới nói được.';
   }
 }

@@ -32,6 +32,32 @@ describe('baselineReadiness', () => {
     expect(baselineReadiness({ ...ready, baseline: { ...ready.baseline!, sampleCount: 0 } }).state).toBe('no_control');
   });
 
+  it('separates a control that is missing from one that is merely young', () => {
+    const { baseline: _b, ...none } = ready;
+    expect(baselineReadiness({ ...none, baselineCollection: { pendingCount: 0 } })).toMatchObject({
+      state: 'no_control',
+      pending: 0,
+    });
+    expect(
+      baselineReadiness({ ...none, baselineCollection: { pendingCount: 143, oldestPendingAgeDays: 2.1 } }),
+    ).toMatchObject({ state: 'no_control', pending: 143, oldestPendingAgeDays: 2.1 });
+  });
+
+  it('reports an unsent count as unknown, not as zero', () => {
+    // An API predating the field has not told us the count is zero, and
+    // "nothing recorded" is an alarm about a broken pipeline. Both counts
+    // are pinned: a deploy that sends pendingCount without pricedCount is
+    // a real intermediate state, and reading the absent one as 0 would
+    // assert a fact the server never sent.
+    const { baseline: _b, ...none } = ready;
+    expect(baselineReadiness(none)).toMatchObject({ state: 'no_control', pending: null, priced: null });
+    expect(baselineReadiness({ ...none, baselineCollection: { pendingCount: 12 } })).toMatchObject({
+      state: 'no_control',
+      pending: 12,
+      priced: null,
+    });
+  });
+
   it('waits while either side is below the threshold', () => {
     const thinScanner = baselineReadiness({ ...ready, sampleCount: 5, sufficientData: false });
     expect(thinScanner).toMatchObject({ state: 'waiting', scannerSamples: 5, needed: MIN_BASELINE_SAMPLES });
@@ -68,23 +94,50 @@ describe('formatBaselineReport', () => {
 
   it('quotes no percentages while the data is thin', () => {
     const out = text({ ...ready, sampleCount: 6, sufficientData: false });
-    expect(out).toMatch(/Not enough outcomes yet/);
+    expect(out).toMatch(/Chưa đủ kết quả/);
     expect(out).toMatch(/6\/20/);
     // The whole point of the threshold: a hit rate off six outcomes reads
     // like a finding. It must not appear at all.
-    expect(out).not.toMatch(/net winners/);
+    expect(out).not.toMatch(/thắng ròng/);
+  });
+
+  it('names the scanner as the empty side when the control already has outcomes', () => {
+    // The performance block is not built when the scanner has no outcomes,
+    // so a report reading only pendingCount announced "no control has
+    // matured yet" while priced controls sat in the table — blaming the
+    // wrong half.
+    const { baseline: _b, ...none } = ready;
+    const out = text({ ...none, baselineCollection: { pendingCount: 140, pricedCount: 3, oldestPendingAgeDays: 6 } });
+    expect(out).toMatch(/đối chứng đã có 3 kết quả/);
+    expect(out).toMatch(/Bên thiếu là scanner/);
+    expect(out).not.toMatch(/chưa con nào tới hạn/);
+  });
+
+  it('tells a young control apart from a broken one, and says which', () => {
+    const { baseline: _b, ...none } = ready;
+
+    const young = text({ ...none, baselineCollection: { pendingCount: 143, pricedCount: 0, oldestPendingAgeDays: 2.1 } });
+    expect(young).toMatch(/143 token bị loại/);
+    expect(young).toMatch(/2\.1 ngày/);
+    expect(young).toMatch(/Đang chạy đúng/);
+
+    const broken = text({ ...none, baselineCollection: { pendingCount: 0, pricedCount: 0 } });
+    expect(broken).toMatch(/Chưa ghi được token bị loại nào/);
+    expect(broken).toMatch(/là hỏng, không phải chờ/);
+    // The two must never be captioned the same way — that is the bug.
+    expect(broken).not.toMatch(/Đang chạy đúng/);
   });
 
   it('says a losing scanner should be switched off, not retuned', () => {
     const out = text({ ...ready, baseline: { ...ready.baseline!, verdict: 'worse', deltaPp: -9 } });
-    expect(out).toMatch(/LOSES to its rejects/);
-    expect(out).toMatch(/switch gem alerts off/);
-    expect(out).toMatch(/not to retune/);
+    expect(out).toMatch(/THUA đám nó loại/);
+    expect(out).toMatch(/tắt alert gem/);
+    expect(out).toMatch(/không phải chỉnh lại trọng số/);
   });
 
   it('does not read an inconclusive result as evidence of no edge', () => {
     const out = text({ ...ready, baseline: { ...ready.baseline!, verdict: 'indistinguishable', deltaPp: 2 } });
-    expect(out).toMatch(/absence of evidence/);
+    expect(out).toMatch(/chưa có bằng chứng cho cả hai chiều/);
   });
 
   it('warns when the control is really one rejection reason wearing a market costume', () => {
@@ -92,8 +145,8 @@ describe('formatBaselineReport', () => {
       ...ready,
       baseline: { ...ready.baseline!, sampleCount: 50, failureCounts: { extreme_pump: 40, thin_volume: 3 } },
     });
-    expect(out).toMatch(/80% of the control was rejected for/);
-    expect(out).toMatch(/narrower than a comparison against the market/);
+    expect(out).toMatch(/80% nhóm đối chứng bị loại vì/);
+    expect(out).toMatch(/hẹp hơn nhiều so với/);
   });
 
   it('does not caption a losing verdict as if the scanner had won', () => {
@@ -110,13 +163,13 @@ describe('formatBaselineReport', () => {
         failureCounts: { thin_volume: 34, low_liquidity: 16 },
       },
     });
-    expect(out).toMatch(/LOSES to its rejects/);
-    expect(out).toMatch(/68% of the control was rejected for/);
-    expect(out).not.toMatch(/beats tokens rejected for/);
+    expect(out).toMatch(/THUA đám nó loại/);
+    expect(out).toMatch(/68% nhóm đối chứng bị loại vì/);
+    expect(out).not.toMatch(/Scanner thắng đám nó loại/);
   });
 
   it('stays quiet about concentration when the control is mixed', () => {
-    expect(text(ready)).not.toMatch(/of the control was rejected for/);
+    expect(text(ready)).not.toMatch(/nhóm đối chứng bị loại vì/);
   });
 
   it('shows the margin next to the gap so the gap is never read alone', () => {
@@ -131,7 +184,7 @@ describe('formatBaselineReport', () => {
       netPositiveMovePct: null,
       baseline: { ...ready.baseline!, netPositiveMovePct: null, marginPp: null, medianDeltaPp: null },
     });
-    expect(out).toMatch(/n\/a/);
-    expect(out).not.toMatch(/needs ±/);
+    expect(out).toMatch(/chưa có/);
+    expect(out).not.toMatch(/mới coi là thật/);
   });
 });
