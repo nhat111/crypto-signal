@@ -113,6 +113,19 @@ describe('formatBaselineReport', () => {
     expect(out).not.toMatch(/chưa con nào tới hạn/);
   });
 
+  it('names a stale API rather than blaming the data, when no counts arrive', () => {
+    // The new field is always sent, including on the empty early return,
+    // so its absence can only mean the API is older than the caller. Read
+    // three times running as "nothing to say", this wording cost more than
+    // it saved.
+    const { baseline: _b, ...none } = ready;
+    const out = text(none);
+    expect(out).toMatch(/API đang trả lời cũ hơn bot/);
+    expect(out).toMatch(/không phải hệ thống hỏng/);
+    // It must not be confused with the genuine "nothing recorded" alarm.
+    expect(out).not.toMatch(/Chưa ghi được token bị loại nào/);
+  });
+
   it('tells a young control apart from a broken one, and says which', () => {
     const { baseline: _b, ...none } = ready;
 

@@ -171,12 +171,18 @@ export function formatBaselineReport(input: BaselineReportInput): string[] {
       ];
     }
 
+    // Both counts absent means the API answering this is older than the
+    // code asking — the new field is always sent, including on the empty
+    // early return. Saying so turns the vaguest of these messages into a
+    // diagnosis: the same wording read three times running as "the system
+    // has nothing to say", when what it meant was "half the deploy has
+    // not landed".
     return [
       TITLE,
       '',
-      'Chưa có nhóm đối chứng nào được chốt giá.',
+      'Chưa đọc được tình trạng nhóm đối chứng.',
       '',
-      'Cái này khác với "đám bị loại không đi đâu cả" — nghĩa là chưa token bị loại nào được theo tới kết quả cuối. Chừng nào chưa có, không có gì để đem scanner ra so.',
+      'API đang trả lời cũ hơn bot — một bản deploy chưa lên hết, không phải hệ thống hỏng. Xem tab Status: dòng <b>Commit</b> đầu là của api, so với commit của bot ở cuối <code>/status</code>. Khi nào hai bên khớp, gõ lại <code>/baseline</code>.',
     ];
   }
 
