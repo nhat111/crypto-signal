@@ -83,6 +83,8 @@ export interface GemRow {
   priceUsd: number | null;
   liquidityUsd: number | null;
   volume24hUsd: number | null;
+  /** Fully diluted valuation — same field the small-cap ceiling gate uses. */
+  fdvUsd: number | null;
   priceChange24hPct: number | null;
   ageDays: number | null;
   safetyVerdict: string | null;

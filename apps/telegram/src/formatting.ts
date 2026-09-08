@@ -99,7 +99,7 @@ export function formatGemList(gems: GemRow[]): string {
     lines.push(
       `<b>${escapeHtml(gem.symbol)}</b> · ${gem.chainId}`,
       `Gem ${gem.gemScore}/100 · Risk ${gem.riskScore}/100 · ${safety}`,
-      `Liq $${gem.liquidityUsd === null ? '?' : formatLargeNumber(gem.liquidityUsd)} · Vol24h $${gem.volume24hUsd === null ? '?' : formatLargeNumber(gem.volume24hUsd)}${
+      `Liq $${gem.liquidityUsd === null ? '?' : formatLargeNumber(gem.liquidityUsd)} · Vol24h $${gem.volume24hUsd === null ? '?' : formatLargeNumber(gem.volume24hUsd)} · FDV $${gem.fdvUsd === null ? '?' : formatLargeNumber(gem.fdvUsd)}${
         gem.priceChange24hPct === null ? '' : ` · ${gem.priceChange24hPct >= 0 ? '+' : ''}${gem.priceChange24hPct.toFixed(1)}%`
       }`,
       ...(gem.url ? [gem.url] : []),
@@ -263,7 +263,7 @@ function windowLine(w: StablecoinFlowWindowDTO | null): string {
 
 /** Token names/symbols come from on-chain metadata that anyone can set, so they're escaped before entering an HTML-parsed message. */
 export function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return s.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>');
 }
 
 /** Full precision with thousands separators — unlike formatLargeNumber, a price should never compact to "78.58K". */
@@ -326,7 +326,7 @@ export function formatLookup(data: LookupDTO): string {
     const { symbol, technical: t } = data.result;
     lines.push(`🔎 <b>${escapeHtml(symbol)}</b> · Binance · ${escapeHtml(data.result.timeframe)}`);
     lines.push(`Price ${t.lastPrice}`);
-    if (t.trend) lines.push(`Structure: ${t.trend.direction === 'up' ? 'EMA20 &gt; EMA50' : t.trend.direction === 'down' ? 'EMA20 &lt; EMA50' : 'flat'} (${t.trend.separationPct.toFixed(2)}%)`);
+    if (t.trend) lines.push(`Structure: ${t.trend.direction === 'up' ? 'EMA20 > EMA50' : t.trend.direction === 'down' ? 'EMA20 < EMA50' : 'flat'} (${t.trend.separationPct.toFixed(2)}%)`);
     if (t.rsi14 !== null) lines.push(`RSI 14: ${t.rsi14.toFixed(1)}`);
     if (t.atrPct !== null) lines.push(`ATR range: ${t.atrPct.toFixed(2)}%`);
     if (t.support !== null || t.resistance !== null) {
