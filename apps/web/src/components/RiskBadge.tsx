@@ -16,6 +16,10 @@ export function RiskBadge({ score, size = 'md' }: RiskBadgeProps) {
         ? 'text-xs px-1.5 py-0.5'
         : 'text-sm px-2 py-1';
 
+  // Mirror HealthBadge: always show what the number is about.
+  // Spec has no named risk bands, so the label is just "Risk".
+  const label = 'Risk';
+
   return (
     <span
       className={cx(
@@ -29,6 +33,7 @@ export function RiskBadge({ score, size = 'md' }: RiskBadgeProps) {
     >
       <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', colors.dot)} />
       {formatScore(score)}
+      {size !== 'sm' && <span className="font-medium opacity-80">{label}</span>}
     </span>
   );
 }

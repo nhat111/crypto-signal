@@ -2,7 +2,7 @@ import { PriceChart } from '@/components/charts/PriceChart';
 import { LiquidationChart } from '@/components/charts/LiquidationChart';
 import { MetricChartCard } from '@/components/charts/MetricChartCard';
 import type { Signal, SymbolSeriesPoint } from '@/lib/types';
-import { formatPct, formatScore, formatSignedUsd, formatUsd } from '@/lib/format';
+import { formatCompactNumber, formatPct, formatScore, formatSignedUsd } from '@/lib/format';
 
 interface ChartsGridProps {
   points: SymbolSeriesPoint[];
@@ -32,11 +32,11 @@ export function ChartsGrid({ points, signals }: ChartsGridProps) {
         formatter={formatSignedUsd}
       />
       <MetricChartCard
-        title="Open Interest"
+        title="Open Interest (contracts)"
         points={points}
         valueKey="openInterest"
         color="#facc15"
-        formatter={(v) => formatUsd(v)}
+        formatter={formatCompactNumber}
       />
 
       <MetricChartCard
