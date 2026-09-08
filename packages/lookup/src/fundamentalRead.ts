@@ -60,7 +60,7 @@ export function buildOnChainFundamentals(pair: GemPair, safety: SafetyReport | n
   const unknowns: string[] = [];
 
   const ageDays = pair.pairCreatedAt === null ? null : (now - pair.pairCreatedAt) / DAY_MS;
-  if (ageDays === null) unknowns.push('Pool age (the source returned no creation date)');
+  if (ageDays === null) unknowns.push('Pool age (nguồn không trả về ngày tạo pool)');
   if (pair.liquidityUsd === null) unknowns.push('Liquidity');
   if (pair.fdvUsd === null) unknowns.push('FDV');
   if (pair.marketCapUsd === null) unknowns.push('Circulating market cap');
@@ -81,15 +81,15 @@ export function buildOnChainFundamentals(pair: GemPair, safety: SafetyReport | n
     // Said out loud rather than rendered as a missing link: "we have no
     // verified explorer for this chain" is a fact about our coverage, and
     // a silently absent button reads as the token having nothing to show.
-    unknowns.push(`Block explorer link (no verified explorer for "${pair.chainId}")`);
+    unknowns.push(`Block explorer link (chưa có explorer nào được xác minh cho "${pair.chainId}")`);
   }
-  if (pair.websites.length === 0) unknowns.push('Project website (the token submitted none to the data source)');
+  if (pair.websites.length === 0) unknowns.push('Project website (token không khai báo website nào với nguồn dữ liệu)');
 
   if (safety === null) {
-    unknowns.push('Safety screen (no source covers this chain)');
+    unknowns.push('Safety screen (chưa nguồn nào quét được chain này)');
   } else {
-    if (safety.topHolderPct === null) unknowns.push('Largest holder share');
-    if (safety.lpLocked === null) unknowns.push('Whether LP is locked');
+    if (safety.topHolderPct === null) unknowns.push('Largest holder share (nguồn không trả về)');
+    if (safety.lpLocked === null) unknowns.push('LP locked (nguồn không trả về)');
   }
 
   return {
@@ -143,7 +143,7 @@ export interface ExchangeFundamentals {
 }
 
 export const EXCHANGE_FUNDAMENTAL_GAPS: readonly string[] = [
-  'Market cap and circulating supply — no data source is wired for these',
-  'Token unlock schedule',
-  'Holder distribution (readable only for on-chain tokens)',
+  'Market cap và nguồn cung lưu hành — chưa đấu nguồn dữ liệu nào cho hai số này',
+  'Lịch mở khoá token',
+  'Phân bố ví nắm giữ (chỉ đọc được với token on-chain)',
 ];

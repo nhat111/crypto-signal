@@ -31,11 +31,11 @@ export function LookupResultView({ result }: { result: LookupResult }) {
               : null,
           ]}
         />
-        <Glossary title="What these readings mean" items={TECHNICAL_GLOSSARY} />
+        <Glossary title="Các chỉ số này nghĩa là gì" items={TECHNICAL_GLOSSARY} />
         <UnknownsPanel
-          title="Fundamentals with no data source"
+          title="Chưa có nguồn dữ liệu"
           items={result.fundamentals.unknowns}
-          note="For an exchange ticker this project has no supply or market-cap source wired. Deriving a market cap from a price would be a made-up number, so none is shown."
+          note="Với mã niêm yết trên sàn, dự án này chưa đấu nguồn nào cho nguồn cung và vốn hoá. Tự suy vốn hoá ra từ giá thì đó là con số bịa, nên thà để trống."
         />
       </div>
     );
@@ -61,12 +61,12 @@ export function LookupResultView({ result }: { result: LookupResult }) {
           <Metric
             label="Liquidity / FDV"
             value={f.liquidityToFdvPct === null ? '—' : `${f.liquidityToFdvPct.toFixed(2)}%`}
-            hint="A thin pool against the valuation means the price is easy to move."
+            hint="Pool mỏng so với mức định giá nghĩa là giá dễ bị đẩy."
           />
           <Metric
             label="Vol / liquidity"
             value={f.volumeToLiquidity === null ? '—' : `${f.volumeToLiquidity.toFixed(2)}×`}
-            hint="Very high means the pool is being churned; very low means almost nobody trades it."
+            hint="Rất cao là pool đang bị quay vòng liên tục; rất thấp là gần như không ai giao dịch."
           />
         </dl>
       </Panel>
@@ -108,12 +108,12 @@ export function LookupResultView({ result }: { result: LookupResult }) {
         ]}
       />
 
-      <Glossary title="What these figures mean" items={ONCHAIN_GLOSSARY} />
+      <Glossary title="Các số liệu này nghĩa là gì" items={ONCHAIN_GLOSSARY} />
 
       <UnknownsPanel
-        title="Could not be read"
+        title="Không đọc được"
         items={f.unknowns}
-        note="The technical readings (RSI, EMA, support/resistance) need candle history, which the free DEX source does not return — so that half is left empty rather than approximated from a handful of percentage changes."
+        note="Phần phân tích kỹ thuật (RSI, EMA, hỗ trợ/kháng cự) cần lịch sử nến, mà nguồn DEX miễn phí không trả về. Nên nửa đó để trống, thay vì suy ra từ vài con số phần trăm rồi gọi là phân tích."
       />
     </div>
   );
@@ -156,12 +156,12 @@ function TechnicalPanel({ read }: { read: LookupTechnical }) {
         <Metric
           label="Nearest low"
           value={levelText(support, read.belowAllSwingLows ? 'below all' : '—')}
-          hint="Nearest swing low below price, and how far away it is."
+          hint="Đáy gần nhất dưới giá hiện tại, và cách bao xa."
         />
         <Metric
           label="Nearest high"
           value={levelText(resistance, read.aboveAllSwingHighs ? 'cleared all' : '—')}
-          hint="Nearest swing high above price. 'cleared all' means price is above every swing high in the window — not missing data."
+          hint="Đỉnh gần nhất trên giá hiện tại. 'cleared all' nghĩa là giá đang cao hơn mọi đỉnh trong khung — đó là sự kiện, không phải thiếu dữ liệu."
         />
         <Metric
           label="Range position"
@@ -171,12 +171,12 @@ function TechnicalPanel({ read }: { read: LookupTechnical }) {
               ? `${formatTokenPrice(read.windowLow.price)} – ${formatTokenPrice(read.windowHigh.price)}`
               : undefined
           }
-          hint="0 is the bottom of the window's range, 100 the top."
+          hint="0 là đáy của khung, 100 là đỉnh."
         />
         <Metric
           label="Volume vs avg"
           value={read.volumeRatio === null || read.volumeRatio === undefined ? '—' : `${read.volumeRatio.toFixed(2)}×`}
-          hint="Latest bar's volume against the 20 before it. 1× is ordinary."
+          hint="Khối lượng nến mới nhất so với 20 nến trước. 1× là bình thường."
         />
         <Metric
           label="Window high"
@@ -212,8 +212,8 @@ function TechnicalPanel({ read }: { read: LookupTechnical }) {
           newer fields simply are not in the response. */}
       {apiPredatesReadings(read) && (
         <p className="mt-1.5 text-[11px] leading-relaxed text-amber-300/80">
-          Some readings are blank because the API answering this page is older than the page itself — a deploy still
-          catching up, not a problem with this symbol. Check the service commits on Status.
+          Một số chỉ số đang trống vì API phục vụ trang này cũ hơn chính trang — bản deploy chưa theo kịp, không phải
+          lỗi của mã này. Xem commit của từng service ở tab Status.
         </p>
       )}
     </Panel>
@@ -224,7 +224,7 @@ function UnknownsPanel({ title, items, note }: { title: string; items: string[];
   return (
     <Panel title={title}>
       {items.length === 0 ? (
-        <p className="text-xs text-slate-500">Everything was readable.</p>
+        <p className="text-xs text-slate-500">Đọc được hết.</p>
       ) : (
         <ul className="space-y-1 text-xs text-slate-400">
           {items.map((item, i) => (

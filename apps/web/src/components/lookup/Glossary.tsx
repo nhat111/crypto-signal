@@ -8,6 +8,17 @@
  * A `<details>` instead: closed by default so it does not push the numbers
  * down, open in one tap, and the text is real text rather than a tooltip
  * the browser may or may not show.
+ *
+ * The explanations are in Vietnamese and the terms are not. The term has
+ * to read exactly as it appears on the panel above, or somebody looking up
+ * "FDV" cannot find the entry that explains it — while the teaching itself
+ * belongs in the reader's own language, where a beginner can actually
+ * follow it.
+ *
+ * They explain what a number measures and, as often, what it does not.
+ * That second half is the part that keeps this a reference rather than a
+ * recommendation: nothing here tells anyone to buy or sell, and
+ * Glossary.test.ts holds that line.
  */
 export function Glossary({ title, items }: { title: string; items: Array<{ term: string; text: string }> }) {
   return (
@@ -32,47 +43,47 @@ export const TECHNICAL_GLOSSARY: Array<{ term: string; text: string }> = [
   {
     term: 'RSI 14',
     text:
-      'Compares the size of the last 14 bars’ gains against their losses, on a 0–100 scale. Above 70 and below 30 are the conventional markers, but they are only conventions — plenty of instruments spend weeks above 70 while still rising. The line underneath is the part that makes it usable: where this reading sits against this instrument’s own last 200 bars.',
+      'So sức tăng với sức giảm của 14 nến gần nhất, quy về thang 0–100. Trên 70 gọi là "quá mua", dưới 30 là "quá bán" — nhưng đó chỉ là quy ước, không phải luật: nhiều mã nằm trên 70 hàng tuần liền mà vẫn tăng tiếp. Dòng nhỏ bên dưới mới là phần dùng được: nó cho biết con số này đứng ở đâu so với chính 200 nến gần nhất của mã đó.',
   },
   {
     term: 'Trend (EMA20 vs EMA50)',
     text:
-      'Two moving averages of the closing price, one over 20 bars and one over 50. When the faster sits above the slower, recent prices are above the older ones. The gap is shown because a 0.1% separation and a 12% separation are not the same statement; anything under 0.5% is called flat rather than a trend, so the label does not flip on noise.',
+      'Hai đường trung bình giá đóng cửa: một tính trên 20 nến, một trên 50 nến. Đường nhanh nằm trên đường chậm nghĩa là giá gần đây cao hơn giá cũ. Khoảng cách giữa hai đường được hiện ra vì cách nhau 0,1% và cách nhau 12% là hai chuyện hoàn toàn khác nhau. Dưới 0,5% thì ghi là "flat" (đi ngang) chứ không gọi là xu hướng, để cái nhãn không lật qua lật lại theo nhiễu.',
   },
   {
     term: 'Range (ATR)',
     text:
-      'The average distance between a bar’s high and low over the last 14 bars, as a percentage of the current price. It is a measure of how much this thing moves in a normal bar — useful for sizing a position or a stop, and it says nothing about direction.',
+      'Khoảng cách trung bình giữa đỉnh và đáy của mỗi nến trong 14 nến gần nhất, tính theo phần trăm giá hiện tại. Nó trả lời "con này mỗi nến thường nhúc nhích bao nhiêu" — dùng để chọn khối lượng vào lệnh hoặc đặt cắt lỗ cho vừa với độ ồn của nó. Nó không nói gì về hướng đi.',
   },
   {
     term: 'Nearest low / high',
     text:
-      'The closest price where the chart already turned: a bar whose high beat the two bars on each side (or whose low undercut them). Shown with how far away it is, because the distance is the part a position size is built from. “cleared all” means price is above every such high in the window — the opposite of missing data.',
+      'Mức giá gần nhất mà đồ thị đã từng quay đầu: một nến có đỉnh cao hơn hai nến hai bên (hoặc đáy thấp hơn). Kèm luôn khoảng cách từ giá hiện tại, vì chính khoảng cách đó là thứ để tính khối lượng vào lệnh. "cleared all" nghĩa là giá đang cao hơn mọi đỉnh loại này trong khung — đó là một sự kiện, không phải thiếu dữ liệu.',
   },
   {
     term: 'Range position',
     text:
-      'Where the current price sits between the lowest low and highest high of the window, 0 to 100. It says where price is, not where it is going: 95 can be a breakout or the top of a range, and this number cannot tell you which.',
+      'Giá hiện tại nằm ở đâu giữa đáy thấp nhất và đỉnh cao nhất của khung, theo thang 0–100. Nó nói giá đang ở đâu, không nói giá sắp đi đâu: 95 có thể là phá đỉnh đi lên, cũng có thể là chạm trần rồi quay xuống, và con số này không phân biệt được hai trường hợp đó.',
   },
   {
     term: 'Volume vs avg',
     text:
-      'The latest bar’s volume divided by the average of the 20 bars before it. 1× is an ordinary bar. The latest bar is deliberately excluded from its own average — including it would drag the baseline toward the very thing being measured.',
+      'Khối lượng của nến mới nhất chia cho khối lượng trung bình 20 nến trước đó. 1× là một nến bình thường, 3× là phiên có chuyện. Nến mới nhất cố ý không được tính vào mức trung bình của chính nó — nếu tính vào thì mốc so sánh sẽ bị kéo về phía cái đang cần đo.',
   },
   {
     term: 'Window high / low',
     text:
-      'The extremes of the whole window, how far the current price is from each, and how many bars ago they happened. “3 bars ago” and “188 bars ago” are very different facts about the same price.',
+      'Đỉnh và đáy của cả khung, giá hiện tại cách mỗi mốc bao xa, và chuyện đó xảy ra cách đây bao nhiêu nến. "3 nến trước" và "188 nến trước" là hai câu chuyện rất khác nhau dù cùng một mức giá.',
   },
   {
     term: 'Other timeframes',
     text:
-      'The same trend read on 1h, 4h and 1d. One frame alone cannot say whether the frames agree, and when they disagree that is usually the more useful fact.',
+      'Cùng một cách đọc xu hướng, áp lên khung 1h, 4h và 1d. Nhìn một khung thì không biết các khung có đồng thuận hay không — mà khi chúng mâu thuẫn nhau, đó thường mới là thông tin đáng giá.',
   },
   {
-    term: '“higher than X% of window”',
+    term: '"higher than X% of window"',
     text:
-      'The percentile of the current reading against every bar in the same window. This is what turns a number into information: RSI 75 means one thing on an instrument that lives at 70, and another on one that has not been above 60 in months.',
+      'Con số hiện tại đang cao hơn bao nhiêu phần trăm số nến trong cùng khung. Đây là thứ biến một con số thành thông tin: RSI 75 mang ý nghĩa khác hẳn trên một mã thường xuyên ở mức 70, so với một mã cả tháng nay chưa vượt quá 60.',
   },
 ];
 
@@ -80,36 +91,36 @@ export const ONCHAIN_GLOSSARY: Array<{ term: string; text: string }> = [
   {
     term: 'Liquidity',
     text:
-      'The dollar value sitting in the pool, both sides combined. It is what you are trading against: a small pool means your own order moves the price, whatever the market cap says.',
+      'Thanh khoản — tổng giá trị đang nằm trong pool, tính cả hai phía. Đây là cái bro thật sự giao dịch với: pool mỏng thì chính lệnh của bro đẩy giá đi, dù vốn hoá có ghi to đến mấy.',
   },
   {
     term: 'FDV vs market cap',
     text:
-      'FDV values every token that will ever exist; market cap values only those circulating. A large gap between them means a lot of supply has yet to arrive.',
+      'FDV định giá toàn bộ token sẽ từng tồn tại; market cap chỉ định giá số đang lưu hành. Hai số chênh nhau nhiều nghĩa là còn một lượng lớn token chưa ra thị trường — và khi chúng ra, chúng sẽ ra ở đâu đó.',
   },
   {
     term: 'Liquidity / FDV',
     text:
-      'Pool depth against valuation. A token claiming a large valuation on a thin pool is one whose price is cheap to move in either direction.',
+      'Độ dày của pool so với mức định giá. Một token tự nhận định giá lớn nhưng ngồi trên pool mỏng là token mà giá của nó rẻ để đẩy — theo cả hai chiều.',
   },
   {
     term: 'Vol / liquidity',
     text:
-      'A day’s volume divided by pool depth. Very high means the pool is being churned rapidly; very low means almost nobody is trading it. Neither is good or bad on its own — both are context for how easily you could get out.',
+      'Khối lượng một ngày chia cho độ dày pool. Rất cao nghĩa là pool đang bị quay vòng liên tục; rất thấp nghĩa là gần như không ai giao dịch. Bản thân hai thái cực đó không tốt cũng không xấu — chúng cho biết bro sẽ thoát ra dễ hay khó.',
   },
   {
     term: 'Largest holder',
     text:
-      'The share of supply in the biggest single wallet the screen could see. Concentration is not proof of anything, but it does mean one address can move the price on its own.',
+      'Tỷ lệ nguồn cung nằm trong một ví lớn nhất mà bộ quét nhìn thấy được. Tập trung không chứng minh điều gì cả, nhưng nó có nghĩa là một địa chỉ đủ sức tự mình làm giá chạy.',
   },
   {
     term: 'LP locked',
     text:
-      'Whether the liquidity pool tokens are locked. Unlocked means whoever holds them can withdraw the pool, and the price with it. “unknown” is a third state and does not mean no.',
+      'Token thanh khoản (LP) có bị khoá hay không. Chưa khoá nghĩa là ai đang giữ chúng đều có thể rút cả pool đi, và kéo giá đi theo. Lưu ý: "unknown" là trạng thái thứ ba — nó có nghĩa là chưa đọc được, không có nghĩa là không.',
   },
   {
     term: 'Mint / freeze revoked',
     text:
-      'Whether the contract can still create new tokens, or block a wallet from transferring. Not revoked means the deployer retains that power. As above, “unknown” is not “no”.',
+      'Hợp đồng còn quyền tạo thêm token mới, hoặc khoá không cho một ví chuyển đi, hay không. Chưa thu hồi nghĩa là người deploy vẫn giữ quyền đó. Cũng như trên, "unknown" không phải là "không".',
   },
 ];

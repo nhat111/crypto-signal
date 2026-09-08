@@ -35,7 +35,7 @@ export default function LookupPage() {
     } catch (err) {
       // The API's own reason is the answer here — "no pool on any DEX we
       // cover" and "404" send you to two different places.
-      setError(err instanceof ApiError ? err.message : 'Could not run that lookup.');
+      setError(err instanceof ApiError ? err.message : 'Không tra cứu được. Thử lại sau ít phút.');
       setData(null);
     } finally {
       setLoading(false);
@@ -47,9 +47,9 @@ export default function LookupPage() {
       <div>
         <h1 className="text-lg font-bold text-slate-100">Lookup</h1>
         <p className="mt-1 max-w-2xl text-xs text-slate-500">
-          An exchange ticker (BTC, ETHUSDT) or the contract address of an on-chain token. A ticker is read from
-          Binance candles; an address is read from its DEX pool and put through a contract safety screen. On-demand
-          only: nothing here is stored, and no lookup feeds any performance number in this system.
+          Nhập mã trên sàn (BTC, ETHUSDT) hoặc địa chỉ contract của một token on-chain. Mã sàn được đọc từ nến
+          Binance; địa chỉ được đọc từ pool DEX của nó rồi cho qua một lượt quét an toàn hợp đồng. Chỉ tra khi bro
+          gõ: không lưu gì ở đây, và không có kết quả tra cứu nào chảy vào các con số hiệu quả của hệ thống.
         </p>
       </div>
 
@@ -93,8 +93,7 @@ export default function LookupPage() {
           </button>
         </div>
         <p className="mt-2 text-[11px] text-slate-600">
-          The timeframe applies to exchange tickers only — on-chain tokens have no candle history from the free
-          data source.
+          Khung thời gian chỉ áp dụng cho mã trên sàn — token on-chain không có lịch sử nến từ nguồn dữ liệu miễn phí.
         </p>
       </form>
 
