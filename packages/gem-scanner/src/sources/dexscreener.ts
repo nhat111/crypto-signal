@@ -29,18 +29,28 @@ const numericString = z
     return Number.isFinite(n) ? n : null;
   });
 
+/** Kept loose on purpose — DexScreener sometimes omits one side; we normalize in toTxnWindow. */
 const txnWindowSchema = z
-  .object({ buys: z.number(), sells: z.number() })
-  .nullish()
-  .transform((v) => v ?? null);
+  .object({
+    buys: z.number().optional(),
+    sells: z.number().optional(),
+  })
+  .nullish();
 
 const pairSchema = z.object({
   chainId: z.string(),
   dexId: z.string(),
   pairAddress: z.string(),
   url: z.string().nullish(),
-  baseToken: z.object({ address: z.string(), name: z.string(), symbol: z.string() }),
-  quoteToken: z.object({ address: z.string(), symbol: z.string() }),
+  baseToken: z.object({
+    address: z.string(),
+    name: z.string(),
+    symbol: z.string(),
+  }),
+  quoteToken: z.object({
+    address: z.string(),
+    symbol: z.string(),
+  }),
   priceUsd: numericString,
   liquidity: z.object({ usd: numericString }).nullish(),
   fdv: numericString,
@@ -182,13 +192,17 @@ export class DexScreenerSource implements MarketDataSource {
   }
 }
 
-function toTxnWindow(
-  window: { buys: number; sells: number } | null | undefined,
-): { buys: number; sells: number } | null {
-  if (window == null) return null;
-  // Field-by-field so TS 5.9 does not treat the z.infer object as having
-  // optional buys/sells when assigning into GemPair.txns.
-  return { buys: window.buys, sells: window.sells };
+/**
+ * Narrow txn counts without relying on z.infer object assignability.
+ * Incomplete windows become null (unknown), never partial { buys?: n }.
+ */
+function toTxnWindow(value: unknown): { buys: number; sells: number } | null {
+  if (value == null || typeof value !== 'object') return null;
+  const buys = (value as { buys?: unknown }).buys;
+  const sells = (value as { sells?: unknown }).sells;
+  if (typeof buys !== 'number' || typeof sells !== 'number') return null;
+  if (!Number.isFinite(buys) || !Number.isFinite(sells)) return null;
+  return { buys, sells };
 }
 
 export function toGemPair(raw: RawPair): GemPair {
@@ -196,7 +210,6 @@ export function toGemPair(raw: RawPair): GemPair {
     chainId: raw.chainId,
     pairAddress: raw.pairAddress,
     dexId: raw.dexId,
-    // Same as toTxnWindow: do not pass the z.infer nested object through.
     baseToken: {
       address: raw.baseToken.address,
       name: raw.baseToken.name,
@@ -217,7 +230,10 @@ export function toGemPair(raw: RawPair): GemPair {
       h6: raw.priceChange?.h6 ?? null,
       h24: raw.priceChange?.h24 ?? null,
     },
-    txns: { h1: toTxnWindow(raw.txns?.h1), h24: toTxnWindow(raw.txns?.h24) },
+    txns: {
+      h1: toTxnWindow(raw.txns?.h1),
+      h24: toTxnWindow(raw.txns?.h24),
+    },
     pairCreatedAt: raw.pairCreatedAt ?? null,
     url: raw.url ?? null,
     // Empty arrays rather than null: "this token submitted no links" is
