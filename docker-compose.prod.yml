@@ -1,0 +1,101 @@
+# Production stack for a single VPS — worker + api + Postgres (+ telegram),
+# with Caddy in front of the api for HTTPS. The web dashboard stays on
+# Vercel, so it is not built here.
+#
+# Nothing in it is tied to one host: any Linux box with Docker runs it.
+# See DEPLOY.md → "Backend — any VPS with Docker" for the walk-through, and
+# scripts/deploy-vps.sh for the one command that updates it.
+#
+# Differs from docker-compose.yml (the local dev stack) in three ways that
+# matter once it faces the internet:
+#   - Postgres is not published on a host port, and its password comes
+#     from .env rather than being the literal "crypto".
+#   - The api is reached only through Caddy, which gets a Let's Encrypt
+#     certificate on its own. The dashboard is served over HTTPS, so a
+#     plain-http api would be blocked by the browser as mixed content.
+#   - Every service restarts on its own, including after a reboot.
+
+x-db-url: &db-url postgres://crypto:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/crypto_market_health
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: crypto
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: crypto_market_health
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U crypto -d crypto_market_health']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Both worker and api migrate at boot behind an advisory lock (see
+  # db/migrate.mjs), so there is no separate migrate service here.
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: *db-url
+      GIT_COMMIT: ${GIT_COMMIT:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: *db-url
+      API_HOST: 0.0.0.0
+      API_PORT: 4000
+      GIT_COMMIT: ${GIT_COMMIT:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # Optional: exits cleanly when TELEGRAM_BOT_TOKEN is unset. Talks to the
+  # api over the compose network, never through Caddy.
+  telegram:
+    build:
+      context: .
+      dockerfile: Dockerfile.telegram
+    env_file:
+      - .env
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://api:4000
+      GIT_COMMIT: ${GIT_COMMIT:-}
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

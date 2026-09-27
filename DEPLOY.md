@@ -7,8 +7,14 @@ something Vercel's serverless functions don't provide.
 
 ```
 Vercel            → apps/web (Next.js dashboard)
-Railway           → apps/worker + apps/api + Postgres (+ apps/telegram, optional)
+Any Docker VPS    → apps/worker + apps/api + Postgres (+ apps/telegram, optional)
+                    via docker-compose.prod.yml, Caddy in front for HTTPS
 ```
+
+The backend used to run on Railway. Nothing in the code depends on it: every
+service is a plain Dockerfile configured by environment variables, so any
+host that runs containers 24/7 works. The VPS route below is the one the
+repo ships config for.
 
 ## Web dashboard — Vercel
 
@@ -16,22 +22,98 @@ Already deployed. To redeploy or set up again:
 
 1. Vercel → **Add New → Project → Import Git Repository** → `nhat111/crypto-signal`.
 2. **Root Directory**: `apps/web`. Framework auto-detects as Next.js.
-3. **Environment Variables**: `NEXT_PUBLIC_API_BASE_URL` = the Railway API's
-   public URL (see below) — this is baked in at build time, so changing it
+3. **Environment Variables**: `NEXT_PUBLIC_API_BASE_URL` = the API's
+   public HTTPS URL (`https://<API_DOMAIN>`, see below) — this is baked in at build time, so changing it
    requires a redeploy, not just a settings save.
 4. Deploy. Future pushes to the connected branch redeploy automatically.
 
-## Backend — Railway
+## Backend — any VPS with Docker
 
-Railway needs the Dashboard for two things a committed config file can't
-express: creating each service and pointing it at the right Dockerfile.
-Everything else (the Dockerfiles themselves, migrations) is already in the
-repo.
+What it needs from the machine:
 
-**Root Directory stays `/` (repo root) for every service below** — all four
-Dockerfiles (`Dockerfile.worker`, `.api`, `.telegram`) were written with a
-repo-root build context specifically so this works without per-service
-subdirectory juggling.
+- **~1GB RAM** at runtime (Postgres ~200MB + ~71MB per Node service). The
+  first build (`npm install` + esbuild) wants more — on a 1GB box add 2GB of
+  swap first.
+- **A region Binance serves.** Binance blocks US IPs (HTTP 451) — pick
+  Singapore, Tokyo, Frankfurt or similar, never a US datacenter.
+- **Ports 80 and 443 open** to the internet (Caddy's certificate check and
+  the dashboard's traffic). Nothing else needs to be open; Postgres is not
+  published.
+
+Free or cheap hosts that fit: Oracle Cloud *Always Free* (ARM, plenty of RAM
+— remember to also open 80/443 in the VCN security list, not just the
+firewall), or any ~$4–6/month VPS (Hetzner, DigitalOcean, Vultr, …).
+
+### 1. First setup
+
+```bash
+# on the VPS
+curl -fsSL https://get.docker.com | sh
+git clone https://github.com/nhat111/crypto-signal.git && cd crypto-signal
+cp .env.example .env
+```
+
+Edit `.env`:
+
+- `POSTGRES_PASSWORD` — `openssl rand -hex 24`. Letters and digits only; it
+  goes into a URL.
+- `API_DOMAIN` — a hostname pointing at the VPS. No domain of your own?
+  `api.<ip-with-dashes>.sslip.io` (e.g. `api.203-0-113-7.sslip.io`) resolves
+  to that IP with no setup, and Caddy gets a real certificate for it.
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_IDS`, `SYMBOLS`, … — same
+  variables as before, all in the one file. `DATABASE_URL` in `.env` is
+  ignored by the production stack; it is built from `POSTGRES_PASSWORD`.
+
+Then:
+
+```bash
+./scripts/deploy-vps.sh
+curl https://<API_DOMAIN>/health
+```
+
+The script pulls, exports `GIT_COMMIT` (so `/status` shows which build is
+serving — a VPS injects no commit variable on its own) and runs
+`docker compose -f docker-compose.prod.yml up -d --build`. **Run the same
+script for every later deploy.** Logs: `docker compose -f
+docker-compose.prod.yml logs -f worker` (or `api`, `telegram`, `caddy`).
+
+Last step: in Vercel set `NEXT_PUBLIC_API_BASE_URL=https://<API_DOMAIN>`
+and **Redeploy** — it is baked in at build time.
+
+### 2. Bringing the data over from Railway (if it is still reachable)
+
+Railway keeps a stopped project's volumes for a while after a trial ends.
+If you can still open the Postgres service, copy its **public** connection
+URL (Postgres → Connect → Public Network) and on the VPS:
+
+```bash
+# stop the writers so the restore lands on a quiet database
+docker compose -f docker-compose.prod.yml stop worker api telegram
+
+docker run --rm postgres:16-alpine pg_dump --no-owner --no-acl -Fc \
+  "<railway public DATABASE_URL>" > railway.dump
+
+docker compose -f docker-compose.prod.yml exec -T postgres \
+  pg_restore --clean --if-exists --no-owner -U crypto -d crypto_market_health < railway.dump
+
+./scripts/deploy-vps.sh
+```
+
+If Railway has already deleted it, skip this: the worker starts from an
+empty database, and `BACKFILL_DAYS=30` (see "Running the historical replay"
+below) recovers the last 30 days — the most Binance serves for open interest.
+
+### Settings that now live in `.env`
+
+Everywhere below that says "worker service → **Variables**", on the VPS it
+means: edit `.env`, then `./scripts/deploy-vps.sh` (or `docker compose -f
+docker-compose.prod.yml up -d` to apply env changes without a rebuild). All
+services read the same `.env`, so a variable meant for the worker is also
+visible to the api — harmless, since each only reads its own.
+
+You also have a shell now, so the one-off jobs no longer need the
+environment-variable trick: `docker compose -f docker-compose.prod.yml exec
+worker node backfill.cjs` runs the replay directly.
 
 ### Redeploying: order doesn't matter
 
@@ -51,63 +133,34 @@ migration first — the CMD chain means a migration error stops the service
 from starting at all, deliberately, rather than letting it serve queries
 against a half-applied schema.
 
-### 1. Create the project and databases
+### Worker configuration
 
-1. Railway → **New Project → Deploy from GitHub repo** → `nhat111/crypto-signal`.
-   Railway will auto-guess a build for the first service — ignore/delete
-   that guess, you'll configure each service manually below.
-2. **New → Database → PostgreSQL** (adds a `Postgres` service with
-   `DATABASE_URL` auto-generated).
+- (optional) `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_IDS` for proactive
+  alert pushes from the worker itself.
+- Everything else (`SYMBOLS`, `TIMEFRAMES`, all `THRESH_*`) has working
+  defaults — only set them if you want to override.
+- `FUTURES_ONLY_SYMBOLS` — comma-separated symbols with a Binance Futures
+  listing but no Spot listing (e.g. `HYPEUSDT`). Reduced feature set, no
+  Health Score, no fabricated spot data — see ASSUMPTIONS.md §15.
 
-   There is deliberately **no Redis service**. An earlier design cached the
-   latest snapshot there, but nothing ever read it back — the API queries
-   Postgres directly. It was removed rather than kept "in case", because on
-   Railway an idle service still bills for its memory every minute.
+**Symbols are read by the worker only.** The worker registers each one in
+the `symbols` table at startup, and `api` reads the list back from there
+(`getEnabledSymbols`), so `api`/`web` need no symbol config of their own.
+The `telegram` service reads the list from the API at boot to register its
+per-symbol commands — **restart it after adding a symbol** or the new
+`/command` won't exist yet.
 
-### 2. Worker service (required — this is the only process that talks to Binance)
+First boot runs migrations automatically (`db/migrate.mjs`, see the
+`Dockerfile.worker` CMD) then starts backfilling history — check logs for
+`"backfill complete"` per symbol/timeframe.
 
-1. On the auto-created service (or **New → GitHub Repo** again for a fresh
-   one): **Settings → Source** — Root Directory empty/`/`.
-2. **Settings → Build** — Builder: **Dockerfile**, Dockerfile Path:
-   `Dockerfile.worker`.
-3. **Variables** tab, add:
-   - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}`
-   - (optional) `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_IDS` if you want
-     proactive alert pushes from the worker itself.
-   - Everything else (`SYMBOLS`, `TIMEFRAMES`, all `THRESH_*`) has working
-     defaults — only set them if you want to override.
-   - `FUTURES_ONLY_SYMBOLS` — comma-separated symbols with a Binance
-     Futures listing but no Spot listing (e.g. `HYPEUSDT`). Reduced feature
-     set, no Health Score, no fabricated spot data — see ASSUMPTIONS.md §15.
+`curl https://<API_DOMAIN>/health` should return `{"status":"ok",...}` (or
+`"degraded"` with `no_data_yet` right after the worker's first boot).
 
-   **Symbols are configured on the `worker` service only.** The worker
-   registers each one in the `symbols` table at startup, and `api` reads
-   the list back from there (`getEnabledSymbols`), so `api`/`web` need no
-   symbol config of their own. The `telegram` service reads the list from
-   the API at boot to register its per-symbol commands — **restart it after
-   adding a symbol** or the new `/command` won't exist yet.
-4. Deploy. First boot runs migrations automatically (`db/migrate.mjs`, see
-   the `Dockerfile.worker` CMD) then starts backfilling history — check logs
-   for `"backfill complete"` per symbol/timeframe.
-
-### 3. API service (required — this is what apps/web talks to)
-
-1. **New → GitHub Repo** → same repo again, as a second service.
-2. **Settings → Build** — Dockerfile Path: `Dockerfile.api`.
-3. **Variables**: same `DATABASE_URL` reference as the
-   worker, plus `API_HOST=0.0.0.0`, `API_PORT=4000` (already the defaults,
-   fine to leave unset).
-4. **Settings → Networking → Generate Domain** — exposes it publicly on
-   port 4000. Copy that URL — it's what Vercel's
-   `NEXT_PUBLIC_API_BASE_URL` should point to.
-5. Sanity check once deployed: `curl https://<that-domain>/health` should
-   return `{"status":"ok",...}` (or `"degraded"` with `no_data_yet` right
-   after the worker's first deploy, before it's produced a snapshot yet).
-
-**Do not point Railway's own healthcheck at `/health`.** It reports on
+**Do not wire `/health` as a container healthcheck that restarts the api.** It reports on
 things outside the api — collector freshness and the worker's heartbeat —
 so it answers "is the system working", not "is this process alive". Wired
-as a platform healthcheck it would have Railway restart the *api* when the
+as a platform healthcheck it would restart the *api* when the
 *worker* dies, which fixes nothing and hides the api's own state behind
 someone else's. Point external uptime monitoring at it by all means; that
 is what it is for.
@@ -164,25 +217,13 @@ signal alerts armed for timeframes  alertTimeframes=["1h","4h"] collected=["5m",
   market.
 - No row at all — the worker predates the field and has not redeployed.
 
-### 4. Telegram bot (optional)
+### Telegram bot (optional)
 
-1. **New → GitHub Repo** → same repo, third service.
-2. Dockerfile Path: `Dockerfile.telegram`.
-3. Variables: `TELEGRAM_BOT_TOKEN` (from @BotFather),
-   `NEXT_PUBLIC_API_BASE_URL` = the API service's **private** Railway URL
-   (`http://<api-service-name>.railway.internal:4000` — check the API
-   service's Settings → Networking → Private Networking for the exact
-   hostname) so bot→api traffic stays inside Railway's network instead of
-   round-tripping through the public internet.
-4. If `TELEGRAM_BOT_TOKEN` is unset, this service just logs a warning and
-   exits cleanly — safe to skip entirely for now.
-
-### 5. Point the web dashboard at it
-
-Back in Vercel: **Settings → Environment Variables** → set
-`NEXT_PUBLIC_API_BASE_URL` to the API service's public Railway domain from
-step 3.4 → **Redeploy** (env var changes don't apply retroactively to an
-already-built deployment).
+Runs as the `telegram` service in `docker-compose.prod.yml` and talks to the
+api over the compose network (`http://api:4000`). If `TELEGRAM_BOT_TOKEN` is
+unset it logs a warning and exits — safe to leave in. Restart it after
+adding a symbol so the new `/command` is registered:
+`docker compose -f docker-compose.prod.yml restart telegram`.
 
 ## Did the deploy actually land?
 
@@ -204,7 +245,7 @@ curl -s <api-url>/health | jq '{status, version}'
   "status": "ok",
   "version": {
     "commit": "66a894f",
-    "commitSource": "RAILWAY_GIT_COMMIT_SHA",
+    "commitSource": "GIT_COMMIT",
     "startedAt": 1788019673995,
     "uptimeMs": 918,
     "schema": { "latest": "010_job_health.sql", "appliedAt": 1788019671224, "count": 10 }
@@ -244,14 +285,14 @@ kênh" can sit over a channel that will never receive anything.
 
 To settle it, send a real message:
 
-1. Worker service → **Variables** → add `TELEGRAM_ALERT_TEST` = `1`
-2. Redeploy the worker (or let the variable change redeploy it)
+1. Add `TELEGRAM_ALERT_TEST=1` to `.env`
+2. `docker compose -f docker-compose.prod.yml up -d worker`
 3. A message arrives in each configured chat within a few seconds of boot
 4. The logs say `alert self-test: every chat received the message`, or
    `alert self-test: some chats did NOT receive the message` naming each
    failing id and Telegram's own reason — "chat not found" means the id is
    wrong, "bot was blocked by the user" means somebody blocked the bot
-5. Remove the variable, or it sends again on every deploy
+5. Remove the variable, or it sends again on every restart
 
 `alert self-test asked for, but no chat ids are configured` means
 `TELEGRAM_ALERT_CHAT_IDS` is empty — a different problem from a wrong id,
@@ -272,11 +313,14 @@ one above it:
 
 ## Running the historical replay
 
-Railway gives no shell inside a running container, so the replay is
-triggered by an environment variable instead:
+With a shell on the VPS, the simplest way is to run it directly:
+`docker compose -f docker-compose.prod.yml exec worker node backfill.cjs`.
 
-1. Worker service → **Variables** → add `BACKFILL_DAYS` = `30`
-2. Redeploy the worker
+It can also be triggered by an environment variable (the way it was done on
+Railway, which had no shell):
+
+1. Add `BACKFILL_DAYS=30` to `.env`
+2. `docker compose -f docker-compose.prod.yml up -d worker`
 3. Watch the logs for `history replay complete`, then check `/status` →
    **Tác vụ nền** for `history_backfill`
 4. Remove the variable when you are done (optional — see below)
@@ -323,19 +367,13 @@ being guessed at, so a typo cannot quietly become some arbitrary window.
 last 30 days only, so every day the replay goes unrun is a day of history
 that can never be recovered.
 
-If you do have a shell (Railway CLI, or running locally against the
-production database), the same job is `node backfill.cjs` inside the worker
+From a laptop against the production database, the same job is `node backfill.cjs` inside the worker
 image, or `npm run backfill -w @crypto-signal/worker` from a clone.
 
-## Keeping it inside Railway's $5 credit
+## Keeping it small
 
-Railway bills memory and CPU **per minute, per service**, so the thing that
-costs money here is how many processes sit running all month — not disk, and
-not how much data the backfill wrote.
-
-Roughly what each part costs (Railway's published rate is about $10 per
-GB-month of memory; check your own usage page for the real figure, these are
-measured RSS numbers from this app, not guesses):
+On a VPS the bill is flat, so the question is whether it fits in RAM, not
+per-minute cost. Measured RSS:
 
 | Service     | Memory | Notes                                        |
 | ----------- | ------ | -------------------------------------------- |
@@ -343,30 +381,13 @@ measured RSS numbers from this app, not guesses):
 | worker      | ~71MB  | The only process that must run 24/7.         |
 | api         | ~71MB  | Needed by the web dashboard and the bot.     |
 | telegram    | ~71MB  | Optional — the dashboard works without it.   |
+| caddy       | ~20MB  | HTTPS for the api.                           |
 
-Two things were removed for exactly this reason:
-
-- **Redis is gone.** The worker used to write a latest-snapshot cache there
-  that nothing ever read — the API queries Postgres directly. A whole
-  service billed every minute for nothing.
-- **The services no longer run `tsx` in production.** They ran TypeScript
-  through a transpiler at boot; each one now runs a pre-bundled `.cjs` on
-  plain node. Measured: ~88MB → ~71MB per service.
-
-If you are still over budget, in order of how much they save versus how much
-they cost you:
-
-1. **Drop the Telegram service** (~71MB). Alerts stop; everything else works.
-2. **Trim `TIMEFRAMES`.** Four timeframes means four times the candles,
-   metrics and health rows. `5m,1h` keeps the default view and the daily
-   picture while cutting write volume by more than half.
-3. **Do not add symbols.** Each one adds websocket streams, REST polls and
-   rows on every timeframe, forever. Three is what the $5 tier comfortably
-   holds.
-
-Storage is genuinely not the concern: the whole schema grows on the order of
-50MB a month at three symbols, and Railway charges cents per GB-month for it.
-The 30-day historical replay adds roughly 60MB once.
+If the box is tight: drop the Telegram service, trim `TIMEFRAMES`
+(`5m,1h` cuts write volume by more than half), and do not add symbols
+casually — each adds websocket streams, REST polls and rows on every
+timeframe. Storage grows roughly 50MB a month at three symbols; the 30-day
+replay adds ~60MB once.
 
 ## Enabling the small-cap discovery scanner (optional)
 

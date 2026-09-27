@@ -1,0 +1,8 @@
+# HTTPS in front of the api. Caddy requests and renews the certificate by
+# itself; all it needs is API_DOMAIN pointing at this machine and ports
+# 80/443 open. No domain? <ip-with-dashes>.sslip.io resolves to that IP
+# and works here, e.g. api.203-0-113-7.sslip.io.
+{$API_DOMAIN} {
+	encode gzip
+	reverse_proxy api:4000
+}
