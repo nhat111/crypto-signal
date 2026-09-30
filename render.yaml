@@ -1,0 +1,20 @@
+# Render Blueprint — free, no credit card. worker + api (+ telegram) run in
+# one free web service (Dockerfile.allinone). Postgres lives elsewhere
+# (Supabase free) because Render's free Postgres is deleted after 30 days.
+# See DEPLOY.md → "Free hosting without Railway".
+services:
+  - type: web
+    name: crypto-signal
+    runtime: docker
+    plan: free
+    # NOT a US region: Binance answers US IPs with 451 "restricted location".
+    region: singapore
+    dockerfilePath: ./Dockerfile.allinone
+    dockerContext: .
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_ALERT_CHAT_IDS
+        sync: false
