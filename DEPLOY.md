@@ -368,6 +368,53 @@ Storage is genuinely not the concern: the whole schema grows on the order of
 50MB a month at three symbols, and Railway charges cents per GB-month for it.
 The 30-day historical replay adds roughly 60MB once.
 
+## Free hosting without Railway (no credit card)
+
+When the Railway trial runs out, the whole backend fits on free tiers that
+ask for no card. The code is unchanged — only the packaging:
+`Dockerfile.allinone` runs worker + api (+ telegram) in **one** container
+(`scripts/start-all.sh`), because free hosts give one always-on service,
+not three.
+
+```
+Vercel (free)          → apps/web                      (unchanged)
+Render free web service → worker + api (+ telegram)     (Dockerfile.allinone)
+Supabase free          → Postgres
+cron-job.org (free)    → pings /health so Render never sleeps
+```
+
+1. **Postgres — Supabase.** New project, region Singapore. Project →
+   **Connect** → **Session pooler** URL (port 5432; *not* the transaction
+   pooler on 6543 — migrations take an advisory lock, which needs a session;
+   *not* the direct URL, which is IPv6-only). Append `?sslmode=no-verify`.
+   500MB free is roughly nine months at three symbols (~50MB/month).
+   Neon's free tier is not a fit: the worker writes all day, so the compute
+   never scales to zero and burns through the monthly compute hours.
+2. **Backend — Render.** New → **Blueprint** → this repo (reads
+   `render.yaml`), or New → Web Service → Docker, Dockerfile path
+   `Dockerfile.allinone`, instance type **Free**, region **Singapore or
+   Frankfurt — never a US region**: Binance answers US IPs with 451
+   "Service unavailable from a restricted location", and the worker then
+   collects nothing. Set `DATABASE_URL`, and optionally
+   `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ALERT_CHAT_IDS` and any worker variable
+   from the Railway sections above (all on this one service now). `PORT` is
+   set by Render and the api listens on it.
+3. **Keep it awake.** A free Render service sleeps after 15 minutes without
+   an inbound request — and a sleeping worker collects nothing. On
+   cron-job.org, GET `https://<service>.onrender.com/health` every 10
+   minutes. 750 free instance-hours a month covers exactly one service
+   running all month, which is why everything is in one container.
+4. **Web — Vercel.** Set `NEXT_PUBLIC_API_BASE_URL` to the Render URL and
+   **Redeploy**.
+
+Moving existing data is optional: `pg_dump` the Railway database into
+Supabase before the trial ends, or start fresh and run the historical
+replay (`BACKFILL_DAYS=30`, see above) — Binance only serves 30 days of
+open-interest history either way.
+
+If api or worker exits, `start-all.sh` stops the container so Render
+restarts it; the bot restarts on its own and never takes the collector down.
+
 ## Enabling the small-cap discovery scanner (optional)
 
 A separate, opt-in subsystem — see ASSUMPTIONS.md §16 for what it can and
