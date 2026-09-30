@@ -40,9 +40,10 @@ const TOC = [
   { id: 'vi-du-2', label: 'Ví dụ 2: phá vùng rồi test lại' },
   { id: 'vi-du-3', label: 'Ví dụ 3: khi không nên vào' },
   { id: 'vi-du-4', label: 'Ví dụ 4: vì sao TA vô dụng với gem' },
+  { id: 'narrative', label: 'Trade theo narrative — không phải đầu tư' },
   { id: 'dashboard', label: 'Kết hợp chart với dashboard' },
   { id: 'kiem-chung', label: 'Ghi chép và kiểm chứng' },
-  { id: 'sai-lam', label: 'Sáu sai lầm hay gặp' },
+  { id: 'sai-lam', label: 'Tám sai lầm hay gặp' },
   { id: 'lo-trinh', label: 'Lộ trình 7 ngày' },
 ];
 
@@ -961,6 +962,41 @@ export default function TaGuidePage() {
             token mà ba ví nắm 60% nguồn cung, cái gọi là &ldquo;vùng hỗ trợ&rdquo; chỉ là chỗ một người tình cờ dừng
             tay. Ngày mai họ đổi ý thì vùng đó biến mất.
           </p>
+          <h3 className="pt-2 text-base font-bold text-slate-100">Thay chart bằng năm câu hỏi về token</h3>
+          <p>
+            Chart của gem không nói được nhiều, nhưng <Term>cấu trúc của chính token</Term> thì nói được: ai đang cầm,
+            và ai sắp được phép bán. Trả lời trước khi mua:
+          </p>
+          <Table
+            head={['Hỏi', 'Xem ở đâu', 'Dấu hiệu xấu']}
+            rows={[
+              [
+                <Term key="a">FDV so với vốn hoá</Term>,
+                'Lookup, thẻ Gems, CoinGecko',
+                'FDV gấp nhiều lần vốn hoá = phần lớn token chưa được bán ra, và sẽ được bán ra.',
+              ],
+              [
+                <Term key="b">Lịch mở khoá</Term>,
+                'Trang của dự án, CoinGecko, Tokenomist',
+                'Một đợt mở khoá lớn trong vài tuần tới. Người nhận token rẻ thường bán ngay.',
+              ],
+              [
+                <Term key="c">Team và cố vấn</Term>,
+                'Tài liệu tokenomics của dự án',
+                'Phần của cố vấn mở khoá hết ngay ngày ra mắt, hoặc team không bị khoá (vest) gì.',
+              ],
+              [
+                <Term key="d">Ai đang cầm</Term>,
+                'Tab Holders trên DexScreener hoặc explorer',
+                'Vài ví nắm phần lớn nguồn cung — một người đổi ý là giá sập.',
+              ],
+              [
+                <Term key="e">Quyền của dev</Term>,
+                'Lookup (quét an toàn hợp đồng)',
+                'Dev còn quyền đúc thêm token, hoặc đóng băng ví người mua.',
+              ],
+            ]}
+          />
           <Takeaway>
             Với gem, câu hỏi không phải &ldquo;vào ở đâu&rdquo; mà là &ldquo;có bị rút thảm không, và nếu mất trắng
             thì mình có sao không&rdquo;. Đó là việc của trang{' '}
@@ -968,6 +1004,78 @@ export default function TaGuidePage() {
               Gems
             </Link>{' '}
             và cột Gem Risk, không phải của chart.
+          </Takeaway>
+        </Section>
+
+        {/* ---------------------------------------------------------- */}
+        <Section id="narrative" eyebrow="Dòng tiền" title="Trade theo narrative — không phải đầu tư">
+          <p>
+            <Term>Narrative</Term> là câu chuyện thị trường đang chú ý: AI, memecoin trên một chain nào đó, một mảng
+            mới vừa có sản phẩm chạy được. Trong thị trường mà phần lớn altcoin cứ tạo đáy mới, thường chỉ có{' '}
+            <Term>một đến hai mảng</Term> được tiền đổ vào cùng lúc. Đọc được mảng đó là đọc được dòng tiền đang nằm ở
+            đâu.
+          </p>
+          <p>
+            Nhưng phải gọi đúng tên việc mình đang làm. Mua một coin vì nó đang nằm trong câu chuyện nóng là{' '}
+            <Term>đánh theo đà</Term>, không phải đầu tư. Coin sống nhờ sự chú ý; hết câu chuyện thì hết người mua,
+            và phần lớn không bao giờ quay lại giá cũ.
+          </p>
+          <Table
+            head={['', 'Đầu tư', 'Đánh theo narrative']}
+            rows={[
+              ['Lý do mua', 'Dự án có giá trị sẽ còn đó sau vài năm', 'Đang có nhiều người chú ý và mua'],
+              ['Giữ bao lâu', 'Lâu, chấp nhận giảm sâu giữa chừng', 'Tới khi câu chuyện nguội — vài ngày tới vài tuần'],
+              ['Chốt lời', 'Hiếm khi', <Term key="a">Chốt dần khi còn đang tăng</Term>],
+              ['Cắt lỗ', 'Khi luận điểm về dự án sai', <Term key="b">Khi câu chuyện hết, hoặc cấu trúc giá gãy</Term>],
+              ['Cỡ lệnh', 'Theo kế hoạch dài hạn', <Term key="c">Nhỏ — tiền mất hết vẫn không sao</Term>],
+            ]}
+          />
+
+          <h3 className="pt-2 text-base font-bold text-slate-100">Thấy một coin đang xanh vài chục phần trăm thì làm gì</h3>
+          <Steps
+            items={[
+              <>
+                <Term>Tìm lý do.</Term> Search mã coin trên X (Twitter). Có ai viết ra <Term>vì sao</Term> nó đáng mua
+                không — một luận điểm, không phải chỉ &ldquo;mua đi, sắp x10&rdquo;. Hô kèo mà không có lý do thì coi
+                như không có gì.
+              </>,
+              <>
+                <Term>Xem ai viết.</Term> Người đó có lịch sử phân tích đúng không, hay tuần nào cũng hô một coin mới?
+                Được những người có tiếng trong giới theo dõi không?
+              </>,
+              <>
+                <Term>Tự đánh giá luận điểm.</Term> Nó có hợp với câu chuyện thị trường đang chú ý không? Nếu chính bro
+                không giải thích lại được lý do bằng một câu, thì chưa phải lúc mua.
+              </>,
+              <>
+                <Term>Kiểm tra token.</Term> Dán địa chỉ hoặc mã vào{' '}
+                <Link href="/lookup" className="font-semibold text-sky-300 underline decoration-sky-500/40 underline-offset-2">
+                  Lookup
+                </Link>{' '}
+                để xem thanh khoản và quét an toàn, rồi trả lời năm câu hỏi ở Ví dụ 4.
+              </>,
+              <>
+                <Term>Ghi vào Journal trước khi bấm mua</Term> — ô <Term>Source</Term> là người đưa ra kèo, ô{' '}
+                <Term>Thesis</Term> là lý do. Sau vài chục lệnh, bảng <Term>By source</Term> sẽ cho biết nguồn nào
+                thật sự làm bro có lãi.
+              </>,
+            ]}
+          />
+
+          <Warning>
+            <p>
+              <Term>Coi chừng làm thanh khoản cho người khác.</Term> Tài khoản nào cứ vài ngày lại hô một coin mới thì
+              họ cần người mua để họ bán. Trader giỏi hiếm khi đánh quá chục coin một năm — số kèo càng nhiều, xác
+              suất bro là người mua cuối cùng càng cao.
+            </p>
+            <p>
+              Và đừng bán hết coin đang giữ để dồn vào một câu chuyện vừa nổi. Tuần sau thị trường có thể đã chuyển
+              sang chuyện khác.
+            </p>
+          </Warning>
+          <Takeaway>
+            Đánh narrative bằng tiền nhỏ, chốt dần khi còn xanh, cắt khi câu chuyện hết. Và luôn biết mình đang đánh
+            theo đà, không phải đang đầu tư.
           </Takeaway>
         </Section>
 
@@ -1086,7 +1194,7 @@ export default function TaGuidePage() {
         </Section>
 
         {/* ---------------------------------------------------------- */}
-        <Section id="sai-lam" eyebrow="Cạm bẫy" title="Sáu sai lầm hay gặp">
+        <Section id="sai-lam" eyebrow="Cạm bẫy" title="Tám sai lầm hay gặp">
           <Table
             head={['Sai lầm', 'Nghe như thế nào trong đầu', 'Thực tế']}
             rows={[
@@ -1119,6 +1227,16 @@ export default function TaGuidePage() {
                 <Term key="f">Một lệnh thắng = phương pháp đúng</Term>,
                 '“Ăn rồi, cách này chuẩn.”',
                 'n = 1. Cần vài chục lệnh mới nói được gì. Cái bẫy này nguy hiểm nhất vì nó khiến bro tăng cỡ lệnh ngay trước chuỗi thua.',
+              ],
+              [
+                <Term key="g">Ôm coin của narrative đã chết</Term>,
+                '“Nó từng x10, kiểu gì chẳng quay lại.”',
+                'Coin chạy theo câu chuyện sống nhờ sự chú ý. Hết chuyện thì hết người mua — phần lớn không bao giờ về lại đỉnh cũ. Mua thêm lúc này là trả tiền để ở lại lâu hơn trong một lệnh đã sai.',
+              ],
+              [
+                <Term key="h">Đánh tiếp ngay sau chuỗi thua</Term>,
+                '“Phải gỡ lại hôm nay.”',
+                'Thua liền mấy lệnh là lúc đầu óc tệ nhất để ra quyết định. Nghỉ vài ngày, mở Journal đọc lại lý do của từng lệnh, ghi ra giấy cái gì lặp lại. Thị trường vẫn ở đó khi bro quay lại.',
               ],
             ]}
           />
