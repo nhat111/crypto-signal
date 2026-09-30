@@ -6,7 +6,7 @@ import { GuideTabs } from '@/components/guide/GuideTabs';
 export const metadata: Metadata = {
   title: 'Phương pháp · Market Health Monitor',
   description:
-    'Hệ thống đo gì, lấy dữ liệu từ đâu, 9 quy tắc tín hiệu, cách tính Health và Rủi ro đòn bẩy, và những giới hạn đã biết.',
+    'Hệ thống đo gì, lấy dữ liệu từ đâu, 11 quy tắc tín hiệu, cách tính Health và Rủi ro đòn bẩy, và những giới hạn đã biết.',
 };
 
 const TOC = [
@@ -14,7 +14,7 @@ const TOC = [
   { id: 'du-lieu', label: 'Dữ liệu lấy từ đâu' },
   { id: 'luong', label: 'Luồng xử lý' },
   { id: 'health', label: 'Health và Rủi ro đòn bẩy' },
-  { id: 'tin-hieu', label: '9 quy tắc tín hiệu' },
+  { id: 'tin-hieu', label: '11 quy tắc tín hiệu' },
   { id: 'confidence', label: 'Confidence và Severity' },
   { id: 'hieu-qua', label: 'Đo hiệu quả' },
   { id: 'trang-thai', label: 'Độ mới dữ liệu và trạng thái' },
@@ -69,7 +69,7 @@ export default function MethodologyPage() {
                 <code className={CODE}>POSSIBLE</code> là để nói thẳng rằng đó là khả năng, không phải khẳng định.
               </>,
               <>
-                <Term>Không có AI trong luồng sinh tín hiệu.</Term> Chín quy tắc là ngưỡng số cố định, đọc được trong
+                <Term>Không có AI trong luồng sinh tín hiệu.</Term> Mười một quy tắc là ngưỡng số cố định, đọc được trong
                 mã, chạy y hệt nhau mỗi lần với cùng đầu vào.
               </>,
             ]}
@@ -117,7 +117,7 @@ export default function MethodologyPage() {
                 <Term>điểm chất lượng dữ liệu</Term>.
               </>,
               'Tính chỉ báo: CVD, OI, funding, basis, bất thường khối lượng, bất thường thanh lý.',
-              'Chạy 9 quy tắc tín hiệu, độc lập với nhau.',
+              'Chạy 11 quy tắc tín hiệu, độc lập với nhau.',
               'Tính Health và Rủi ro đòn bẩy — hai trục riêng.',
               'Ghi vào cơ sở dữ liệu, rồi API phục vụ Web và Telegram.',
             ]}
@@ -161,9 +161,9 @@ export default function MethodologyPage() {
         </Section>
 
         {/* ---------------------------------------------------------- */}
-        <Section id="tin-hieu" eyebrow="Quy tắc" title="9 quy tắc tín hiệu">
+        <Section id="tin-hieu" eyebrow="Quy tắc" title="11 quy tắc tín hiệu">
           <p>
-            Chín quy tắc chạy <Term>độc lập</Term>. Cùng lúc có thể nổ nhiều tín hiệu, và hệ thống{' '}
+            Mười một quy tắc chạy <Term>độc lập</Term>. Cùng lúc có thể nổ nhiều tín hiệu, và hệ thống{' '}
             <Term>không chọn ra tín hiệu thắng</Term> — mâu thuẫn giữa chúng là thông tin, không phải lỗi cần dọn.
           </p>
           <Table

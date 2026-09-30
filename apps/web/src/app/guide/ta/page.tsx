@@ -14,6 +14,7 @@ import {
   RSI_FIG,
   STOP_INSIDE,
   STRUCTURE,
+  TREND_BREAK,
 } from '@/components/guide/taFigures';
 
 export const metadata: Metadata = {
@@ -27,6 +28,8 @@ const TOC = [
   { id: 'spot', label: 'Spot khác futures ở đâu' },
   { id: 'khung', label: 'Vì sao 1D + 4H' },
   { id: 'quy-trinh', label: 'Quy trình đọc chart' },
+  { id: 'het-xu-huong', label: 'Khi nào xu hướng kết thúc' },
+  { id: 'btc', label: 'BTC dẫn đường cho altcoin' },
   { id: 'vung-gia', label: 'Vùng giá quan trọng' },
   { id: 'chi-bao', label: 'Chỉ ba chỉ báo' },
   { id: 'bat-chi-bao', label: 'Cách bật EMA và RSI lên chart' },
@@ -37,6 +40,7 @@ const TOC = [
   { id: 'vi-du-2', label: 'Ví dụ 2: phá vùng rồi test lại' },
   { id: 'vi-du-3', label: 'Ví dụ 3: khi không nên vào' },
   { id: 'vi-du-4', label: 'Ví dụ 4: vì sao TA vô dụng với gem' },
+  { id: 'dashboard', label: 'Kết hợp chart với dashboard' },
   { id: 'kiem-chung', label: 'Ghi chép và kiểm chứng' },
   { id: 'sai-lam', label: 'Sáu sai lầm hay gặp' },
   { id: 'lo-trinh', label: 'Lộ trình 7 ngày' },
@@ -231,6 +235,108 @@ export default function TaGuidePage() {
           <Takeaway>
             Không viết được điểm sai thì không phải là kế hoạch, mà là hy vọng.
           </Takeaway>
+        </Section>
+
+        {/* ---------------------------------------------------------- */}
+        <Section id="het-xu-huong" eyebrow="Theo dõi xu hướng" title="Khi nào xu hướng kết thúc">
+          <p>
+            Nhận ra một xu hướng tăng thì dễ. Khó là nhận ra lúc nó <Term>đã hỏng</Term> — vì lúc đó chart vẫn còn
+            trông khá đẹp, và ai cũng muốn tin đây chỉ là một nhịp hồi.
+          </p>
+          <p>
+            Định nghĩa ở bước 1 đã chứa sẵn câu trả lời: xu hướng tăng là <Term>đỉnh sau cao hơn và đáy sau cao
+            hơn</Term>. Nó kết thúc khi một trong hai vế đó gãy, theo đúng thứ tự này:
+          </p>
+          <Steps
+            items={[
+              <>
+                <Term>Cảnh báo: đỉnh thấp hơn.</Term> Giá bật lên nhưng không vượt được đỉnh cũ. Lực mua đã yếu đi, nhưng
+                cấu trúc <Term>chưa</Term> hỏng — đáy vẫn đang cao dần. Không mua thêm, chưa cần bán.
+              </>,
+              <>
+                <Term>Xác nhận: đóng nến dưới đáy gần nhất.</Term> Đáy cao hơn gần nhất là chỗ người mua đã từng đỡ.
+                Giá đóng hẳn xuống dưới nó nghĩa là lần này họ không đỡ nữa. Từ đây không còn gọi là xu hướng tăng.
+              </>,
+              <>
+                <Term>Sau đó: đứng ngoài, chờ cấu trúc mới.</Term> Không phải &ldquo;chắc sắp đảo chiều giảm&rdquo; —
+                phần lớn trường hợp giá sẽ đi ngang một thời gian. Chờ lại một chuỗi đáy cao dần mới rồi mới tính tiếp.
+              </>,
+            ]}
+          />
+          <CandleChart
+            caption="Đỉnh 2 cao hơn Đỉnh 1, Đáy 2 cao hơn Đáy 1 — xu hướng tăng còn nguyên. Rồi giá bật lên 114, không vượt được 116: đỉnh thấp hơn, cảnh báo. Hai nến sau giá đóng ở 104, dưới Đáy 2 (106): cấu trúc tăng đã hỏng."
+            candles={TREND_BREAK.candles}
+            domain={TREND_BREAK.domain}
+            levels={TREND_BREAK.levels}
+            markers={TREND_BREAK.markers}
+          />
+          <Warning>
+            <p>
+              <Term>Râu nến chọc xuống không tính, phải là giá đóng.</Term> Giá quét xuống dưới đáy rồi đóng lại phía
+              trên là chuyện xảy ra suốt — đó là vùng hỗ trợ đang làm việc, không phải hỏng. Và đọc trên{' '}
+              <Term>1D</Term>, không phải 4H: một nến 4H đóng dưới đáy của khung 4H chỉ là một nhịp rung trong xu hướng
+              lớn.
+            </p>
+          </Warning>
+          <p>
+            Xu hướng giảm thì lật ngược lại: <Term>đáy cao hơn</Term> là cảnh báo đầu tiên, và <Term>đóng nến trên
+            đỉnh gần nhất</Term> mới là xác nhận giảm đã hết. Với spot, đó cũng là lúc sớm nhất nên bắt đầu tìm lệnh
+            mua — không phải lúc giá &ldquo;đã giảm nhiều rồi&rdquo;.
+          </p>
+          <p>
+            <Term>Khối lượng cho biết sớm hơn một chút.</Term> Trong xu hướng tăng khoẻ, các nến tăng thường có khối
+            lượng lớn hơn các nến giảm. Nếu giá vẫn lên mà khối lượng mỗi nhịp tăng một nhỏ dần, còn các nhịp giảm
+            lại nặng dần, thì lực mua đang cạn trước khi cấu trúc kịp gãy.
+          </p>
+          <Takeaway>
+            Đỉnh thấp hơn là lời cảnh báo. Đóng nến dưới đáy gần nhất là kết luận. Đừng hành động theo cái đầu như
+            thể nó là cái sau, và cũng đừng phớt lờ cái sau vì tiếc.
+          </Takeaway>
+        </Section>
+
+        {/* ---------------------------------------------------------- */}
+        <Section id="btc" eyebrow="Bối cảnh" title="BTC dẫn đường cho altcoin">
+          <p>
+            Phần lớn altcoin đi theo BTC. Khi BTC giảm mạnh, gần như cả thị trường giảm theo, và thường giảm{' '}
+            <Term>sâu hơn</Term> BTC. Một setup altcoin đẹp tới đâu cũng khó chạy nổi khi BTC đang rơi.
+          </p>
+          <p>
+            Nên trước khi đọc chart của một altcoin, đọc <Term>chart 1D của BTC</Term> trước — đúng quy trình ở trên,
+            chỉ đổi sang BTC:
+          </p>
+          <Table
+            head={['BTC trên 1D', 'Altcoin có setup đẹp', 'Nên làm gì']}
+            rows={[
+              ['Xu hướng tăng, trên EMA200', 'Có', 'Được phép vào theo kế hoạch bình thường.'],
+              [
+                'Đi ngang',
+                'Có',
+                'Vào được, nhưng giảm cỡ lệnh hoặc chỉ nhận setup có R:R từ 1:3 trở lên.',
+              ],
+              [
+                <Term key="a">Xu hướng giảm, dưới EMA200</Term>,
+                'Có',
+                <span key="b" className="text-rose-300">
+                  Bỏ qua. Setup đẹp trên altcoin lúc này thường chỉ là nhịp hồi trước khi rơi tiếp theo BTC.
+                </span>,
+              ],
+            ]}
+          />
+          <Warning>
+            <p>
+              Đôi khi một altcoin tăng ngược chiều BTC vì có tin riêng — niêm yết sàn mới, nâng cấp mạng, được quỹ
+              lớn mua. Những cú đó có thật, nhưng <Term>khó lường và đảo chiều nhanh</Term>. Đừng lấy vài trường
+              hợp hiếm để bỏ quy tắc chung.
+            </p>
+          </Warning>
+          <p>
+            Trang{' '}
+            <Link href="/" className="font-semibold text-sky-300 underline decoration-sky-500/40 underline-offset-2">
+              Overview
+            </Link>{' '}
+            luôn có BTC ở thẻ đầu tiên. Nhìn Health và Risk của BTC trước khi nhìn tới coin khác cũng là một cách
+            làm bước này nhanh.
+          </p>
         </Section>
 
         {/* ---------------------------------------------------------- */}
@@ -670,10 +776,10 @@ export default function TaGuidePage() {
           <Warning>
             <p>
               <Term>Phí giao dịch ăn vào R.</Term> Spot trên Binance khoảng 0,1% mỗi chiều, khứ hồi 0,2%. Lệnh 186&nbsp;$
-              mất khoảng 0,40&nbsp;$ phí — bằng 4% của số tiền rủi ro 10&nbsp;$.
+              mất khoảng 0,37&nbsp;$ phí — gần 4% của số tiền rủi ro 10&nbsp;$.
             </p>
             <p>
-              Một lệnh thì không đáng kể. Nhưng 30 lệnh một tháng thì phí bằng đúng 1,2 lệnh thua. Đó là lý do đánh
+              Một lệnh thì không đáng kể. Nhưng 30 lệnh một tháng thì phí khoảng 11&nbsp;$ — hơn một lệnh thua. Đó là lý do đánh
               càng nhiều càng khó có lãi, chứ không phải càng nhiều càng nhanh giàu.
             </p>
           </Warning>
@@ -706,7 +812,7 @@ export default function TaGuidePage() {
               ['Rủi ro', '5,5 (5,3%)', '103 − 97,5'],
               ['Lợi nhuận', '15', '118 − 103'],
               [<Term key="c">R:R</Term>, <Term key="d">1 : 2,7</Term>, 'Chỉ cần đúng 27% số lần là hoà vốn.'],
-              ['Cỡ lệnh', '1,81 coin ≈ 187 $', 'Theo công thức ở mục Cỡ lệnh, tài khoản 1.000 $.'],
+              ['Cỡ lệnh', '1,81 coin ≈ 186 $', 'Theo công thức ở mục Cỡ lệnh, tài khoản 1.000 $.'],
             ]}
           />
           <Warning>
@@ -862,6 +968,78 @@ export default function TaGuidePage() {
               Gems
             </Link>{' '}
             và cột Gem Risk, không phải của chart.
+          </Takeaway>
+        </Section>
+
+        {/* ---------------------------------------------------------- */}
+        <Section id="dashboard" eyebrow="Ghép hai nguồn" title="Kết hợp chart với dashboard">
+          <p>
+            Chart chỉ cho bro thấy <Term>giá đã đi thế nào</Term>. Dashboard trả lời thêm một câu mà chart không trả
+            lời được: <Term>ai đẩy giá đi</Term> — người mua bằng tiền thật trên spot, hay người vay tiền trên futures.
+            Hai nguồn này độc lập với nhau, nên khi chúng cùng nói một điều thì đáng tin hơn hẳn từng cái riêng lẻ.
+          </p>
+          <p>
+            Thứ tự không đổi: <Term>chart quyết định có setup hay không</Term>. Dashboard chỉ dùng để tăng hay giảm
+            niềm tin vào setup đó — không bao giờ để tạo ra một lệnh mà chart không có.
+          </p>
+          <Table
+            head={['Chart nói', 'Dashboard nói', 'Đọc thế nào']}
+            rows={[
+              [
+                'Xu hướng tăng, giá hồi về vùng hỗ trợ',
+                <span key="a">
+                  Health cao, Spot CVD đi lên, có <code className="font-mono text-xs text-sky-300">SPOT_CONFIRMED_RALLY</code> hoặc{' '}
+                  <code className="font-mono text-xs text-sky-300">SELLING_ABSORPTION_POSSIBLE</code>
+                </span>,
+                <span key="b" className="text-emerald-300">
+                  Hai nguồn đồng ý. Setup đáng tin hơn — vẫn vào đúng cỡ lệnh theo công thức, không tăng lên.
+                </span>,
+              ],
+              [
+                'Giá vừa phá kháng cự',
+                <span key="c">
+                  Risk cao, funding cao, OI tăng mạnh, có <code className="font-mono text-xs text-sky-300">LEVERAGED_RALLY</code> hoặc <code className="font-mono text-xs text-sky-300">LONG_CROWDING</code>
+                </span>,
+                <span key="d" className="text-amber-300">
+                  Cú phá do tiền vay đẩy. Rất dễ phá giả khi đám long bị thanh lý — càng phải chờ test lại, đừng mua đuổi.
+                </span>,
+              ],
+              [
+                'Xu hướng giảm, giá đang rơi',
+                <span key="e">
+                  <code className="font-mono text-xs text-sky-300">BULLISH_SPOT_DIVERGENCE</code> — spot vẫn mua ròng
+                </span>,
+                <span key="f">
+                  Có người đang gom, nhưng cấu trúc vẫn giảm. Chỉ là lý do để <Term>theo dõi</Term>, chưa phải lý do để
+                  mua — chờ cấu trúc đổi như mục Khi nào xu hướng kết thúc.
+                </span>,
+              ],
+              [
+                'Giá đi ngang giữa vùng',
+                'Tín hiệu nổ liên tục ở khung 5m, 15m',
+                <span key="g" className="text-slate-400">
+                  Nhiễu. Chart đã nói không có gì để làm (Ví dụ 3), dashboard không thay đổi điều đó.
+                </span>,
+              ],
+            ]}
+          />
+          <Warning>
+            <p>
+              <Term>Dùng dashboard ở khung 4H</Term>, khớp với khung tìm điểm vào. Tín hiệu 5m và 15m đổi quá nhanh để
+              gắn với một lệnh giữ vài ngày.
+            </p>
+            <p>
+              Và trước khi tin một con số, liếc qua trang{' '}
+              <Link href="/status" className="font-semibold text-sky-300 underline decoration-sky-500/40 underline-offset-2">
+                Status
+              </Link>
+              . OI bằng 0 hay funding đúng 0,000% thường là <Term>thiếu dữ liệu</Term>, không phải thị trường thật —
+              và Health, Risk tính từ dữ liệu thiếu thì cũng sai theo.
+            </p>
+          </Warning>
+          <Takeaway>
+            Chart tìm ra setup. Dashboard cho biết setup đó được tiền thật hay tiền vay đứng sau. Cần cả hai đồng ý
+            mới đáng tin hơn — và không cái nào được phép thay cỡ lệnh.
           </Takeaway>
         </Section>
 

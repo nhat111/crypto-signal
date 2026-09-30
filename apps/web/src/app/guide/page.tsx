@@ -16,6 +16,8 @@ const TOC = [
   { id: 'performance', label: 'Trang Performance' },
   { id: 'gems', label: 'Trang Gems' },
   { id: 'journal', label: 'Trang Journal' },
+  { id: 'lookup', label: 'Trang Lookup' },
+  { id: 'status', label: 'Trang Status' },
   { id: 'tu-dien', label: 'Từ điển' },
 ];
 
@@ -593,6 +595,94 @@ export default function GuidePage() {
               số lượng), <Term>không phải</Term> là hòa vốn 0 đồng.
             </p>
           </Warning>
+        </Section>
+
+        {/* ---------------------------------------------------------- */}
+        <Section id="lookup" eyebrow="Trang Lookup" title="Tra nhanh một coin bất kỳ">
+          <p>
+            Các trang khác chỉ nói về những coin hệ thống đang theo dõi. Lookup thì tra được 
+            <Term>bất kỳ thứ gì bro gõ vào</Term> — hữu ích nhất đúng lúc thấy một token tăng đột biến và muốn biết
+            chuyện gì đang xảy ra.
+          </p>
+          <Table
+            head={['Gõ gì', 'Hệ thống đọc từ đâu', 'Bro nhận được']}
+            rows={[
+              [
+                <Term key="a">Mã trên sàn</Term>,
+                'Nến Binance (BTC, ETHUSDT…)',
+                'Giá, biến động và khối lượng trên khung bro chọn.',
+              ],
+              [
+                <Term key="b">Địa chỉ contract</Term>,
+                'Pool DEX của token đó, rồi quét an toàn hợp đồng',
+                'Thanh khoản, khối lượng, FDV, và các cờ rủi ro như dev còn quyền đúc thêm hay đóng băng token.',
+              ],
+            ]}
+          />
+          <Warning>
+            <p>
+              Lookup <Term>không lưu gì</Term> và không đưa kết quả vào trang Performance. Nó là một câu hỏi, không
+              phải một lần hệ thống tự quan sát — nên đừng coi việc tra ra &ldquo;trông ổn&rdquo; là hệ thống đã
+              duyệt coin đó.
+            </p>
+            <p>
+              Quét an toàn chỉ giảm rủi ro rút thảm, không loại bỏ được. Và Lookup không đọc tin tức hay mạng xã hội —
+              câu hỏi &ldquo;vì sao nó tăng&rdquo; vẫn phải tự đi tìm.
+            </p>
+          </Warning>
+        </Section>
+
+        {/* ---------------------------------------------------------- */}
+        <Section id="status" eyebrow="Trang Status" title="Số liệu có đang đúng không?">
+          <p>
+            Mọi con số trên dashboard đều giả định dữ liệu đang chảy về bình thường. Trang 
+            <Link href="/status" className="font-semibold text-sky-300 underline decoration-sky-500/40 underline-offset-2">
+              Status
+            </Link> 
+            cho biết giả định đó có còn đúng không — không cần terminal, tự làm mới mỗi 30 giây.
+          </p>
+          <Table
+            head={['Thẻ', 'Trả lời câu hỏi']}
+            rows={[
+              [<Term key="a">Bản đang chạy</Term>, 'Bản cập nhật mới nhất đã lên chưa. API và worker phải cùng một commit.'],
+              [
+                <Term key="b">Kết nối Binance</Term>,
+                'Worker còn sống không (nhịp tim), và ba đường dữ liệu spot, futures, thanh lý có đang mở không.',
+              ],
+              [
+                <Term key="c">Thu thập dữ liệu</Term>,
+                'Từng coin có nhận được nến mới trong 15 phút qua không. Đây là thẻ quan trọng nhất.',
+              ],
+              [<Term key="d">Chấm kết quả tín hiệu</Term>, 'Hệ thống có đang chấm đúng/sai cho các tín hiệu cũ không.'],
+              [<Term key="e">Tác vụ nền</Term>, 'Các việc chạy định kỳ có đang thất bại âm thầm không.'],
+            ]}
+          />
+          <Warning>
+            <p>
+              <Term>Kết nối &ldquo;đang mở&rdquo; chưa có nghĩa là có dữ liệu.</Term> Luôn nhìn thẻ Thu thập dữ liệu
+              — nó đo nến thật sự về tới nơi, không phải chỉ đường truyền còn nối.
+            </p>
+          </Warning>
+          <h3 className="pt-2 text-lg font-bold text-slate-100">Khi nào không nên tin trang Overview</h3>
+          <Steps
+            items={[
+              <>
+                <Term>OI bằng 0</Term> hoặc <Term>Funding đúng 0,000%</Term>: gần như chắc chắn là thiếu dữ liệu,
+                không phải thị trường thật. Health và Risk tính từ dữ liệu thiếu cũng sai theo.
+              </>,
+              <>
+                <Term>Thẻ Thu thập dữ liệu có coin màu vàng hoặc đỏ</Term>: số của coin đó đang cũ.
+              </>,
+              <>
+                <Term>Vừa cập nhật hệ thống</Term>: 15 phút đầu mọi coin im lặng là bình thường — phải chờ cây nến 15m
+                đầu tiên đóng.
+              </>,
+            ]}
+          />
+          <Takeaway>
+            Trước khi ra quyết định dựa trên một con số lạ, mất mười giây nhìn trang Status. Rẻ hơn nhiều so với
+            giao dịch theo dữ liệu hỏng.
+          </Takeaway>
         </Section>
 
         {/* ---------------------------------------------------------- */}
