@@ -571,6 +571,14 @@ export default function GuidePage() {
               Điểm cao <Term>không</Term> nghĩa là coin sẽ tăng. Nó chỉ nghĩa là coin khớp với tiêu chí đang tìm. Coin
               nhỏ có thể mất gần hết giá trị rất nhanh.
             </p>
+            <p>
+              <Term>Token vừa airdrop</Term> hay có vài ngày tăng đẹp vì người nhận còn đang phân vân giữ hay bán. Đó là
+              sóng chú ý giả — khi họ quyết định bán thì giá sập. Xem thêm mục{' '}
+              <Link href="/guide/ta#chu-y" className="font-semibold text-sky-300 underline decoration-sky-500/40 underline-offset-2">
+                Chu kỳ chú ý
+              </Link>
+              .
+            </p>
           </Warning>
         </Section>
 
@@ -587,8 +595,22 @@ export default function GuidePage() {
               [<Term key="b">Side</Term>, 'Mua thường (spot) thì chọn "long". Công thức tính lãi lỗ y hệt nhau.'],
               [<Term key="c">Entry price</Term>, 'Giá lúc mua vào.'],
               [<Term key="d">Exit price</Term>, 'Giá lúc bán ra. Điền vào là lệnh coi như đã đóng.'],
+              [
+                <Term key="e">Source</Term>,
+                'Kèo này từ đâu ra: tên tài khoản (@...), tên group, hay "tự phân tích". Gõ lại đúng tên cũ — ô này gợi ý sẵn.',
+              ],
+              [<Term key="f">Thesis</Term>, 'Vì sao vào lệnh, một câu. Viết lúc mua, không phải lúc bán.'],
             ]}
           />
+          <p>
+            Bảng <Term>By source</Term> gom các lệnh đã đóng theo nguồn: nguồn nào thắng bao nhiêu, lãi lỗ trung bình
+            bao nhiêu. Dòng <Term>no source</Term> là mốc so sánh — một nguồn chỉ đáng theo nếu nó làm tốt hơn các lệnh
+            bro tự vào mà không ai chỉ. Dưới 10 lệnh đóng thì tỉ lệ thắng bị ẩn, vì số ít như vậy chủ yếu là may rủi.
+          </p>
+          <p>
+            Bấm <Term>Log in journal →</Term> trên thẻ Gems thì ô Source tự điền <Term>Gem scanner</Term> — nhờ vậy
+            bảng này cũng chấm luôn việc mua theo máy quét có lãi hay không, bằng giá bro thật sự khớp.
+          </p>
           <Warning>
             <p>
               Nếu bro thấy dấu <Term>—</Term> ở chỗ tổng lãi lỗ, nghĩa là <Term>chưa tính được</Term> (vì chưa nhập
@@ -600,7 +622,7 @@ export default function GuidePage() {
         {/* ---------------------------------------------------------- */}
         <Section id="lookup" eyebrow="Trang Lookup" title="Tra nhanh một coin bất kỳ">
           <p>
-            Các trang khác chỉ nói về những coin hệ thống đang theo dõi. Lookup thì tra được 
+            Các trang khác chỉ nói về những coin hệ thống đang theo dõi. Lookup thì tra được{' '}
             <Term>bất kỳ thứ gì bro gõ vào</Term> — hữu ích nhất đúng lúc thấy một token tăng đột biến và muốn biết
             chuyện gì đang xảy ra.
           </p>
@@ -635,10 +657,10 @@ export default function GuidePage() {
         {/* ---------------------------------------------------------- */}
         <Section id="status" eyebrow="Trang Status" title="Số liệu có đang đúng không?">
           <p>
-            Mọi con số trên dashboard đều giả định dữ liệu đang chảy về bình thường. Trang 
+            Mọi con số trên dashboard đều giả định dữ liệu đang chảy về bình thường. Trang{' '}
             <Link href="/status" className="font-semibold text-sky-300 underline decoration-sky-500/40 underline-offset-2">
               Status
-            </Link> 
+            </Link>{' '}
             cho biết giả định đó có còn đúng không — không cần terminal, tự làm mới mỗi 30 giây.
           </p>
           <Table

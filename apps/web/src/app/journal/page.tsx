@@ -2,9 +2,10 @@
 
 import { Suspense, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { getTradeSummary, getTrades } from '@/lib/api';
+import { getTradeSources, getTradeSummary, getTrades } from '@/lib/api';
 import { parseTradePrefill, type TradePrefill } from '@/lib/journalPrefill';
 import { usePolling } from '@/lib/usePolling';
+import { JournalSources } from '@/components/journal/JournalSources';
 import { JournalSummary } from '@/components/journal/JournalSummary';
 import { TradeForm } from '@/components/journal/TradeForm';
 import { TradeTable } from '@/components/journal/TradeTable';
@@ -28,14 +29,21 @@ export default function JournalPage() {
 function JournalContent() {
   const tradesFetcher = useCallback(() => getTrades(200), []);
   const summaryFetcher = useCallback(() => getTradeSummary(), []);
+  // Its own poll, and its failure is its own: an API that predates the
+  // endpoint 404s here, and that must not take the rest of the journal down.
+  const sourcesFetcher = useCallback(() => getTradeSources(), []);
   const trades = usePolling(tradesFetcher, POLL_MS, []);
   const summary = usePolling(summaryFetcher, POLL_MS, []);
+  const sources = usePolling(sourcesFetcher, POLL_MS, []);
   const prefill = usePrefill();
 
   const refreshAll = () => {
     trades.refresh();
     summary.refresh();
+    sources.refresh();
   };
+
+  const knownSources = (sources.data?.sources ?? []).flatMap((s) => (s.source === null ? [] : [s.source]));
 
   const isBootstrapping = (trades.loading && !trades.data) || (summary.loading && !summary.data);
 
@@ -64,7 +72,9 @@ function JournalContent() {
             key={prefill === null ? 'blank' : `${prefill.symbol}:${prefill.entryPrice}:${prefill.side}`}
             onCreated={refreshAll}
             prefill={prefill}
+            knownSources={knownSources}
           />
+          {sources.data && <JournalSources sources={sources.data.sources} minClosed={sources.data.minClosed} />}
           <TradeTable trades={trades.data?.trades ?? []} onChanged={refreshAll} nowMs={trades.data?.serverTime ?? null} />
         </>
       )}

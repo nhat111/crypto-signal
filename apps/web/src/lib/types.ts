@@ -303,6 +303,9 @@ export interface Trade {
   pnlUsd: number | null;
   status: TradeStatus;
   note: string | null;
+  /** Optional: an API deployed before these columns sends neither. */
+  source?: string | null;
+  thesis?: string | null;
   openedAt: number;
   closedAt: number | null;
 
@@ -340,6 +343,23 @@ export interface TradeSummary {
   unrealizedPnlUsd?: number | null;
   /** How many open positions that total actually covers — a total over some of them is not a total. */
   unrealizedPricedCount?: number;
+}
+
+/** One row of the journal grouped by where each idea came from. `source: null` is the "not recorded" group. */
+export interface TradeSourceStats {
+  source: string | null;
+  openCount: number;
+  closedCount: number;
+  wins: number;
+  winRatePct: number | null;
+  avgPnlPct: number | null;
+  totalPnlUsd: number | null;
+}
+
+export interface TradeSourcesResponse {
+  sources: TradeSourceStats[];
+  /** Below this many closed trades a source's numbers are noise; the API decides so every client agrees. */
+  minClosed: number;
 }
 
 /* ---------- Small-cap discovery (gem scanner) ---------- */

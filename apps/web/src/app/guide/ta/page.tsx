@@ -40,9 +40,11 @@ const TOC = [
   { id: 'vi-du-2', label: 'Ví dụ 2: phá vùng rồi test lại' },
   { id: 'vi-du-3', label: 'Ví dụ 3: khi không nên vào' },
   { id: 'vi-du-4', label: 'Ví dụ 4: vì sao TA vô dụng với gem' },
+  { id: 'narrative', label: 'Trade theo narrative — không phải đầu tư' },
+  { id: 'chu-y', label: 'Chu kỳ chú ý: vào lúc nào, ra lúc nào' },
   { id: 'dashboard', label: 'Kết hợp chart với dashboard' },
   { id: 'kiem-chung', label: 'Ghi chép và kiểm chứng' },
-  { id: 'sai-lam', label: 'Sáu sai lầm hay gặp' },
+  { id: 'sai-lam', label: 'Tám sai lầm hay gặp' },
   { id: 'lo-trinh', label: 'Lộ trình 7 ngày' },
 ];
 
@@ -961,6 +963,41 @@ export default function TaGuidePage() {
             token mà ba ví nắm 60% nguồn cung, cái gọi là &ldquo;vùng hỗ trợ&rdquo; chỉ là chỗ một người tình cờ dừng
             tay. Ngày mai họ đổi ý thì vùng đó biến mất.
           </p>
+          <h3 className="pt-2 text-base font-bold text-slate-100">Thay chart bằng năm câu hỏi về token</h3>
+          <p>
+            Chart của gem không nói được nhiều, nhưng <Term>cấu trúc của chính token</Term> thì nói được: ai đang cầm,
+            và ai sắp được phép bán. Trả lời trước khi mua:
+          </p>
+          <Table
+            head={['Hỏi', 'Xem ở đâu', 'Dấu hiệu xấu']}
+            rows={[
+              [
+                <Term key="a">FDV so với vốn hoá</Term>,
+                'Lookup, thẻ Gems, CoinGecko',
+                'FDV gấp nhiều lần vốn hoá = phần lớn token chưa được bán ra, và sẽ được bán ra.',
+              ],
+              [
+                <Term key="b">Lịch mở khoá</Term>,
+                'Trang của dự án, CoinGecko, Tokenomist',
+                'Một đợt mở khoá lớn trong vài tuần tới. Người nhận token rẻ thường bán ngay.',
+              ],
+              [
+                <Term key="c">Team và cố vấn</Term>,
+                'Tài liệu tokenomics của dự án',
+                'Phần của cố vấn mở khoá hết ngay ngày ra mắt, hoặc team không bị khoá (vest) gì.',
+              ],
+              [
+                <Term key="d">Ai đang cầm</Term>,
+                'Tab Holders trên DexScreener hoặc explorer',
+                'Vài ví nắm phần lớn nguồn cung — một người đổi ý là giá sập.',
+              ],
+              [
+                <Term key="e">Quyền của dev</Term>,
+                'Lookup (quét an toàn hợp đồng)',
+                'Dev còn quyền đúc thêm token, hoặc đóng băng ví người mua.',
+              ],
+            ]}
+          />
           <Takeaway>
             Với gem, câu hỏi không phải &ldquo;vào ở đâu&rdquo; mà là &ldquo;có bị rút thảm không, và nếu mất trắng
             thì mình có sao không&rdquo;. Đó là việc của trang{' '}
@@ -968,6 +1005,183 @@ export default function TaGuidePage() {
               Gems
             </Link>{' '}
             và cột Gem Risk, không phải của chart.
+          </Takeaway>
+        </Section>
+
+        {/* ---------------------------------------------------------- */}
+        <Section id="narrative" eyebrow="Dòng tiền" title="Trade theo narrative — không phải đầu tư">
+          <p>
+            <Term>Narrative</Term> là câu chuyện thị trường đang chú ý: AI, memecoin trên một chain nào đó, một mảng
+            mới vừa có sản phẩm chạy được. Trong thị trường mà phần lớn altcoin cứ tạo đáy mới, thường chỉ có{' '}
+            <Term>một đến hai mảng</Term> được tiền đổ vào cùng lúc. Đọc được mảng đó là đọc được dòng tiền đang nằm ở
+            đâu.
+          </p>
+          <p>
+            Nhưng phải gọi đúng tên việc mình đang làm. Mua một coin vì nó đang nằm trong câu chuyện nóng là{' '}
+            <Term>đánh theo đà</Term>, không phải đầu tư. Coin sống nhờ sự chú ý; hết câu chuyện thì hết người mua,
+            và phần lớn không bao giờ quay lại giá cũ.
+          </p>
+          <Table
+            head={['', 'Đầu tư', 'Đánh theo narrative']}
+            rows={[
+              ['Lý do mua', 'Dự án có giá trị sẽ còn đó sau vài năm', 'Đang có nhiều người chú ý và mua'],
+              ['Giữ bao lâu', 'Lâu, chấp nhận giảm sâu giữa chừng', 'Tới khi câu chuyện nguội — vài ngày tới vài tuần'],
+              ['Chốt lời', 'Hiếm khi', <Term key="a">Chốt dần khi còn đang tăng</Term>],
+              ['Cắt lỗ', 'Khi luận điểm về dự án sai', <Term key="b">Khi câu chuyện hết, hoặc cấu trúc giá gãy</Term>],
+              ['Cỡ lệnh', 'Theo kế hoạch dài hạn', <Term key="c">Nhỏ — tiền mất hết vẫn không sao</Term>],
+            ]}
+          />
+
+          <h3 className="pt-2 text-base font-bold text-slate-100">Thấy một coin đang xanh vài chục phần trăm thì làm gì</h3>
+          <Steps
+            items={[
+              <>
+                <Term>Tìm lý do.</Term> Search mã coin trên X (Twitter). Có ai viết ra <Term>vì sao</Term> nó đáng mua
+                không — một luận điểm, không phải chỉ &ldquo;mua đi, sắp x10&rdquo;. Hô kèo mà không có lý do thì coi
+                như không có gì.
+              </>,
+              <>
+                <Term>Xem ai viết.</Term> Người đó có lịch sử phân tích đúng không, hay tuần nào cũng hô một coin mới?
+                Được những người có tiếng trong giới theo dõi không?
+              </>,
+              <>
+                <Term>Tự đánh giá luận điểm.</Term> Nó có hợp với câu chuyện thị trường đang chú ý không? Nếu chính bro
+                không giải thích lại được lý do bằng một câu, thì chưa phải lúc mua.
+              </>,
+              <>
+                <Term>Kiểm tra token.</Term> Dán địa chỉ hoặc mã vào{' '}
+                <Link href="/lookup" className="font-semibold text-sky-300 underline decoration-sky-500/40 underline-offset-2">
+                  Lookup
+                </Link>{' '}
+                để xem thanh khoản và quét an toàn, rồi trả lời năm câu hỏi ở Ví dụ 4.
+              </>,
+              <>
+                <Term>Ghi vào Journal trước khi bấm mua</Term> — ô <Term>Source</Term> là người đưa ra kèo, ô{' '}
+                <Term>Thesis</Term> là lý do. Sau vài chục lệnh, bảng <Term>By source</Term> sẽ cho biết nguồn nào
+                thật sự làm bro có lãi.
+              </>,
+            ]}
+          />
+
+          <Warning>
+            <p>
+              <Term>Coi chừng làm thanh khoản cho người khác.</Term> Tài khoản nào cứ vài ngày lại hô một coin mới thì
+              họ cần người mua để họ bán. Trader giỏi hiếm khi đánh quá chục coin một năm — số kèo càng nhiều, xác
+              suất bro là người mua cuối cùng càng cao.
+            </p>
+            <p>
+              Và đừng bán hết coin đang giữ để dồn vào một câu chuyện vừa nổi. Tuần sau thị trường có thể đã chuyển
+              sang chuyện khác.
+            </p>
+          </Warning>
+          <Takeaway>
+            Đánh narrative bằng tiền nhỏ, chốt dần khi còn xanh, cắt khi câu chuyện hết. Và luôn biết mình đang đánh
+            theo đà, không phải đang đầu tư.
+          </Takeaway>
+        </Section>
+
+        {/* ---------------------------------------------------------- */}
+        <Section id="chu-y" eyebrow="Dòng tiền" title="Chu kỳ chú ý: vào lúc nào, ra lúc nào">
+          <p>
+            Ý của mục này lấy từ bài{' '}
+            <a href="https://cobie.substack.com/p/tokens-in-the-attention-economy" target="_blank" rel="noreferrer" className="font-semibold text-sky-300 underline decoration-sky-500/40 underline-offset-2">
+              Tokens in the Attention Economy
+            </a>{' '}
+            của Cobie. Luận điểm chính: trong crypto, token in ra bao nhiêu cũng được, tiền cũng không thiếu — thứ{' '}
+            <Term>thật sự khan hiếm là sự chú ý</Term>. Số người để ý tới một coin là có hạn, và giá chạy theo nó.
+          </p>
+          <Story title="Như một quán ăn mới mở">
+            <p>
+              Lúc mới mở, ít người biết. Rồi vài người review, hàng bắt đầu xếp dài — đây là lúc quán đông lên nhanh
+              nhất. Đến khi cả khu ai cũng đã ăn thử, quán vẫn có thể đông, nhưng không còn đông <Term>thêm</Term> được
+              nữa. Muốn đông hơn thì phải mở thêm chi nhánh hay món mới — chuyện của nhiều tháng, không phải vài ngày.
+            </p>
+          </Story>
+          <p>
+            Giá coin cũng vậy. Nó tăng mạnh nhất trong giai đoạn <Term>đang được biết tới</Term> — khi số người chú ý
+            tăng nhanh hơn số người đã mua. Khi <Term>ai cũng biết và ai cũng đã mua</Term>, phần tăng nhanh đã hết.
+          </p>
+          <Table
+            head={['Giai đoạn', 'Trông thế nào', 'Làm gì']}
+            rows={[
+              ['Ít người biết', 'Khối lượng thấp, đi ngang, không ai bàn tới', 'Rủi ro cao nhất, cũng rẻ nhất. Chỉ tiền rất nhỏ.'],
+              [
+                <Term key="a">Đang được biết tới</Term>,
+                'Khối lượng và số giao dịch tăng dần qua nhiều ngày, bắt đầu có người viết luận điểm',
+                <span key="b" className="text-emerald-300">Đoạn đáng đánh nhất. Vào theo kế hoạch, cỡ lệnh nhỏ.</span>,
+              ],
+              [
+                <Term key="c">Ai cũng biết</Term>,
+                'Người ngoài crypto hỏi tới, KOL lớn đồng loạt hô, giá vẫn lên nhưng khối lượng mỗi nhịp nhỏ dần',
+                <span key="d" className="text-amber-300">Chốt dần. Không mua thêm.</span>,
+              ],
+              ['Nguội', 'Khối lượng rơi, giá giảm, không ai nhắc nữa', 'Đứng ngoài. Đừng bắt đáy một câu chuyện đã hết.'],
+            ]}
+          />
+
+          <h3 className="pt-2 text-base font-bold text-slate-100">Dấu hiệu một coin đã bão hoà</h3>
+          <Steps
+            items={[
+              <>
+                <Term>Người không chơi crypto hỏi bro về nó.</Term> Lúc đó gần như không còn ai chưa biết để mua tiếp.
+              </>,
+              <>
+                <Term>KOL và YouTuber lớn cùng hô một lúc.</Term> Họ kiếm tiền từ sự chú ý của người xem — lời khuyên
+                đi theo thứ đang được xem nhiều, không theo giá trị của coin.
+              </>,
+              <>
+                <Term>Giá lên mà khối lượng mỗi nhịp nhỏ dần</Term> — như mục Khi nào xu hướng kết thúc.
+              </>,
+              <>
+                <Term>Dashboard báo tiền vay đang đẩy giá:</Term> Funding cao, OI tăng mạnh, tín hiệu{' '}
+                <code className="font-mono text-xs text-sky-300">LONG_CROWDING</code> hoặc{' '}
+                <code className="font-mono text-xs text-sky-300">LEVERAGED_RALLY</code>. Người đến sau cùng thường dùng
+                đòn bẩy — và đây là phần dashboard này đo được mà bài viết không có.
+              </>,
+            ]}
+          />
+
+          <h3 className="pt-2 text-base font-bold text-slate-100">Coin đáng giữ lâu, hay chỉ là bẫy?</h3>
+          <Table
+            head={['Nhóm', 'Ví dụ trong bài', 'Nhận ra thế nào']}
+            rows={[
+              [
+                <Term key="a">Winner</Term>,
+                'ETH',
+                'Ai cũng biết, có người dùng thật mỗi ngày. Hợp giữ dài hạn, nhưng tăng gần bằng mặt bằng thị trường — đừng mong x10 nhanh.',
+              ],
+              [
+                <Term key="b">Ít người biết</Term>,
+                'Coin nhỏ chưa ai để ý',
+                'Rủi ro cao, nhưng tăng mạnh nếu sự chú ý đổ tới. Đây là đất của trang Gems.',
+              ],
+              [
+                <Term key="c">Bẫy cho người mới</Term>,
+                'Cardano cuối 2021',
+                <span key="d">
+                  Rất ồn ào nhưng không có sản phẩm hay người dùng giữ chân sự chú ý. Hype nguội là giá rơi — trong
+                  bài, ADA mất khoảng 93% so với SOL trong năm 2021.
+                </span>,
+              ],
+            ]}
+          />
+          <p>
+            Câu hỏi phân biệt Winner với Bẫy: <Term>có người dùng nó mỗi ngày không, hay chỉ có người nói về nó?</Term>{' '}
+            Coin giữ được sự chú ý là coin có hệ sinh thái người ta vào dùng hằng ngày, hoặc cộng đồng tự quảng bá cho
+            nó. Coin chỉ có câu chuyện thì câu chuyện hết là hết.
+          </p>
+
+          <Warning>
+            <p>
+              <Term>Airdrop tạo ra sóng chú ý giả.</Term> Token phát miễn phí làm hàng nghìn người cùng lúc để ý tới
+              nó, và vài ngày đầu người nhận còn đang phân vân giữ hay bán nên giá thường lên. Nhưng nếu không có sản
+              phẩm giữ chân, khi họ quyết định bán thì giá sập. Đừng đọc cú tăng sau airdrop như đang được biết tới
+              thật.
+            </p>
+          </Warning>
+          <Takeaway>
+            Vào khi sự chú ý đang tăng nhanh hơn số người đã mua. Ra khi ai cũng đã biết. Và đừng giữ lâu một coin
+            chỉ có người nói về nó mà không có người dùng nó.
           </Takeaway>
         </Section>
 
@@ -1086,7 +1300,7 @@ export default function TaGuidePage() {
         </Section>
 
         {/* ---------------------------------------------------------- */}
-        <Section id="sai-lam" eyebrow="Cạm bẫy" title="Sáu sai lầm hay gặp">
+        <Section id="sai-lam" eyebrow="Cạm bẫy" title="Tám sai lầm hay gặp">
           <Table
             head={['Sai lầm', 'Nghe như thế nào trong đầu', 'Thực tế']}
             rows={[
@@ -1119,6 +1333,16 @@ export default function TaGuidePage() {
                 <Term key="f">Một lệnh thắng = phương pháp đúng</Term>,
                 '“Ăn rồi, cách này chuẩn.”',
                 'n = 1. Cần vài chục lệnh mới nói được gì. Cái bẫy này nguy hiểm nhất vì nó khiến bro tăng cỡ lệnh ngay trước chuỗi thua.',
+              ],
+              [
+                <Term key="g">Ôm coin của narrative đã chết</Term>,
+                '“Nó từng x10, kiểu gì chẳng quay lại.”',
+                'Coin chạy theo câu chuyện sống nhờ sự chú ý. Hết chuyện thì hết người mua — phần lớn không bao giờ về lại đỉnh cũ. Mua thêm lúc này là trả tiền để ở lại lâu hơn trong một lệnh đã sai.',
+              ],
+              [
+                <Term key="h">Đánh tiếp ngay sau chuỗi thua</Term>,
+                '“Phải gỡ lại hôm nay.”',
+                'Thua liền mấy lệnh là lúc đầu óc tệ nhất để ra quyết định. Nghỉ vài ngày, mở Journal đọc lại lý do của từng lệnh, ghi ra giấy cái gì lặp lại. Thị trường vẫn ở đó khi bro quay lại.',
               ],
             ]}
           />

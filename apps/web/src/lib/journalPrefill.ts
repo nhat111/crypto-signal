@@ -15,6 +15,8 @@ export interface TradePrefill {
   /** A string, not a number: it goes straight into a text input the user edits. */
   entryPrice: string;
   note: string;
+  /** Where the idea came from; a gem card fills in the scanner, so its picks are scored as a source. */
+  source: string;
 }
 
 /**
@@ -28,11 +30,19 @@ export interface TradePrefill {
  * to enter, and a journal that quietly recorded the scanner's price would
  * be recording something that never happened.
  */
+/**
+ * Trades opened from a gem card are credited to the scanner, so the
+ * journal's by-source table answers "did buying what it surfaced pay?"
+ * with the user's own fills, not the scanner's paper outcomes.
+ */
+export const GEM_SCANNER_SOURCE = 'Gem scanner';
+
 export function journalPrefillHref(gem: Gem): string {
   const params = new URLSearchParams({
     symbol: gem.symbol,
     side: 'spot',
     note: `${gem.chainId} · ${gem.tokenAddress} · Gem ${gem.gemScore}`,
+    source: GEM_SCANNER_SOURCE,
   });
   if (gem.priceUsd !== null) params.set('entry', String(gem.priceUsd));
   return `/journal?${params.toString()}`;
@@ -60,5 +70,6 @@ export function parseTradePrefill(params: URLSearchParams): TradePrefill | null 
     // simply left for the user, which is where it belonged anyway.
     entryPrice: entry !== null && entry.trim() !== '' && Number.isFinite(Number(entry)) ? entry : '',
     note: params.get('note') ?? '',
+    source: params.get('source') ?? '',
   };
 }

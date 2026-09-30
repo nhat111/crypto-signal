@@ -336,13 +336,19 @@ render that as "no signals of this type yet", not a chart with a zero bar.
 Same shape as one entry of `results` above, for a single signal type. 404
 if `signalType` isn't one of the 9 valid values.
 
-## Trade journal — `POST /api/journal`, `GET /api/journal`, `PATCH /api/journal/:id`, `DELETE /api/journal/:id`, `GET /api/journal/summary`
+## Trade journal — `POST /api/journal`, `GET /api/journal`, `PATCH /api/journal/:id`, `DELETE /api/journal/:id`, `GET /api/journal/summary`, `GET /api/journal/sources`
 A manual log of trades a person actually took — separate from both the
 signal engine and the gem scanner, which never write here. `chatId` scopes
 entries to whoever logged them (a Telegram chat id, or the fixed string
 `"web"` for entries made on the dashboard, which has no login).
 
-`POST /api/journal` body: `{ chatId, symbol, side: "spot"|"long"|"short", entryPrice, size?, note? }`
+`POST /api/journal` body: `{ chatId, symbol, side: "spot"|"long"|"short", entryPrice, size?, note?, source?, thesis? }`
+
+`source` (≤80 chars) is where the idea came from — an account, a group,
+"tự phân tích"; `thesis` (≤2000) is why it was taken. Both are trimmed and
+a blank one is stored as `null`, so a cleared field does not become a
+source of its own. They are separate from `note` because they are
+counted: see `/api/journal/sources`. 400 if either is not text or too long.
 
 `spot` prices identically to `long` — it exists so the row records the
 position that was actually taken rather than the nearest futures word.
@@ -395,6 +401,7 @@ dashboard does). Returns `{ trades: [...] }`, most recent first.
   "entryPrice": 78000, "exitPrice": 79200, "size": 0.1,
   "pnlPct": 1.54, "pnlUsd": 120,
   "status": "closed", "note": "bullish divergence signal",
+  "source": "@CryptoCred", "thesis": "reclaimed the 1D range high",
   "openedAt": 1700000000000, "closedAt": 1700003600000
 }
 ```
@@ -403,7 +410,7 @@ dashboard does). Returns `{ trades: [...] }`, most recent first.
 stored, not derived on read.
 
 `PATCH /api/journal/:id` body: any subset of `{ symbol, side, entryPrice,
-exitPrice, size, note }`. Setting `exitPrice` to a number is how a trade
+exitPrice, size, note, source, thesis }`. Setting `exitPrice` to a number is how a trade
 gets closed (recomputes `pnlPct`/`pnlUsd`, sets `status: "closed"`);
 setting it to `null` reopens the trade. 404 if the id doesn't exist.
 
@@ -420,6 +427,25 @@ setting it to `null` reopens the trade. 404 if the id doesn't exist.
 `totalPnlUsd` is `null` when no closed trade recorded a `size` — render
 those as "—"/"not enough data" rather than a misleading `0%`/`$0.00`, same
 rule as `/api/performance`.
+
+`GET /api/journal/sources?chatId=` → the journal grouped by `source`:
+```json
+{
+  "sources": [
+    { "source": "@CryptoCred", "openCount": 1, "closedCount": 12, "wins": 7,
+      "winRatePct": 58.3, "avgPnlPct": 2.4, "totalPnlUsd": 140.5 },
+    { "source": null, "openCount": 0, "closedCount": 20, "wins": 9,
+      "winRatePct": 45, "avgPnlPct": -0.3, "totalPnlUsd": -12 }
+  ],
+  "minClosed": 10
+}
+```
+Grouped case- and whitespace-insensitively, so `@cryptocred` and
+`@CryptoCred` are one row, labelled with the most recently typed spelling.
+`source: null` is the "not recorded" group and is kept, not dropped: it is
+the baseline a named source has to beat. `minClosed` is the sample size
+below which a win rate is noise; clients withhold it under that line.
+Sorted by closed count, most first.
 
 ## `GET /api/flow`
 Macro context: total stablecoin circulating supply and how fast it's

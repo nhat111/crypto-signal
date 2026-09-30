@@ -38,7 +38,7 @@ export function TradeTable({ trades, onChanged, nowMs }: TradeTableProps) {
             <th className="py-2 pr-3 font-medium">Exit</th>
             <th className="py-2 pr-3 font-medium">Size</th>
             <th className="py-2 pr-3 font-medium">P&amp;L</th>
-            <th className="py-2 pr-3 font-medium">Note</th>
+            <th className="py-2 pr-3 font-medium">Source · thesis · note</th>
             <th className="py-2 pr-3 font-medium">Opened</th>
             <th className="py-2 font-medium">Actions</th>
           </tr>
