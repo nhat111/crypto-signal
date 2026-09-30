@@ -71,6 +71,8 @@ export async function getJobHealth(pool: Pool, jobName: string): Promise<JobHeal
 
 /** Job names are referenced from both the writer and the reader, so they live in one place. */
 export const JOB_STABLECOIN_FLOW = 'stablecoin_flow';
+export const JOB_TREND_1D = 'trend_1d';
+export const JOB_DAILY_DIGEST = 'daily_digest';
 
 /** Every recorded job, for the operator status page. Ordered by name so the page does not reshuffle between polls. */
 export async function getAllJobHealth(pool: Pool): Promise<JobHealth[]> {

@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { HealthBadge } from '@/components/HealthBadge';
 import { RiskBadge } from '@/components/RiskBadge';
 import { StatePanel } from '@/components/StatePanel';
-import type { OverviewRow, Signal, SymbolLatest } from '@/lib/types';
+import type { OverviewRow, Signal, SymbolLatest, TrendState } from '@/lib/types';
+import { TrendBadge } from './TrendBadge';
 import { cx, formatCompactNumber, formatPct, formatRelativeTime, formatSignedUsd, formatUsd, isStale } from '@/lib/format';
 
 interface SymbolCardProps {
@@ -11,6 +12,9 @@ interface SymbolCardProps {
   snapshot: SymbolLatest | null | undefined;
   activeSignalCount: number;
   latestSignal: Signal | undefined;
+  /** The daily structure read; absent until the worker has run it, or on an API that predates it. */
+  trend?: TrendState;
+  nowMs?: number | null;
 }
 
 /**
@@ -18,7 +22,7 @@ interface SymbolCardProps {
  * the four demand/leverage metrics side by side so a rally can be sanity
  * checked in one glance.
  */
-export function SymbolCard({ symbol, overviewRow, snapshot, activeSignalCount, latestSignal }: SymbolCardProps) {
+export function SymbolCard({ symbol, overviewRow, snapshot, activeSignalCount, latestSignal, trend, nowMs = null }: SymbolCardProps) {
   if (!overviewRow) {
     return (
       <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
@@ -51,6 +55,11 @@ export function SymbolCard({ symbol, overviewRow, snapshot, activeSignalCount, l
               {formatPct(overviewRow.priceChangePct)}
             </span>
           </div>
+          {trend && (
+            <div className="mt-1.5">
+              <TrendBadge trend={trend} nowMs={nowMs} />
+            </div>
+          )}
         </div>
         {activeSignalCount > 0 && (
           <span className="rounded-full border border-sky-500/40 bg-sky-500/10 px-2 py-0.5 text-xs font-bold text-sky-300">

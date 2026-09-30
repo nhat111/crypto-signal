@@ -1,6 +1,6 @@
 import type { Candle, Logger, SymbolId, Timeframe } from '@crypto-signal/shared';
-import type { ConnectionStatus, ExchangeAdapter, KlineQuery, Unsubscribe } from '../types.js';
-import { rawKlineToCandle, wsKlineToCandle, type WsKlinePayload } from '../normalizer.js';
+import type { ConnectionStatus, DailyBar, ExchangeAdapter, KlineQuery, Unsubscribe } from '../types.js';
+import { closedDailyBars, rawKlineToCandle, wsKlineToCandle, type WsKlinePayload } from '../normalizer.js';
 import { BinanceRestClient } from './rest.js';
 import { CombinedStreamClient } from './ws.js';
 import { klineStreamName, timeframeFromKlineStream } from './stream-names.js';
@@ -26,6 +26,17 @@ export class BinanceSpotAdapter implements ExchangeAdapter {
   async fetchKlines(symbol: SymbolId, timeframe: Timeframe, opts: KlineQuery = {}): Promise<Candle[]> {
     const raw = await this.rest.getKlines(symbol, timeframe, opts);
     return raw.map((r) => rawKlineToCandle(r, symbol, this.market, timeframe));
+  }
+
+  /**
+   * Daily bars for the 1D structure read. Not a collected timeframe — it is
+   * fetched on demand, a few requests a day — so it skips the Candle type
+   * and returns only bars that have CLOSED: the one still forming would let
+   * an intraday dip read as a broken structure.
+   */
+  async fetchClosedDailyBars(symbol: SymbolId, limit = 400, now = Date.now()): Promise<DailyBar[]> {
+    const raw = await this.rest.getKlines(symbol, '1d', { limit });
+    return closedDailyBars(raw, now);
   }
 
   subscribeKlines(

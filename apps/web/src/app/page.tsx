@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useSyncExternalStore } from 'react';
-import { getFlow, getOverview, getSignals } from '@/lib/api';
+import { getFlow, getOverview, getSignals, getTrend } from '@/lib/api';
 import { usePolling } from '@/lib/usePolling';
 import { useSymbolSnapshots } from '@/lib/useSymbolSnapshots';
 import type { Signal } from '@/lib/types';
@@ -27,6 +27,10 @@ export default function OverviewPage() {
   const signals = usePolling(() => getSignals({ limit: 20 }), POLL_MS, []);
   // Daily data — polled far less often than the market panels above it.
   const flow = usePolling(getFlow, FLOW_POLL_MS, []);
+  // Read from the last closed daily bar — it changes once a day, so a slow
+  // poll is plenty. A failure here leaves the cards without a badge rather
+  // than taking the overview down.
+  const trend = usePolling(getTrend, FLOW_POLL_MS, []);
 
   const symbols = overview.data?.symbols ?? [];
   const available = overview.data?.timeframes ?? [];
@@ -99,6 +103,8 @@ export default function OverviewPage() {
                   snapshot={snapshots.data?.[symbol]}
                   activeSignalCount={symbolSignals.length}
                   latestSignal={symbolSignals[0]}
+                  trend={trend.data?.trends.find((t) => t.symbol === symbol)}
+                  nowMs={trend.data ? Math.max(...trend.data.trends.map((t) => t.computedAt), 0) || null : null}
                 />
               );
             })}

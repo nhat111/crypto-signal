@@ -34,6 +34,17 @@ export interface FuturesAdapter extends ExchangeAdapter {
   subscribeLiquidations(symbols: SymbolId[], onLiquidation: (event: LiquidationEvent) => void, onStatus?: (status: ConnectionStatus) => void): Unsubscribe;
 }
 
+/** A daily OHLCV bar that has already closed. Plain shape: 1d is not one of the collected timeframes. */
+export interface DailyBar {
+  openTime: number;
+  closeTime: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
 export interface KlineQuery {
   limit?: number;
   startTime?: number;

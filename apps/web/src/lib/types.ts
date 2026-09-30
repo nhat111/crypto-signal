@@ -362,6 +362,34 @@ export interface TradeSourcesResponse {
   minClosed: number;
 }
 
+/* ---------- Daily market structure ---------- */
+
+export type TrendLabel = 'up' | 'down' | 'sideways';
+
+export interface TrendState {
+  symbol: string;
+  /** Open time of the last closed daily bar the read used. */
+  lastCloseTime: number;
+  lastClose: number;
+  trend: TrendLabel;
+  /** Set on the close that lost the last swing on the wrong side, and while it stays lost. */
+  event: 'up_broken' | 'down_broken' | null;
+  previousTrend: TrendLabel | null;
+  changedAt: number | null;
+  ema: number | null;
+  emaPeriod: number;
+  aboveEma: boolean | null;
+  swingHighs: Array<{ openTime: number; price: number }>;
+  swingLows: Array<{ openTime: number; price: number }>;
+  reasons: string[];
+  computedAt: number;
+}
+
+export interface TrendResponse {
+  trends: TrendState[];
+  fetch: { lastAttemptAt: number | null; lastSuccessAt: number | null; consecutiveFailures: number; lastError: string | null } | null;
+}
+
 /* ---------- Small-cap discovery (gem scanner) ---------- */
 
 export type SafetyVerdict = 'safe' | 'caution' | 'danger' | 'unknown';
