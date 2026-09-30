@@ -571,6 +571,14 @@ export default function GuidePage() {
               Điểm cao <Term>không</Term> nghĩa là coin sẽ tăng. Nó chỉ nghĩa là coin khớp với tiêu chí đang tìm. Coin
               nhỏ có thể mất gần hết giá trị rất nhanh.
             </p>
+            <p>
+              <Term>Token vừa airdrop</Term> hay có vài ngày tăng đẹp vì người nhận còn đang phân vân giữ hay bán. Đó là
+              sóng chú ý giả — khi họ quyết định bán thì giá sập. Xem thêm mục{' '}
+              <Link href="/guide/ta#chu-y" className="font-semibold text-sky-300 underline decoration-sky-500/40 underline-offset-2">
+                Chu kỳ chú ý
+              </Link>
+              .
+            </p>
           </Warning>
         </Section>
 
