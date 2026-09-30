@@ -47,6 +47,42 @@ export const STRUCTURE: {
   ],
 };
 
+/* --- Xu hướng tăng hỏng: đỉnh thấp hơn, rồi thủng đáy gần nhất ------- */
+
+export const TREND_BREAK: {
+  candles: Candle[];
+  domain: [number, number];
+  levels: Level[];
+  markers: Marker[];
+} = {
+  candles: [
+    c(100, 104, 99, 103),
+    c(103, 108, 102, 107),
+    c(107, 112, 106, 110),
+    c(110, 111, 105, 106),
+    c(106, 107, 102, 103),
+    c(103, 109, 102.5, 108),
+    c(108, 116, 107, 115),
+    c(115, 116, 109, 110),
+    c(110, 111, 106, 107),
+    c(107, 113, 106.5, 112),
+    c(112, 114, 110, 111),
+    c(111, 112, 107, 108),
+    c(108, 109, 103, 104),
+    c(104, 106, 101, 102),
+  ],
+  domain: [97, 119],
+  levels: [{ price: 106, label: 'Đáy gần nhất 106', tone: 'stop' }],
+  markers: [
+    { index: 2, label: 'Đỉnh 1', place: 'above' },
+    { index: 4, label: 'Đáy 1', place: 'below' },
+    { index: 6, label: 'Đỉnh 2', place: 'above' },
+    { index: 8, label: 'Đáy 2', place: 'below' },
+    { index: 10, label: 'Đỉnh thấp hơn', place: 'above' },
+    { index: 12, label: 'Đóng dưới 106', place: 'below' },
+  ],
+};
+
 /* --- Kháng cự bị phá thì thành hỗ trợ ------------------------------- */
 
 export const FLIP: {
