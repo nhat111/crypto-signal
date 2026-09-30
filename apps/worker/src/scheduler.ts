@@ -12,6 +12,7 @@ import {
   type OutcomeHorizon,
 } from '@crypto-signal/db';
 import { ALL_SIGNAL_TYPES, type SignalType } from '@crypto-signal/signal-engine';
+import { BinanceRestError } from '@crypto-signal/market-data';
 import { processMatchedCandles } from './pipeline.js';
 import { runGemOutcomeTracker, runGemScanCycle, type GemScanDeps } from './gemScan.js';
 import { runGemWatchCycle, type GemWatchDeps } from './gemWatch.js';
@@ -123,6 +124,14 @@ export async function resolveTimedOutPairs(ctx: WorkerContext): Promise<void> {
       const pair = ctx.pairBuffer.add(candle);
       if (pair) await processMatchedCandles(ctx, pair.spot, pair.futures);
     } catch (err) {
+      // During an IP ban every retry fails the same way, every 5 seconds,
+      // for hours — the log drowns and the bucket is unrecoverable anyway.
+      // Drop it once, loudly, instead.
+      if (err instanceof BinanceRestError && err.status === 418) {
+        ctx.logger.warn({ entry }, 'REST fallback unavailable during Binance IP ban — dropping this bucket');
+        ctx.pairBuffer.drop(entry.symbol, entry.timeframe, entry.openTime);
+        continue;
+      }
       ctx.logger.warn({ err, entry }, 'REST fallback fetch failed, will retry next tick');
     }
   }

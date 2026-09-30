@@ -399,6 +399,9 @@ cron-job.org (free)    → pings /health so Render never sleeps
    `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ALERT_CHAT_IDS` and any worker variable
    from the Railway sections above (all on this one service now). `PORT` is
    set by Render and the api listens on it.
+   **Health Check Path must be `/livez`** (render.yaml sets it). Never
+   `/health`: it answers 503 whenever Binance or the worker is unhappy, and
+   Render then times the deploy out and silently keeps the old build.
 3. **Keep it awake.** A free Render service sleeps after 15 minutes without
    an inbound request — and a sleeping worker collects nothing. On
    cron-job.org, GET `https://<service>.onrender.com/health` every 10
