@@ -62,7 +62,10 @@ const envSchema = z.object({
   BINANCE_SPOT_REST_BASE: z.string().default('https://api.binance.com'),
   BINANCE_SPOT_WS_BASE: z.string().default('wss://stream.binance.com:9443'),
   BINANCE_FUTURES_REST_BASE: z.string().default('https://fapi.binance.com'),
-  BINANCE_FUTURES_WS_BASE: z.string().default('wss://fstream.binance.com'),
+  // Market streams (klines, forceOrder) moved under /market. The bare host
+  // still accepts the connection and then sends nothing — the socket reads
+  // "open" on /status while no futures candle ever arrives.
+  BINANCE_FUTURES_WS_BASE: z.string().default('wss://fstream.binance.com/market'),
 
   THRESH_PRICE_CHANGE_PCT: numeric(0.3),
   THRESH_CVD_SKEW_RATIO: numeric(0.15),
