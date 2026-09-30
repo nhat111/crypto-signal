@@ -11,6 +11,9 @@ services:
     region: singapore
     dockerfilePath: ./Dockerfile.allinone
     dockerContext: .
+    # Liveness only. Never /health — it goes 503 when Binance is unhappy,
+    # and Render would then time the deploy out (see DEPLOY.md).
+    healthCheckPath: /livez
     envVars:
       - key: DATABASE_URL
         sync: false
