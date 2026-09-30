@@ -3,10 +3,13 @@ import {
   computeUnrealized,
   deleteTrade,
   getMarkPrices,
+  getTradeSourceStats,
   getTradeSummary,
   getTrades,
   insertTrade,
   isTradeSide,
+  TRADE_SOURCE_MAX,
+  TRADE_THESIS_MAX,
   updateTrade,
   type TradeRow,
   type TradeSide,
@@ -22,6 +25,8 @@ interface CreateTradeBody {
   entryPrice: number;
   size?: number | null;
   note?: string | null;
+  source?: string | null;
+  thesis?: string | null;
 }
 
 interface UpdateTradeBody {
@@ -31,6 +36,8 @@ interface UpdateTradeBody {
   exitPrice?: number | null;
   size?: number | null;
   note?: string | null;
+  source?: string | null;
+  thesis?: string | null;
 }
 
 interface TradesQuery {
@@ -54,10 +61,32 @@ interface TradesQuery {
  * get refused: a price of 0 books a total loss, and a negative or
  * non-finite one has no meaning the P&L maths can carry.
  */
+/**
+ * Below this many closed trades a source's win rate is noise: five trades
+ * at 60% and five at 20% are one lucky coin flip apart.
+ */
+const SOURCE_MIN_CLOSED = 10;
+
 function invalidPrice(value: unknown, field: string): string | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return `${field} must be a number`;
   if (value <= 0) return `${field} must be greater than zero`;
   return null;
+}
+
+/**
+ * Source and thesis are free text, but bounded: a source is a name to
+ * group by, and a pasted thread in that field would make it useless as
+ * one. Absent and null both mean "not recorded".
+ */
+function invalidText(value: unknown, field: string, max: number): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') return `${field} must be text`;
+  if (value.trim().length > max) return `${field} must be at most ${max} characters`;
+  return null;
+}
+
+function textProblem(body: { source?: unknown; thesis?: unknown }): string | null {
+  return invalidText(body.source, 'source', TRADE_SOURCE_MAX) ?? invalidText(body.thesis, 'thesis', TRADE_THESIS_MAX);
 }
 
 export function registerJournalRoutes(app: FastifyInstance, deps: ApiDeps): void {
@@ -75,6 +104,8 @@ export function registerJournalRoutes(app: FastifyInstance, deps: ApiDeps): void
       const sizeProblem = invalidPrice(req.body.size, 'size');
       if (sizeProblem) return reply.code(400).send({ error: sizeProblem });
     }
+    const createTextProblem = textProblem(req.body);
+    if (createTextProblem) return reply.code(400).send({ error: createTextProblem });
     const trade = await insertTrade(deps.pool, {
       chatId,
       // Casing is decided in one place (normalizeTradeSymbol), because a
@@ -84,6 +115,8 @@ export function registerJournalRoutes(app: FastifyInstance, deps: ApiDeps): void
       entryPrice,
       size: req.body.size ?? null,
       note: req.body.note ?? null,
+      source: req.body.source ?? null,
+      thesis: req.body.thesis ?? null,
     });
     return { trade };
   });
@@ -107,6 +140,13 @@ export function registerJournalRoutes(app: FastifyInstance, deps: ApiDeps): void
     return { summary: { ...summary, ...aggregateUnrealized(await withUnrealized(deps.pool, open)) } };
   });
 
+  // Grouped by where each idea came from. `minClosed` travels with the
+  // numbers so every client applies the same "too few to mean anything"
+  // line rather than each picking its own.
+  app.get<{ Querystring: { chatId?: string } }>('/api/journal/sources', async (req) => {
+    return { sources: await getTradeSourceStats(deps.pool, req.query.chatId), minClosed: SOURCE_MIN_CLOSED };
+  });
+
   app.patch<{ Params: { id: string }; Body: UpdateTradeBody }>('/api/journal/:id', async (req, reply) => {
     // null is meaningful on a patch — it reopens a trade, or clears a size —
     // so only a supplied non-null value is checked.
@@ -119,6 +159,8 @@ export function registerJournalRoutes(app: FastifyInstance, deps: ApiDeps): void
       const problem = invalidPrice(value, field);
       if (problem) return reply.code(400).send({ error: problem });
     }
+    const patchTextProblem = textProblem(req.body);
+    if (patchTextProblem) return reply.code(400).send({ error: patchTextProblem });
 
     const trade = await updateTrade(deps.pool, req.params.id, req.body);
     if (!trade) return reply.code(404).send({ error: 'unknown trade' });

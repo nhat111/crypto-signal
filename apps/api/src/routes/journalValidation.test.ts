@@ -81,3 +81,30 @@ describe('PATCH /api/journal/:id price validation', () => {
     expect(query).toHaveBeenCalled();
   });
 });
+
+describe('source and thesis validation', () => {
+  const base = { chatId: '1', symbol: 'DINGER', side: 'spot' as const, entryPrice: 0.004 };
+
+  it('refuses a source long enough to be a pasted thread rather than a name', async () => {
+    const { app, query } = buildApp();
+    const res = await app.inject({ method: 'POST', url: '/api/journal', payload: { ...base, source: 'x'.repeat(81) } });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toMatch(/source/);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('refuses a thesis that is not text', async () => {
+    const { app, query } = buildApp();
+    const res = await app.inject({ method: 'POST', url: '/api/journal', payload: { ...base, thesis: 42 } });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toMatch(/thesis/);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('checks the same bounds on a patch', async () => {
+    const { app, query } = buildApp();
+    const res = await app.inject({ method: 'PATCH', url: '/api/journal/7', payload: { thesis: 'y'.repeat(2001) } });
+    expect(res.statusCode).toBe(400);
+    expect(query).not.toHaveBeenCalled();
+  });
+});

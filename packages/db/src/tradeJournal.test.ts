@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeTradePnl, isTradeSide, normalizeTradeSymbol } from './tradeJournal.js';
+import { cleanTradeText, computeTradePnl, isTradeSide, normalizeTradeSymbol, tradeSourceKey } from './tradeJournal.js';
 
 describe('computeTradePnl', () => {
   it('is positive for a long that closed above entry', () => {
@@ -116,5 +116,19 @@ describe('normalizeTradeSymbol', () => {
     // ticker to fold.
     expect(normalizeTradeSymbol('btc-usdt')).toBe('btc-usdt');
     expect(normalizeTradeSymbol('')).toBe('');
+  });
+});
+
+describe('trade source text', () => {
+  it('stores blank as not recorded, so a cleared field is not a source of its own', () => {
+    expect(cleanTradeText('   ')).toBeNull();
+    expect(cleanTradeText(undefined)).toBeNull();
+    expect(cleanTradeText('  @CryptoCred ')).toBe('@CryptoCred');
+  });
+
+  it('groups one account typed three ways as one source', () => {
+    const keys = ['@CryptoCred', '@cryptocred', ' @CryptoCred '].map(tradeSourceKey);
+    expect(new Set(keys).size).toBe(1);
+    expect(tradeSourceKey('')).toBeNull();
   });
 });

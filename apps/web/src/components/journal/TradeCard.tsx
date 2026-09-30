@@ -70,6 +70,22 @@ export function TradeCard({ trade, onChanged, nowMs }: { trade: Trade; onChanged
               onValueChange={(v) => a.setEditDraft((d) => ({ ...d, size: v }))}
             />
           </Field>
+          <Field label="Source">
+            <input
+              className={inputClass}
+              maxLength={80}
+              value={a.editDraft.source}
+              onChange={(e) => a.setEditDraft((d) => ({ ...d, source: e.target.value }))}
+            />
+          </Field>
+          <Field label="Thesis">
+            <input
+              className={inputClass}
+              maxLength={2000}
+              value={a.editDraft.thesis}
+              onChange={(e) => a.setEditDraft((d) => ({ ...d, thesis: e.target.value }))}
+            />
+          </Field>
           <Field label="Note">
             <input
               className={inputClass}
@@ -106,6 +122,16 @@ export function TradeCard({ trade, onChanged, nowMs }: { trade: Trade; onChanged
         </dl>
       )}
 
+      {a.mode !== 'editing' && (trade.source || trade.thesis) && (
+        <div className="mt-2 space-y-1 text-[11px]">
+          {trade.source && (
+            <span className="inline-block rounded bg-violet-500/15 px-1.5 py-0.5 font-semibold text-violet-300">
+              {trade.source}
+            </span>
+          )}
+          {trade.thesis && <p className="text-slate-400">{trade.thesis}</p>}
+        </div>
+      )}
       {trade.note && a.mode !== 'editing' && <p className="mt-2 text-[11px] text-slate-500">{trade.note}</p>}
 
       {a.mode === 'closing' && (

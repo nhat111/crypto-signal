@@ -16,6 +16,7 @@ import type {
   SymbolDetailResponse,
   Timeframe,
   Trade,
+  TradeSourcesResponse,
   TradeSide,
   TradeSummary,
   TradesResponse,
@@ -179,12 +180,18 @@ export function getTradeSummary(): Promise<{ summary: TradeSummary }> {
   return fetchJson<{ summary: TradeSummary }>('/api/journal/summary');
 }
 
+export function getTradeSources(): Promise<TradeSourcesResponse> {
+  return fetchJson<TradeSourcesResponse>('/api/journal/sources');
+}
+
 export interface CreateTradeInput {
   symbol: string;
   side: TradeSide;
   entryPrice: number;
   size: number | null;
   note: string | null;
+  source: string | null;
+  thesis: string | null;
 }
 
 export function createTrade(input: CreateTradeInput): Promise<{ trade: Trade }> {
@@ -198,6 +205,8 @@ export interface UpdateTradeInput {
   exitPrice?: number | null;
   size?: number | null;
   note?: string | null;
+  source?: string | null;
+  thesis?: string | null;
 }
 
 export function updateTrade(id: string, patch: UpdateTradeInput): Promise<{ trade: Trade }> {

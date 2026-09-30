@@ -12,6 +12,8 @@ export interface TradeEditDraft {
   exitPrice: string;
   size: string;
   note: string;
+  source: string;
+  thesis: string;
 }
 
 /**
@@ -37,6 +39,8 @@ export function useTradeActions(trade: Trade, onChanged: () => void) {
     exitPrice: trade.exitPrice === null ? '' : String(trade.exitPrice),
     size: trade.size === null ? '' : String(trade.size),
     note: trade.note ?? '',
+    source: trade.source ?? '',
+    thesis: trade.thesis ?? '',
   }));
 
   async function run(action: () => Promise<unknown>, fallback: string, keepBusy = false) {
@@ -90,6 +94,8 @@ export function useTradeActions(trade: Trade, onChanged: () => void) {
             exitPrice: editDraft.exitPrice.trim() === '' ? null : parsePriceInput(editDraft.exitPrice),
             size: editDraft.size.trim() === '' ? null : parseSizeInput(editDraft.size),
             note: editDraft.note.trim() === '' ? null : editDraft.note.trim(),
+            source: editDraft.source.trim() === '' ? null : editDraft.source.trim(),
+            thesis: editDraft.thesis.trim() === '' ? null : editDraft.thesis.trim(),
           }),
         'Could not save changes.',
       );
