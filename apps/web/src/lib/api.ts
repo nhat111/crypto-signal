@@ -18,6 +18,7 @@ import type {
   Trade,
   TradeSourcesResponse,
   TrendResponse,
+  SetupsResponse,
   TradeSide,
   TradeSummary,
   TradesResponse,
@@ -153,6 +154,10 @@ export function getStatus(): Promise<StatusResponse> {
 /** Fetched on demand, never polled: these are table scans. */
 export function getOutcomeDiagnostics(): Promise<StatusOutcomeDiagnostics> {
   return fetchJson<StatusOutcomeDiagnostics>('/api/status/outcomes');
+}
+
+export function getSetups(limit = 30): Promise<SetupsResponse> {
+  return fetchJson<SetupsResponse>(`/api/setups?limit=${limit}`);
 }
 
 export function getTrend(): Promise<TrendResponse> {

@@ -249,6 +249,23 @@ With the digest on, most people want `ALERT_TIMEFRAMES=4h` (or nothing
 pushed at all besides the digest): the 5m and 15m signal alerts are what
 makes the bot noisy.
 
+### 4H entry setups
+
+On the same hourly run the worker reads the last 120 closed 4H bars of each
+spot symbol and looks for the two setups the TA guide teaches — a pullback
+rejected at the latest 1D swing low, and a high-volume break above the latest
+1D swing high that is then retested — only while the 1D structure is not
+down and price is above its EMA200, and only when the plan's R:R is at least
+1:2. A new setup is stored once (per symbol, kind and 4H bar) and pushed to
+the alert chats; `SETUP_ALERTS=off` stops the push but not the record. Every
+open setup is then followed until it touches its target or its stop (a bar
+touching both counts as the stop), or expires after 14 days at the last
+close, so `/setups` and the Overview panel show how they actually ended.
+
+Expect them to be rare. Replayed walk-forward over May–September 2026 on
+BTC/ETH/SOL — mostly a falling market — the rules produced three setups.
+That is the guide's "most of the time there is nothing to do", not a fault.
+
 ## Proving the alert path actually works
 
 `/status` shows how many chats the worker could alert, which proves the

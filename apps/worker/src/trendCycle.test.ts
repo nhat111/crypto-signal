@@ -63,3 +63,31 @@ describe('formatDigest', () => {
     expect(text).toContain('ETH&lt;USDT');
   });
 });
+
+describe('formatSetupAlert', () => {
+  it('gives the three numbers, R:R and the guide’s example size, and keeps the plan line out of the bullets', async () => {
+    const { formatSetupAlert } = await import('./trendCycle.js');
+    const text = formatSetupAlert({
+      id: '1',
+      symbol: 'SOLUSDT',
+      kind: 'pullback',
+      barOpenTime: 0,
+      detectedAt: 0,
+      level: 112.5,
+      entry: 114,
+      stop: 110.8,
+      target: 124.95,
+      rr: 3.4,
+      atr: 2,
+      reasons: ['1D đang tăng.', 'Nến 4H chạm đáy rồi bật lên.', 'Kế hoạch: …'],
+      status: 'open',
+      resolvedAt: null,
+      rMultiple: null,
+    });
+    expect(text).toContain('SOLUSDT 4H — Hồi về hỗ trợ');
+    expect(text).toContain('Vào ~114 · Cắt lỗ 110.8 · Chốt lời 124.95');
+    expect(text).toContain('R:R 1:3.4');
+    expect(text).toMatch(/3\.1[23] SOL/);
+    expect(text).not.toContain('Kế hoạch:');
+  });
+});

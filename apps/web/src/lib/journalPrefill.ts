@@ -1,4 +1,4 @@
-import { isTradeSide, type Gem, type TradeSide } from './types';
+import { isTradeSide, type Gem, type TradeSetup, type TradeSide } from './types';
 
 /**
  * The hand-off from a gem card to the journal form, both directions.
@@ -17,6 +17,8 @@ export interface TradePrefill {
   note: string;
   /** Where the idea came from; a gem card fills in the scanner, so its picks are scored as a source. */
   source: string;
+  /** Why — a setup card fills in its plan, so a loss is read back against it. Empty for a gem. */
+  thesis: string;
 }
 
 /**
@@ -36,6 +38,27 @@ export interface TradePrefill {
  * with the user's own fills, not the scanner's paper outcomes.
  */
 export const GEM_SCANNER_SOURCE = 'Gem scanner';
+
+/** Trades opened from a 4H setup card are credited to it, for the same reason. */
+export const SETUP_SCANNER_SOURCE = 'Setup scanner';
+
+const SETUP_KIND_LABEL: Record<TradeSetup['kind'], string> = { pullback: 'hồi về hỗ trợ', breakout_retest: 'phá vùng rồi test lại' };
+
+/**
+ * A journal draft for a 4H setup. The price is the setup's planned entry —
+ * a plan, not a fill — so like the gem draft it fills the form and leaves
+ * the number for the user to correct to what they actually paid.
+ */
+export function setupPrefillHref(setup: TradeSetup): string {
+  const params = new URLSearchParams({
+    symbol: setup.symbol,
+    side: 'spot',
+    entry: String(setup.entry),
+    source: SETUP_SCANNER_SOURCE,
+    thesis: `4H ${SETUP_KIND_LABEL[setup.kind]} ${setup.level} · SL ${setup.stop.toPrecision(6)} · TP ${setup.target} · R:R 1:${setup.rr.toFixed(1)}`,
+  });
+  return `/journal?${params.toString()}`;
+}
 
 export function journalPrefillHref(gem: Gem): string {
   const params = new URLSearchParams({
@@ -71,5 +94,6 @@ export function parseTradePrefill(params: URLSearchParams): TradePrefill | null 
     entryPrice: entry !== null && entry.trim() !== '' && Number.isFinite(Number(entry)) ? entry : '',
     note: params.get('note') ?? '',
     source: params.get('source') ?? '',
+    thesis: params.get('thesis') ?? '',
   };
 }

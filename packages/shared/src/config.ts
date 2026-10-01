@@ -42,6 +42,8 @@ const envSchema = z.object({
   TELEGRAM_ALERT_TEST: z.string().default(''),
   // One morning message per day after the 1D close. On unless set to off/0/false.
   DAILY_DIGEST: z.string().default('on'),
+  // Telegram message when a pullback / breakout-retest setup forms on 4H. On unless off/0/false.
+  SETUP_ALERTS: z.string().default('on'),
 
   SYMBOLS: z.string().default('BTCUSDT,ETHUSDT,SOLUSDT'),
   /** Futures-only symbols (no Binance Spot listing) — see ASSUMPTIONS.md §15. Tracked with a reduced indicator/signal set. */
@@ -158,6 +160,8 @@ export interface AppConfig {
   telegramAlertTest: boolean;
   /** The once-a-day summary after the daily close. On by default; DAILY_DIGEST=off disables it. */
   dailyDigest: boolean;
+  /** Push a message when a 4H entry setup forms. On by default; SETUP_ALERTS=off disables. */
+  setupAlerts: boolean;
   telegramAlertChatIds: string[];
   symbols: string[];
   /** Symbols tracked in reduced (Futures-only, no Spot) mode — disjoint from `symbols`. */
@@ -306,6 +310,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     telegramDefaultTimeframe: pickDefaultTimeframe(parsed.TELEGRAM_DEFAULT_TIMEFRAME, timeframes),
     telegramAlertTest: isEnabledFlag(parsed.TELEGRAM_ALERT_TEST),
     dailyDigest: !['off', '0', 'false', 'no'].includes(parsed.DAILY_DIGEST.trim().toLowerCase()),
+    setupAlerts: !['off', '0', 'false', 'no'].includes(parsed.SETUP_ALERTS.trim().toLowerCase()),
     binance: {
       spotRestBase: parsed.BINANCE_SPOT_REST_BASE,
       spotWsBase: parsed.BINANCE_SPOT_WS_BASE,

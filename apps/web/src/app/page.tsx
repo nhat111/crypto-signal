@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useSyncExternalStore } from 'react';
-import { getFlow, getOverview, getSignals, getTrend } from '@/lib/api';
+import { getFlow, getOverview, getSetups, getSignals, getTrend } from '@/lib/api';
 import { usePolling } from '@/lib/usePolling';
 import { useSymbolSnapshots } from '@/lib/useSymbolSnapshots';
 import type { Signal } from '@/lib/types';
@@ -16,6 +16,7 @@ import {
 } from '@/lib/timeframe';
 import { Heatmap } from '@/components/overview/Heatmap';
 import { MacroFlowBar } from '@/components/overview/MacroFlowBar';
+import { SetupsPanel } from '@/components/overview/SetupsPanel';
 import { SignalList } from '@/components/signals/SignalList';
 import { LoadingPanel, StatePanel } from '@/components/StatePanel';
 
@@ -31,6 +32,8 @@ export default function OverviewPage() {
   // poll is plenty. A failure here leaves the cards without a badge rather
   // than taking the overview down.
   const trend = usePolling(getTrend, FLOW_POLL_MS, []);
+  // Setups are found on the hourly scan of closed 4H bars; a minute's poll is plenty.
+  const setups = usePolling(() => getSetups(30), 60_000, []);
 
   const symbols = overview.data?.symbols ?? [];
   const available = overview.data?.timeframes ?? [];
@@ -111,6 +114,8 @@ export default function OverviewPage() {
           </div>
         )}
       </section>
+
+      {setups.data && <SetupsPanel data={setups.data} />}
 
       {overview.data && overview.data.rows.length > 0 && (
         <section>
