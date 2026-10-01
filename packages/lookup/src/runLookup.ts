@@ -94,6 +94,11 @@ export async function runLookup(
 async function lookupExchange(deps: LookupDeps, symbol: string, timeframe: string): Promise<LookupResult> {
   const candidates = candidateSymbols(symbol);
   const tried: string[] = [];
+  // Only Binance's 400 ("Invalid symbol") means unlisted. A ban (418), a
+  // rate limit (429), a geo-block (451), or a network error says nothing
+  // about the symbol — reporting those as "not listed" told a user that
+  // NEARUSDT does not exist on Binance.
+  let upstreamFailure: string | null = null;
 
   for (const candidate of candidates) {
     tried.push(candidate);
@@ -105,6 +110,8 @@ async function lookupExchange(deps: LookupDeps, symbol: string, timeframe: strin
       // here from a transient failure — so try the next quote asset rather
       // than declaring the token unlisted on one bad response.
       deps.logger.warn({ err, candidate }, 'lookup: kline fetch failed, trying the next quote');
+      const status = (err as { status?: unknown } | null)?.status;
+      if (status !== 400) upstreamFailure = describeUpstreamFailure(status, err);
       continue;
     }
     if (bars.length === 0) continue;
@@ -132,10 +139,24 @@ async function lookupExchange(deps: LookupDeps, symbol: string, timeframe: strin
     };
   }
 
+  if (upstreamFailure !== null) {
+    return {
+      kind: 'not_found',
+      reason: `Không lấy được dữ liệu "${symbol}" từ Binance lúc này (${upstreamFailure}). Đây KHÔNG có nghĩa là mã không niêm yết — thử lại sau ít phút, hoặc xem trang Status.`,
+    };
+  }
   return {
     kind: 'not_found',
     reason: `"${symbol}" is not listed on Binance (tried ${tried.join(', ')}). If it is an on-chain token, paste its contract address instead.`,
   };
+}
+
+function describeUpstreamFailure(status: unknown, err: unknown): string {
+  if (status === 418) return 'HTTP 418 — IP máy chủ đang bị Binance chặn tạm thời';
+  if (status === 429) return 'HTTP 429 — gọi Binance quá nhiều, đang bị giới hạn';
+  if (status === 451) return 'HTTP 451 — Binance chặn theo vùng của máy chủ';
+  if (typeof status === 'number') return `HTTP ${status}`;
+  return err instanceof Error ? err.message : 'lỗi kết nối';
 }
 
 async function lookupAddress(deps: LookupDeps, address: string, now: number): Promise<LookupResult> {

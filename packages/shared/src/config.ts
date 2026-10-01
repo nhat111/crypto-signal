@@ -63,7 +63,11 @@ const envSchema = z.object({
    */
   TELEGRAM_DEFAULT_TIMEFRAME: z.string().default('4h'),
 
-  BINANCE_SPOT_REST_BASE: z.string().default('https://api.binance.com'),
+  // Binance's market-data-only host. The spot adapter only ever reads
+  // /api/v3/klines, which it serves identically, and it answered when
+  // api.binance.com was refusing the server's IP — a Lookup then called
+  // NEARUSDT unlisted. Futures has no such host, so fapi stays as it is.
+  BINANCE_SPOT_REST_BASE: z.string().default('https://data-api.binance.vision'),
   BINANCE_SPOT_WS_BASE: z.string().default('wss://stream.binance.com:9443'),
   BINANCE_FUTURES_REST_BASE: z.string().default('https://fapi.binance.com'),
   // Market streams (klines, forceOrder) moved under /market. The bare host
