@@ -390,6 +390,46 @@ export interface TrendResponse {
   fetch: { lastAttemptAt: number | null; lastSuccessAt: number | null; consecutiveFailures: number; lastError: string | null } | null;
 }
 
+/* ---------- 4H entry setups ---------- */
+
+export type SetupKind = 'pullback' | 'breakout_retest';
+
+export interface TradeSetup {
+  id: string;
+  symbol: string;
+  kind: SetupKind;
+  barOpenTime: number;
+  detectedAt: number;
+  level: number;
+  entry: number;
+  stop: number;
+  target: number;
+  rr: number;
+  atr: number;
+  reasons: string[];
+  status: 'open' | 'target' | 'stop' | 'expired';
+  resolvedAt: number | null;
+  rMultiple: number | null;
+}
+
+export interface TradeSetupStats {
+  kind: SetupKind;
+  total: number;
+  open: number;
+  resolved: number;
+  targets: number;
+  stops: number;
+  expired: number;
+  avgR: number | null;
+}
+
+export interface SetupsResponse {
+  setups: TradeSetup[];
+  stats: TradeSetupStats[];
+  minResolved: number;
+  fetch: { lastAttemptAt: number | null; lastSuccessAt: number | null; consecutiveFailures: number; lastError: string | null } | null;
+}
+
 /* ---------- Small-cap discovery (gem scanner) ---------- */
 
 export type SafetyVerdict = 'safe' | 'caution' | 'danger' | 'unknown';

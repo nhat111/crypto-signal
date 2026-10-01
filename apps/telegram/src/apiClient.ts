@@ -153,6 +153,18 @@ export interface TradeDTO {
   closedAt: number | null;
 }
 
+export interface SetupDTO {
+  symbol: string;
+  kind: 'pullback' | 'breakout_retest';
+  detectedAt: number;
+  entry: number;
+  stop: number;
+  target: number;
+  rr: number;
+  status: 'open' | 'target' | 'stop' | 'expired';
+  rMultiple: number | null;
+}
+
 export interface TrendDTO {
   symbol: string;
   lastCloseTime: number;
@@ -355,6 +367,10 @@ export class ApiClient {
 
   getTrend(): Promise<{ trends: TrendDTO[] }> {
     return this.get('/api/trend');
+  }
+
+  getSetups(limit = 10): Promise<{ setups: SetupDTO[]; minResolved: number }> {
+    return this.get(`/api/setups?limit=${limit}`);
   }
 
   closeTrade(id: string, exitPrice: number): Promise<{ trade: TradeDTO }> {

@@ -46,7 +46,7 @@ export function TradeForm({ onCreated, prefill, knownSources = [] }: TradeFormPr
   const [size, setSize] = useState('');
   const [note, setNote] = useState(prefill?.note ?? '');
   const [source, setSource] = useState(prefill?.source ?? '');
-  const [thesis, setThesis] = useState('');
+  const [thesis, setThesis] = useState(prefill?.thesis ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

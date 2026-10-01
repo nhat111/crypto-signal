@@ -16,6 +16,7 @@ import {
   formatTradeOpened,
   formatWatchConfirmation,
   formatWatchList,
+  formatSetups,
   formatTrends,
 } from './formatting.js';
 import { botBuildLine } from './botBuildLine.js';
@@ -311,6 +312,16 @@ async function main(): Promise<void> {
     }
   });
 
+  bot.command('setups', async (ctx) => {
+    try {
+      const { setups } = await api.getSetups(10);
+      await ctx.reply(formatSetups(setups), { parse_mode: 'HTML' });
+    } catch (err) {
+      logger.error({ err }, '/setups failed');
+      await ctx.reply('Không đọc được setup lúc này — thử lại sau ít phút.');
+    }
+  });
+
   bot.command('trend', async (ctx) => {
     try {
       const { trends } = await api.getTrend();
@@ -401,6 +412,7 @@ async function main(): Promise<void> {
       await bot.telegram.setMyCommands([
         { command: 'status', description: `Sức khỏe thị trường (mặc định ${config.telegramDefaultTimeframe})` },
         { command: 'trend', description: 'Xu hướng 1D: tăng / giảm / đi ngang' },
+        { command: 'setups', description: 'Setup 4H: vào / cắt lỗ / chốt lời' },
         { command: 'market', description: 'Heatmap across timeframes' },
         ...symbols.map((symbol) => ({ command: commandNameFor(symbol), description: `${symbol} detail` })),
         { command: 'signals', description: 'Tín hiệu gần đây (mặc định: khung bot bắn alert)' },

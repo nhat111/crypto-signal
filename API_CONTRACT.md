@@ -475,6 +475,30 @@ with fewer than `emaPeriod` daily bars. `previousTrend`/`changedAt` move only
 when the label changes on a new close. `fetch` says whether the job is
 running at all, as on `/api/flow`.
 
+## `GET /api/setups?limit=`
+4H entry setups, most recent first (limit 1–100, default 30), with per-kind
+stats and the job's health.
+```json
+{
+  "setups": [{
+    "id": "7", "symbol": "ETHUSDT", "kind": "pullback" | "breakout_retest",
+    "barOpenTime": 0, "detectedAt": 0, "level": 2600.15,
+    "entry": 2416.65, "stop": 2335.72, "target": 2665.99, "rr": 3.1, "atr": 40.2,
+    "reasons": ["…", "Kế hoạch: …"],
+    "status": "open" | "target" | "stop" | "expired",
+    "resolvedAt": null, "rMultiple": null
+  }],
+  "stats": [{ "kind": "pullback", "total": 3, "open": 1, "resolved": 2, "targets": 1, "stops": 1, "expired": 0, "avgR": 1.05 }],
+  "minResolved": 20,
+  "fetch": { "lastAttemptAt": 0, "lastSuccessAt": 0, "consecutiveFailures": 0, "lastError": null }
+}
+```
+`rMultiple` is in units of the planned risk (entry − stop): `+rr` at the
+target, `-1` at the stop, the last close's distance for `expired`. A bar
+that touched both levels is scored as the stop. Clients withhold hit rates
+below `minResolved` resolved setups. The last element of `reasons` is the
+plan as one sentence; clients that show entry/stop/target as fields drop it.
+
 ## `GET /api/flow`
 Macro context: total stablecoin circulating supply and how fast it's
 growing, as a proxy for money entering or leaving crypto as a whole.

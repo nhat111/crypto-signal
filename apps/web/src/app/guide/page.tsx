@@ -116,6 +116,16 @@ export default function GuidePage() {
             nào.
           </p>
 
+          <p>
+            Bảng <Term>Setup 4H</Term> bên dưới các thẻ coin là hai setup trong phần học TA — <Term>hồi về hỗ trợ</Term>{' '}
+            và <Term>phá vùng rồi test lại</Term> — được máy tìm trên nến 4H đã đóng, chỉ khi 1D không giảm, giá trên
+            EMA200 và R:R từ 1:2. Mỗi setup có sẵn giá vào, cắt lỗ dưới vùng và chốt lời ở đỉnh 1D, và được theo dõi
+            tới khi chạm chốt lời hoặc cắt lỗ — để sau vài chục setup bro biết nó có đáng tin không. Setup hiếm, có
+            tuần không có cái nào. Đây là <Term>ứng viên, không phải lệnh</Term>: vẫn tự xem chart và BTC, vẫn tính cỡ
+            lệnh theo quy tắc 1%, và bấm <Term>Log in journal →</Term> nếu vào để bảng By source chấm luôn nguồn{' '}
+            <Term>Setup scanner</Term>. Bot: <Term>/setups</Term>.
+          </p>
+
           <h3 className="pt-2 text-lg font-bold text-slate-100">Health — &ldquo;có bao nhiêu tiền mặt?&rdquo;</h3>
           <p>
             Điểm càng cao nghĩa là cú tăng càng được người mua đứt (tiền mặt) ủng hộ. Điểm thấp nghĩa là giá đang lên

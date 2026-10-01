@@ -75,7 +75,12 @@ export class BinanceFuturesAdapter implements FuturesAdapter {
    * an intraday dip read as a broken structure.
    */
   async fetchClosedDailyBars(symbol: SymbolId, limit = 400, now = Date.now()): Promise<DailyBar[]> {
-    const raw = await this.rest.getKlines(symbol, '1d', { limit });
+    return this.fetchClosedBars(symbol, '1d', limit, now);
+  }
+
+  /** Same, for any Binance interval — the setup scan reads 4h straight from the exchange so a gap in the collector's own candles cannot hide a setup. */
+  async fetchClosedBars(symbol: SymbolId, interval: string, limit: number, now = Date.now()): Promise<DailyBar[]> {
+    const raw = await this.rest.getKlines(symbol, interval, { limit });
     return closedDailyBars(raw, now);
   }
 

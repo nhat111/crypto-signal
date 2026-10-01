@@ -20,6 +20,7 @@ export * from './gemBaselineAnnounce.js';
 export * from './markPrice.js';
 export * from './tradeJournal.js';
 export * from './trendStates.js';
+export * from './tradeSetups.js';
 export * from './stablecoinSupply.js';
 export * from './jobHealth.js';
 export * from './serviceBuild.js';
