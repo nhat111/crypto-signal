@@ -20,6 +20,7 @@ import { runBaselineAnnounceCycle, type BaselineAnnounceDeps } from './baselineA
 import { runHealthAlertCycle } from './healthAlerts.js';
 import { runAlertSelfTest } from './alertSelfTest.js';
 import { runStablecoinFlowCycle } from './stablecoinFlow.js';
+import { runTrendCycle } from './trendCycle.js';
 import type { WorkerContext } from './context.js';
 
 const HORIZONS: OutcomeHorizon[] = ['15m', '1h', '4h', '24h'];
@@ -201,6 +202,12 @@ export function startSchedulers(ctx: WorkerContext): () => void {
     ),
   );
   void runStablecoinFlowCycle(stablecoinDeps).catch((err) => ctx.logger.error({ err }, 'initial stablecoin flow refresh failed'));
+
+  // Daily structure and the morning digest. Hourly, so a worker started at
+  // any time picks up the latest daily close within the hour; most runs
+  // re-read an unchanged bar and write nothing new.
+  timers.push(setInterval(() => void runTrendCycle(ctx).catch((err) => ctx.logger.error({ err }, 'trend cycle failed')), 60 * 60_000));
+  void runTrendCycle(ctx).catch((err) => ctx.logger.error({ err }, 'initial trend cycle failed'));
 
   timers.push(setInterval(() => void runOutcomeTracker(ctx).catch((err) => ctx.logger.error({ err }, 'outcome tracker failed')), 5 * 60_000));
   timers.push(setInterval(() => void refreshHistoricalScores(ctx).catch((err) => ctx.logger.error({ err }, 'historical score refresh failed')), 10 * 60_000));

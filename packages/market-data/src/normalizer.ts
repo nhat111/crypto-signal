@@ -1,3 +1,4 @@
+import type { DailyBar } from './types.js';
 import type { Candle, LiquidationEvent, Market, SymbolId, Timeframe } from '@crypto-signal/shared';
 import { timeframeToMs } from '@crypto-signal/shared';
 
@@ -164,4 +165,19 @@ export class CandleSequenceGuard {
   reset(): void {
     this.lastOpenTime = undefined;
   }
+}
+
+/** Raw 1d klines → closed bars only, oldest first. A bar whose close time is still ahead is the forming one. */
+export function closedDailyBars(raw: RawKline[], now: number): DailyBar[] {
+  return raw
+    .filter((r) => r[6] < now)
+    .map((r) => ({
+      openTime: r[0],
+      closeTime: r[6],
+      open: Number(r[1]),
+      high: Number(r[2]),
+      low: Number(r[3]),
+      close: Number(r[4]),
+      volume: Number(r[5]),
+    }));
 }

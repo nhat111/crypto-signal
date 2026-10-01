@@ -234,6 +234,21 @@ deploys first pulls the schema forward, and an old build then queries a
 newer schema. That is fine for additive migrations (every one here so far)
 and is why the order in the previous section is api first.
 
+### Morning digest and the 1D trend
+
+The worker reads each symbol's **daily** structure every hour (a few Binance
+requests) and, once per UTC day after the daily close — 07:00 in Vietnam —
+sends **one** summary to every alert chat: the 1D trend per coin, any coin
+whose structure just broke, Health/Risk on 4h, and the most severe 4h
+signals of the last 24h. It is on by default; `DAILY_DIGEST=off` on the
+worker turns it off. A restart never sends a second one for the same day,
+and a worker that was down all morning skips that day rather than sending
+yesterday's summary in the evening.
+
+With the digest on, most people want `ALERT_TIMEFRAMES=4h` (or nothing
+pushed at all besides the digest): the 5m and 15m signal alerts are what
+makes the bot noisy.
+
 ## Proving the alert path actually works
 
 `/status` shows how many chats the worker could alert, which proves the

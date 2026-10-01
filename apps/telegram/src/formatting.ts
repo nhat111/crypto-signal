@@ -1,4 +1,4 @@
-import type { GemRow, GemWatchDTO, LookupDTO, LatestSymbolState, OverviewRow, PriceLevels, SignalRow, StablecoinFlowDTO, StablecoinFlowWindowDTO, TradeDTO, TradeSummaryDTO } from './apiClient.js';
+import type { GemRow, GemWatchDTO, LookupDTO, LatestSymbolState, OverviewRow, PriceLevels, SignalRow, StablecoinFlowDTO, StablecoinFlowWindowDTO, TradeDTO, TradeSummaryDTO, TrendDTO } from './apiClient.js';
 
 function healthLine(row: OverviewRow): string {
   const score = row.healthScore === null ? 'N/A' : String(row.healthScore);
@@ -177,6 +177,8 @@ export function formatTradeOpened(trade: TradeDTO): string {
   const lines = [
     `📓 Logged <b>${escapeHtml(trade.symbol)}</b> ${trade.side.toUpperCase()}`,
     `Entry: $${formatPrice(trade.entryPrice)}${trade.size !== null ? ` · size ${trade.size}` : ''}`,
+    ...(trade.source ? [`Nguồn: ${escapeHtml(trade.source)}`] : []),
+    ...(trade.thesis ? [`Lý do: ${escapeHtml(trade.thesis)}`] : []),
     '',
     `<i>/close ${escapeHtml(trade.symbol)} EXIT_PRICE when you're out.</i>`,
   ];
@@ -215,7 +217,7 @@ export function formatJournal(trades: TradeDTO[], summary: TradeSummaryDTO): str
   lines.push('');
 
   if (trades.length === 0) {
-    lines.push('No trades logged yet. Use /trade SYMBOL long|short ENTRY [SIZE] to start.');
+    lines.push('No trades logged yet. Use /trade SYMBOL spot ENTRY [SIZE] [NGUỒN] [| LÝ DO] to start.');
     return lines.join('\n');
   }
 
@@ -299,7 +301,8 @@ export function buildHelpText(symbols: string[]): string {
     '/watch SYMBOL — track a position you bought, get a sell alert here',
     '/watches — list your active watches',
     '/unwatch SYMBOL — stop tracking one',
-    '/trade SYMBOL long|short ENTRY [SIZE] — log a trade you took',
+    '/trade SYMBOL spot|long|short ENTRY [SIZE] [NGUỒN] [| LÝ DO] — ghi lệnh đã vào, vd /trade SOLUSDT spot 150 2 @CryptoCred | hồi về hỗ trợ 1D',
+    '/trend — xu hướng 1D của từng coin (đỉnh/đáy, EMA200)',
     '/close SYMBOL EXIT_PRICE — close your most recent open trade on that symbol',
     '/journal — your trade log + win rate / P&L summary',
     '/flow — stablecoin supply: money entering or leaving crypto',
@@ -356,5 +359,21 @@ export function formatLookup(data: LookupDTO): string {
     lines.push('');
     lines.push(`<i>Could not be read: ${escapeHtml(f.unknowns.join(', '))}</i>`);
   }
+  return lines.join('\n');
+}
+
+const TREND_TEXT: Record<TrendDTO['trend'], string> = { up: '🟢 Tăng', down: '🔴 Giảm', sideways: '⚪ Đi ngang' };
+
+/** /trend — the daily structure per symbol, with the reasons, because a label without them is a claim. */
+export function formatTrends(trends: TrendDTO[]): string {
+  if (trends.length === 0) return 'Chưa có dữ liệu xu hướng 1D — worker đọc nến ngày mỗi giờ, thử lại sau.';
+  const lines = ['<b>Xu hướng 1D</b> (nến ngày đã đóng)', ''];
+  for (const t of trends) {
+    const ema = t.aboveEma === null ? '' : ` · ${t.aboveEma ? 'trên' : 'dưới'} EMA${t.emaPeriod}`;
+    lines.push(`<b>${escapeHtml(t.symbol)}</b> ${formatPrice(t.lastClose)} — ${TREND_TEXT[t.trend]}${ema}`);
+    for (const r of t.reasons) lines.push(`  · ${escapeHtml(r)}`);
+    lines.push('');
+  }
+  lines.push('<i>Mô tả cấu trúc đỉnh/đáy, không phải dự báo.</i>');
   return lines.join('\n');
 }

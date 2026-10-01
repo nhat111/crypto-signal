@@ -107,6 +107,15 @@ export default function GuidePage() {
             cộng, đừng trừ, đừng gộp lại.
           </p>
 
+          <p>
+            Dưới giá mỗi coin còn có nhãn <Term>Xu hướng 1D</Term>: <Term>Tăng</Term> khi hai đỉnh và hai đáy gần nhất
+            trên nến ngày đều cao dần, <Term>Giảm</Term> khi đều thấp dần, còn lại là <Term>Đi ngang</Term>. Chữ{' '}
+            <Term>gãy cấu trúc tăng</Term> hiện khi giá đóng nến ngày dưới đáy gần nhất — đúng như mục Khi nào xu hướng
+            kết thúc trong phần học TA. Nhãn chỉ đổi khi một nến ngày đóng (7 giờ sáng giờ Việt Nam), rê chuột vào để
+            xem lý do. Mỗi sáng bot Telegram gửi một tin tóm tắt các nhãn này; gõ <Term>/trend</Term> để xem bất cứ lúc
+            nào.
+          </p>
+
           <h3 className="pt-2 text-lg font-bold text-slate-100">Health — &ldquo;có bao nhiêu tiền mặt?&rdquo;</h3>
           <p>
             Điểm càng cao nghĩa là cú tăng càng được người mua đứt (tiền mặt) ủng hộ. Điểm thấp nghĩa là giá đang lên

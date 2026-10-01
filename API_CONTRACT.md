@@ -447,6 +447,34 @@ the baseline a named source has to beat. `minClosed` is the sample size
 below which a win rate is noise; clients withhold it under that line.
 Sorted by closed count, most first.
 
+## `GET /api/trend`
+The daily market-structure read per symbol, from the last **closed** 1D bar.
+The worker refreshes it hourly; the label only moves on a new daily close.
+```json
+{
+  "trends": [{
+    "symbol": "BTCUSDT", "lastCloseTime": 1790640000000, "lastClose": 83664,
+    "trend": "up" | "down" | "sideways",
+    "event": "up_broken" | "down_broken" | null,
+    "previousTrend": "up", "changedAt": 1790726400000,
+    "ema": 75198, "emaPeriod": 200, "aboveEma": true,
+    "swingHighs": [{ "openTime": 0, "price": 79600 }, { "openTime": 0, "price": 87395 }],
+    "swingLows":  [{ "openTime": 0, "price": 74968 }, { "openTime": 0, "price": 82875 }],
+    "reasons": ["Đỉnh gần nhất … cao hơn đỉnh trước …", "Giá đóng trên EMA200 (…)."],
+    "computedAt": 1790730000000
+  }],
+  "fetch": { "lastAttemptAt": 0, "lastSuccessAt": 0, "consecutiveFailures": 0, "lastError": null }
+}
+```
+`up` = the last two swing highs and the last two swing lows are each higher
+(fractal pivots, 3 bars each side); `down` = both lower; anything else is
+`sideways`. `event` is set when the last close is below the latest swing low
+while lows were rising (`up_broken`), or above the latest swing high while
+highs were falling (`down_broken`) — closes only, never wicks. `ema` is null
+with fewer than `emaPeriod` daily bars. `previousTrend`/`changedAt` move only
+when the label changes on a new close. `fetch` says whether the job is
+running at all, as on `/api/flow`.
+
 ## `GET /api/flow`
 Macro context: total stablecoin circulating supply and how fast it's
 growing, as a proxy for money entering or leaving crypto as a whole.
