@@ -40,6 +40,39 @@ describe('BinanceRestClient ban handling', () => {
     await expect(rest.get('/fapi/v1/klines')).resolves.toEqual([1]);
   });
 
+  it('does not retry a 418 without Retry-After, and takes the ban end from the body', async () => {
+    vi.useFakeTimers();
+    const until = Date.now() + 600_000;
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(response(418, {}, { code: -1003, msg: `Way too many requests; IP(1.2.3.4) banned until ${until}.` }));
+    vi.stubGlobal('fetch', fetchMock);
+    const rest = client();
+
+    await expect(rest.get('/fapi/v1/klines')).rejects.toThrow(new RegExp(`banned until ${new Date(until).toISOString()}`));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(599_000);
+    await expect(rest.get('/fapi/v1/klines')).rejects.toThrow(/skipped/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('pauses two minutes after a 418 that gives no duration at all', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockResolvedValueOnce(response(418, {}, {}));
+    vi.stubGlobal('fetch', fetchMock);
+    const rest = client();
+
+    await expect(rest.get('/fapi/v1/klines')).rejects.toThrow(/banned until/);
+    vi.advanceTimersByTime(119_000);
+    await expect(rest.get('/fapi/v1/klines')).rejects.toThrow(/skipped/);
+
+    vi.advanceTimersByTime(2_000);
+    fetchMock.mockResolvedValueOnce(response(200, {}, [1]));
+    await expect(rest.get('/fapi/v1/klines')).resolves.toEqual([1]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('still waits out a short Retry-After and retries', async () => {
     vi.useFakeTimers();
     const fetchMock = vi

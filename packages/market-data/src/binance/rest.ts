@@ -32,6 +32,9 @@ export interface RestClientOptions {
  */
 const DEFAULT_MAX_BACKOFF_MS = 60_000;
 
+/** Pause after a 418 that says neither in a header nor in its body how long the ban lasts. */
+const DEFAULT_BAN_MS = 2 * 60_000;
+
 /**
  * Thin typed wrapper over Binance's REST endpoints actually used by this
  * app (spec §29 "Rate-limit handling"): backs off on HTTP 429 (rate limit)
@@ -40,7 +43,7 @@ const DEFAULT_MAX_BACKOFF_MS = 60_000;
  * are programming/data errors, not transient rate limiting, and retrying
  * them would hide a real bug.
  *
- * A ban (Retry-After beyond maxBackoffMs) fails fast instead, and every
+ * A ban (any 418, or a Retry-After beyond maxBackoffMs) fails fast instead, and every
  * call until it lifts throws without touching the network: Binance
  * lengthens a ban for requests sent during it, and the callers already
  * treat a failed REST call as "live data will catch up".
@@ -87,8 +90,14 @@ export class BinanceRestClient {
       const isRateLimited = res.status === 429 || res.status === 418;
       if (isRateLimited && attempt <= this.maxRetries) {
         const retryAfterHeader = res.headers.get('retry-after');
-        const delayMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : 1000 * 2 ** attempt;
-        if (delayMs > this.maxBackoffMs) {
+        // A 418 is already a ban. Without Retry-After, backing off 2s/4s/8s
+        // would send three more requests into it and lengthen it.
+        const delayMs = retryAfterHeader
+          ? Number(retryAfterHeader) * 1000
+          : res.status === 418
+            ? banDelayFromBody(await safeJson(res)) ?? DEFAULT_BAN_MS
+            : 1000 * 2 ** attempt;
+        if (res.status === 418 || delayMs > this.maxBackoffMs) {
           this.bannedUntil = Date.now() + delayMs;
           const until = new Date(this.bannedUntil).toISOString();
           this.logger.error(
@@ -123,6 +132,19 @@ export class BinanceRestClient {
       endTime: opts.endTime,
     });
   }
+}
+
+/**
+ * Binance's 418 body reads "... IP(1.2.3.4) banned until 1569543460000. ..."
+ * (epoch ms). Returns the wait until then, or null if the body says nothing.
+ */
+function banDelayFromBody(body: unknown): number | null {
+  if (body === null || typeof body !== 'object') return null;
+  const msg = (body as { msg?: unknown }).msg;
+  if (typeof msg !== 'string') return null;
+  const match = /banned until (\d{13})/.exec(msg);
+  if (!match) return null;
+  return Math.max(0, Number(match[1]) - Date.now());
 }
 
 async function safeJson(res: Response): Promise<unknown> {
