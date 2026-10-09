@@ -303,6 +303,9 @@ export interface Trade {
   pnlUsd: number | null;
   status: TradeStatus;
   note: string | null;
+  /** Optional: an API deployed before these columns sends neither. */
+  source?: string | null;
+  thesis?: string | null;
   openedAt: number;
   closedAt: number | null;
 
@@ -340,6 +343,91 @@ export interface TradeSummary {
   unrealizedPnlUsd?: number | null;
   /** How many open positions that total actually covers — a total over some of them is not a total. */
   unrealizedPricedCount?: number;
+}
+
+/** One row of the journal grouped by where each idea came from. `source: null` is the "not recorded" group. */
+export interface TradeSourceStats {
+  source: string | null;
+  openCount: number;
+  closedCount: number;
+  wins: number;
+  winRatePct: number | null;
+  avgPnlPct: number | null;
+  totalPnlUsd: number | null;
+}
+
+export interface TradeSourcesResponse {
+  sources: TradeSourceStats[];
+  /** Below this many closed trades a source's numbers are noise; the API decides so every client agrees. */
+  minClosed: number;
+}
+
+/* ---------- Daily market structure ---------- */
+
+export type TrendLabel = 'up' | 'down' | 'sideways';
+
+export interface TrendState {
+  symbol: string;
+  /** Open time of the last closed daily bar the read used. */
+  lastCloseTime: number;
+  lastClose: number;
+  trend: TrendLabel;
+  /** Set on the close that lost the last swing on the wrong side, and while it stays lost. */
+  event: 'up_broken' | 'down_broken' | null;
+  previousTrend: TrendLabel | null;
+  changedAt: number | null;
+  ema: number | null;
+  emaPeriod: number;
+  aboveEma: boolean | null;
+  swingHighs: Array<{ openTime: number; price: number }>;
+  swingLows: Array<{ openTime: number; price: number }>;
+  reasons: string[];
+  computedAt: number;
+}
+
+export interface TrendResponse {
+  trends: TrendState[];
+  fetch: { lastAttemptAt: number | null; lastSuccessAt: number | null; consecutiveFailures: number; lastError: string | null } | null;
+}
+
+/* ---------- 4H entry setups ---------- */
+
+export type SetupKind = 'pullback' | 'breakout_retest';
+
+export interface TradeSetup {
+  id: string;
+  symbol: string;
+  kind: SetupKind;
+  barOpenTime: number;
+  detectedAt: number;
+  level: number;
+  entry: number;
+  stop: number;
+  target: number;
+  rr: number;
+  atr: number;
+  reasons: string[];
+  status: 'open' | 'target' | 'stop' | 'expired';
+  resolvedAt: number | null;
+  rMultiple: number | null;
+}
+
+export interface TradeSetupStats {
+  kind: SetupKind;
+  total: number;
+  open: number;
+  resolved: number;
+  targets: number;
+  stops: number;
+  expired: number;
+  avgR: number | null;
+}
+
+export interface SetupsResponse {
+  setups: TradeSetup[];
+  stats: TradeSetupStats[];
+  minResolved: number;
+  fetch: { lastAttemptAt: number | null; lastSuccessAt: number | null; consecutiveFailures: number; lastError: string | null } | null;
 }
 
 /* ---------- Small-cap discovery (gem scanner) ---------- */

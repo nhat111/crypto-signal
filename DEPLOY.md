@@ -234,6 +234,38 @@ deploys first pulls the schema forward, and an old build then queries a
 newer schema. That is fine for additive migrations (every one here so far)
 and is why the order in the previous section is api first.
 
+### Morning digest and the 1D trend
+
+The worker reads each symbol's **daily** structure every hour (a few Binance
+requests) and, once per UTC day after the daily close — 07:00 in Vietnam —
+sends **one** summary to every alert chat: the 1D trend per coin, any coin
+whose structure just broke, Health/Risk on 4h, and the most severe 4h
+signals of the last 24h. It is on by default; `DAILY_DIGEST=off` on the
+worker turns it off. A restart never sends a second one for the same day,
+and a worker that was down all morning skips that day rather than sending
+yesterday's summary in the evening.
+
+With the digest on, most people want `ALERT_TIMEFRAMES=4h` (or nothing
+pushed at all besides the digest): the 5m and 15m signal alerts are what
+makes the bot noisy.
+
+### 4H entry setups
+
+On the same hourly run the worker reads the last 120 closed 4H bars of each
+spot symbol and looks for the two setups the TA guide teaches — a pullback
+rejected at the latest 1D swing low, and a high-volume break above the latest
+1D swing high that is then retested — only while the 1D structure is not
+down and price is above its EMA200, and only when the plan's R:R is at least
+1:2. A new setup is stored once (per symbol, kind and 4H bar) and pushed to
+the alert chats; `SETUP_ALERTS=off` stops the push but not the record. Every
+open setup is then followed until it touches its target or its stop (a bar
+touching both counts as the stop), or expires after 14 days at the last
+close, so `/setups` and the Overview panel show how they actually ended.
+
+Expect them to be rare. Replayed walk-forward over May–September 2026 on
+BTC/ETH/SOL — mostly a falling market — the rules produced three setups.
+That is the guide's "most of the time there is nothing to do", not a fault.
+
 ## Proving the alert path actually works
 
 `/status` shows how many chats the worker could alert, which proves the
@@ -367,6 +399,56 @@ they cost you:
 Storage is genuinely not the concern: the whole schema grows on the order of
 50MB a month at three symbols, and Railway charges cents per GB-month for it.
 The 30-day historical replay adds roughly 60MB once.
+
+## Free hosting without Railway (no credit card)
+
+When the Railway trial runs out, the whole backend fits on free tiers that
+ask for no card. The code is unchanged — only the packaging:
+`Dockerfile.allinone` runs worker + api (+ telegram) in **one** container
+(`scripts/start-all.sh`), because free hosts give one always-on service,
+not three.
+
+```
+Vercel (free)          → apps/web                      (unchanged)
+Render free web service → worker + api (+ telegram)     (Dockerfile.allinone)
+Supabase free          → Postgres
+cron-job.org (free)    → pings /health so Render never sleeps
+```
+
+1. **Postgres — Supabase.** New project, region Singapore. Project →
+   **Connect** → **Session pooler** URL (port 5432; *not* the transaction
+   pooler on 6543 — migrations take an advisory lock, which needs a session;
+   *not* the direct URL, which is IPv6-only). Append `?sslmode=no-verify`.
+   500MB free is roughly nine months at three symbols (~50MB/month).
+   Neon's free tier is not a fit: the worker writes all day, so the compute
+   never scales to zero and burns through the monthly compute hours.
+2. **Backend — Render.** New → **Blueprint** → this repo (reads
+   `render.yaml`), or New → Web Service → Docker, Dockerfile path
+   `Dockerfile.allinone`, instance type **Free**, region **Singapore or
+   Frankfurt — never a US region**: Binance answers US IPs with 451
+   "Service unavailable from a restricted location", and the worker then
+   collects nothing. Set `DATABASE_URL`, and optionally
+   `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ALERT_CHAT_IDS` and any worker variable
+   from the Railway sections above (all on this one service now). `PORT` is
+   set by Render and the api listens on it.
+   **Health Check Path must be `/livez`** (render.yaml sets it). Never
+   `/health`: it answers 503 whenever Binance or the worker is unhappy, and
+   Render then times the deploy out and silently keeps the old build.
+3. **Keep it awake.** A free Render service sleeps after 15 minutes without
+   an inbound request — and a sleeping worker collects nothing. On
+   cron-job.org, GET `https://<service>.onrender.com/health` every 10
+   minutes. 750 free instance-hours a month covers exactly one service
+   running all month, which is why everything is in one container.
+4. **Web — Vercel.** Set `NEXT_PUBLIC_API_BASE_URL` to the Render URL and
+   **Redeploy**.
+
+Moving existing data is optional: `pg_dump` the Railway database into
+Supabase before the trial ends, or start fresh and run the historical
+replay (`BACKFILL_DAYS=30`, see above) — Binance only serves 30 days of
+open-interest history either way.
+
+If api or worker exits, `start-all.sh` stops the container so Render
+restarts it; the bot restarts on its own and never takes the collector down.
 
 ## Enabling the small-cap discovery scanner (optional)
 

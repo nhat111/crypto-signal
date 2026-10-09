@@ -146,8 +146,35 @@ export interface TradeDTO {
   pnlUsd: number | null;
   status: TradeStatus;
   note: string | null;
+  /** Optional: an API that predates these columns sends neither. */
+  source?: string | null;
+  thesis?: string | null;
   openedAt: number;
   closedAt: number | null;
+}
+
+export interface SetupDTO {
+  symbol: string;
+  kind: 'pullback' | 'breakout_retest';
+  detectedAt: number;
+  entry: number;
+  stop: number;
+  target: number;
+  rr: number;
+  status: 'open' | 'target' | 'stop' | 'expired';
+  rMultiple: number | null;
+}
+
+export interface TrendDTO {
+  symbol: string;
+  lastCloseTime: number;
+  lastClose: number;
+  trend: 'up' | 'down' | 'sideways';
+  event: 'up_broken' | 'down_broken' | null;
+  previousTrend: 'up' | 'down' | 'sideways' | null;
+  aboveEma: boolean | null;
+  emaPeriod: number;
+  reasons: string[];
 }
 
 export interface TradeSummaryDTO {
@@ -326,8 +353,24 @@ export class ApiClient {
     return this.post(`/api/watches/${id}/close`, { chatId });
   }
 
-  openTrade(chatId: string, symbol: string, side: TradeSide, entryPrice: number, size: number | null): Promise<{ trade: TradeDTO }> {
-    return this.post('/api/journal', { chatId, symbol, side, entryPrice, size });
+  openTrade(
+    chatId: string,
+    symbol: string,
+    side: TradeSide,
+    entryPrice: number,
+    size: number | null,
+    source: string | null = null,
+    thesis: string | null = null,
+  ): Promise<{ trade: TradeDTO }> {
+    return this.post('/api/journal', { chatId, symbol, side, entryPrice, size, source, thesis });
+  }
+
+  getTrend(): Promise<{ trends: TrendDTO[] }> {
+    return this.get('/api/trend');
+  }
+
+  getSetups(limit = 10): Promise<{ setups: SetupDTO[]; minResolved: number }> {
+    return this.get(`/api/setups?limit=${limit}`);
   }
 
   closeTrade(id: string, exitPrice: number): Promise<{ trade: TradeDTO }> {

@@ -16,13 +16,15 @@ import {
   formatTradeOpened,
   formatWatchConfirmation,
   formatWatchList,
+  formatSetups,
+  formatTrends,
 } from './formatting.js';
-import { isTradeSide } from './apiClient.js';
 import { botBuildLine } from './botBuildLine.js';
 import { launchWithHandover } from './launchWithHandover.js';
 import { retryOn429 } from './retryAfter.js';
 import { parseSignalsArg, resolveSignalsScope } from './signalsScope.js';
 import { parseTimeframeArg, type TimeframeChoice } from './timeframeArg.js';
+import { parseTradeArgs } from './tradeArgs.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -287,26 +289,46 @@ async function main(): Promise<void> {
 
   bot.command('trade', async (ctx) => {
     const chatId = String(ctx.chat.id);
-    const parts = ctx.message.text.split(/\s+/).slice(1);
-    const [symbolRaw, sideRaw, entryRaw, sizeRaw] = parts;
-    // Sent as typed: the API decides casing, because a contract address is
-    // case-sensitive on Solana and upper-casing it stores a different token.
-    const symbol = symbolRaw;
-    const side = sideRaw?.toLowerCase();
-    const entryPrice = entryRaw !== undefined ? Number(entryRaw) : NaN;
-    const size = sizeRaw !== undefined ? Number(sizeRaw) : null;
-
-    if (!symbol || !isTradeSide(side) || !Number.isFinite(entryPrice) || (size !== null && !Number.isFinite(size))) {
-      await ctx.reply('Usage: /trade SYMBOL spot|long|short ENTRY_PRICE [SIZE]\ne.g. /trade BTCUSDT spot 78000 0.1');
+    // Symbol is sent as typed: the API decides casing, because a contract
+    // address is case-sensitive on Solana and upper-casing it stores a
+    // different token.
+    const parsed = parseTradeArgs(ctx.message.text);
+    if (!parsed.ok) {
+      await ctx.reply(
+        'Usage: /trade SYMBOL spot|long|short ENTRY [SIZE] [NGUỒN] [| LÝ DO]\n' +
+          'e.g. /trade BTCUSDT spot 78000 0.1\n' +
+          '     /trade SOLUSDT spot 150 2 @CryptoCred | hồi về hỗ trợ 1D',
+      );
       return;
     }
+    const { symbol, side, entryPrice, size, source, thesis } = parsed.args;
 
     try {
-      const { trade } = await api.openTrade(chatId, symbol, side, entryPrice, size);
+      const { trade } = await api.openTrade(chatId, symbol, side, entryPrice, size, source, thesis);
       await ctx.reply(formatTradeOpened(trade), { parse_mode: 'HTML' });
     } catch (err) {
       logger.error({ err, symbol }, '/trade failed');
       await ctx.reply('Could not log that trade right now — try again shortly.');
+    }
+  });
+
+  bot.command('setups', async (ctx) => {
+    try {
+      const { setups } = await api.getSetups(10);
+      await ctx.reply(formatSetups(setups), { parse_mode: 'HTML' });
+    } catch (err) {
+      logger.error({ err }, '/setups failed');
+      await ctx.reply('Không đọc được setup lúc này — thử lại sau ít phút.');
+    }
+  });
+
+  bot.command('trend', async (ctx) => {
+    try {
+      const { trends } = await api.getTrend();
+      await ctx.reply(formatTrends(trends), { parse_mode: 'HTML' });
+    } catch (err) {
+      logger.error({ err }, '/trend failed');
+      await ctx.reply('Không đọc được xu hướng lúc này — thử lại sau ít phút.');
     }
   });
 
@@ -389,6 +411,8 @@ async function main(): Promise<void> {
     attempt: async () => {
       await bot.telegram.setMyCommands([
         { command: 'status', description: `Sức khỏe thị trường (mặc định ${config.telegramDefaultTimeframe})` },
+        { command: 'trend', description: 'Xu hướng 1D: tăng / giảm / đi ngang' },
+        { command: 'setups', description: 'Setup 4H: vào / cắt lỗ / chốt lời' },
         { command: 'market', description: 'Heatmap across timeframes' },
         ...symbols.map((symbol) => ({ command: commandNameFor(symbol), description: `${symbol} detail` })),
         { command: 'signals', description: 'Tín hiệu gần đây (mặc định: khung bot bắn alert)' },

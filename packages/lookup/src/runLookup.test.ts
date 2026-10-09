@@ -115,6 +115,22 @@ describe('runLookup — exchange path', () => {
     expect(await runLookup(deps({ fetchBars }), 'FOO')).toMatchObject({ kind: 'exchange', symbol: 'FOOUSDC' });
   });
 
+  it('does not call a listed coin unlisted when Binance refused the request — NEARUSDT on a banned IP', async () => {
+    const banned = Object.assign(new Error('Binance REST 418'), { status: 418 });
+    const result = await runLookup(deps({ fetchBars: async () => { throw banned; } }), 'nearusdt');
+    expect(result.kind).toBe('not_found');
+    const reason = (result as { reason: string }).reason;
+    expect(reason).toContain('418');
+    expect(reason).toContain('KHÔNG có nghĩa là mã không niêm yết');
+    expect(reason).not.toContain('is not listed');
+  });
+
+  it('still calls it unlisted when every refusal was Binance’s invalid-symbol 400', async () => {
+    const invalid = Object.assign(new Error('Binance REST 400'), { status: 400 });
+    const result = await runLookup(deps({ fetchBars: async () => { throw invalid; } }), 'NOPE');
+    expect((result as { reason: string }).reason).toContain('is not listed');
+  });
+
   it('says which symbols it tried when none of them existed', async () => {
     const result = await runLookup(deps({ fetchBars: async () => [] }), 'NOPE');
     expect(result.kind).toBe('not_found');

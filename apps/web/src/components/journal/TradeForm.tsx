@@ -21,6 +21,8 @@ interface TradeFormProps {
    * half-typed form from being overwritten by a re-render.
    */
   prefill?: TradePrefill | null;
+  /** Sources already used, offered as suggestions so one account is not typed three ways. */
+  knownSources?: string[];
 }
 
 const inputClass =
@@ -34,7 +36,7 @@ const SIDE_STYLES: Record<TradeSide, string> = {
 
 const SIDE_LABELS: Record<TradeSide, string> = { spot: 'Spot', long: 'Long', short: 'Short' };
 
-export function TradeForm({ onCreated, prefill }: TradeFormProps) {
+export function TradeForm({ onCreated, prefill, knownSources = [] }: TradeFormProps) {
   const [symbol, setSymbol] = useState(prefill?.symbol ?? '');
   // Spot by default: it is the only one of the three that needs no margin
   // account, and a wrong default here writes a position type into the log
@@ -43,6 +45,8 @@ export function TradeForm({ onCreated, prefill }: TradeFormProps) {
   const [entryPrice, setEntryPrice] = useState(prefill?.entryPrice ?? '');
   const [size, setSize] = useState('');
   const [note, setNote] = useState(prefill?.note ?? '');
+  const [source, setSource] = useState(prefill?.source ?? '');
+  const [thesis, setThesis] = useState(prefill?.thesis ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,11 +70,15 @@ export function TradeForm({ onCreated, prefill }: TradeFormProps) {
         entryPrice: parsedEntry,
         size: size.trim() === '' ? null : parseSizeInput(size),
         note: note.trim() === '' ? null : note.trim(),
+        source: source.trim() === '' ? null : source.trim(),
+        thesis: thesis.trim() === '' ? null : thesis.trim(),
       });
       setSymbol('');
       setEntryPrice('');
       setSize('');
       setNote('');
+      setSource('');
+      setThesis('');
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not log the trade.');
@@ -128,10 +136,36 @@ export function TradeForm({ onCreated, prefill }: TradeFormProps) {
           />
         </Field>
 
+        <Field label="Source (optional)">
+          <input
+            className={cx(inputClass, 'w-44')}
+            placeholder="@account, group, tự phân tích"
+            list="journal-sources"
+            maxLength={80}
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
+          />
+          <datalist id="journal-sources">
+            {knownSources.map((s) => (
+              <option key={s} value={s} />
+            ))}
+          </datalist>
+        </Field>
+
+        <Field label="Thesis (optional)">
+          <input
+            className={cx(inputClass, 'w-72')}
+            placeholder="why you are taking it, in one line"
+            maxLength={2000}
+            value={thesis}
+            onChange={(e) => setThesis(e.target.value)}
+          />
+        </Field>
+
         <Field label="Note (optional)">
           <input
             className={cx(inputClass, 'w-48')}
-            placeholder="why you took it"
+            placeholder="anything else"
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />

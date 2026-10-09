@@ -82,6 +82,8 @@ describe('parseTradePrefill', () => {
       side: 'spot',
       entryPrice: '0.00042',
       note: 'solana · bdm98av7y3geqrhnn3f8uvcdlxngm7xbxxqzcgpbrub · Gem 71',
+      source: 'Gem scanner',
+      thesis: '',
     });
   });
 

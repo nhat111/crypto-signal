@@ -336,13 +336,19 @@ render that as "no signals of this type yet", not a chart with a zero bar.
 Same shape as one entry of `results` above, for a single signal type. 404
 if `signalType` isn't one of the 9 valid values.
 
-## Trade journal — `POST /api/journal`, `GET /api/journal`, `PATCH /api/journal/:id`, `DELETE /api/journal/:id`, `GET /api/journal/summary`
+## Trade journal — `POST /api/journal`, `GET /api/journal`, `PATCH /api/journal/:id`, `DELETE /api/journal/:id`, `GET /api/journal/summary`, `GET /api/journal/sources`
 A manual log of trades a person actually took — separate from both the
 signal engine and the gem scanner, which never write here. `chatId` scopes
 entries to whoever logged them (a Telegram chat id, or the fixed string
 `"web"` for entries made on the dashboard, which has no login).
 
-`POST /api/journal` body: `{ chatId, symbol, side: "spot"|"long"|"short", entryPrice, size?, note? }`
+`POST /api/journal` body: `{ chatId, symbol, side: "spot"|"long"|"short", entryPrice, size?, note?, source?, thesis? }`
+
+`source` (≤80 chars) is where the idea came from — an account, a group,
+"tự phân tích"; `thesis` (≤2000) is why it was taken. Both are trimmed and
+a blank one is stored as `null`, so a cleared field does not become a
+source of its own. They are separate from `note` because they are
+counted: see `/api/journal/sources`. 400 if either is not text or too long.
 
 `spot` prices identically to `long` — it exists so the row records the
 position that was actually taken rather than the nearest futures word.
@@ -395,6 +401,7 @@ dashboard does). Returns `{ trades: [...] }`, most recent first.
   "entryPrice": 78000, "exitPrice": 79200, "size": 0.1,
   "pnlPct": 1.54, "pnlUsd": 120,
   "status": "closed", "note": "bullish divergence signal",
+  "source": "@CryptoCred", "thesis": "reclaimed the 1D range high",
   "openedAt": 1700000000000, "closedAt": 1700003600000
 }
 ```
@@ -403,7 +410,7 @@ dashboard does). Returns `{ trades: [...] }`, most recent first.
 stored, not derived on read.
 
 `PATCH /api/journal/:id` body: any subset of `{ symbol, side, entryPrice,
-exitPrice, size, note }`. Setting `exitPrice` to a number is how a trade
+exitPrice, size, note, source, thesis }`. Setting `exitPrice` to a number is how a trade
 gets closed (recomputes `pnlPct`/`pnlUsd`, sets `status: "closed"`);
 setting it to `null` reopens the trade. 404 if the id doesn't exist.
 
@@ -420,6 +427,77 @@ setting it to `null` reopens the trade. 404 if the id doesn't exist.
 `totalPnlUsd` is `null` when no closed trade recorded a `size` — render
 those as "—"/"not enough data" rather than a misleading `0%`/`$0.00`, same
 rule as `/api/performance`.
+
+`GET /api/journal/sources?chatId=` → the journal grouped by `source`:
+```json
+{
+  "sources": [
+    { "source": "@CryptoCred", "openCount": 1, "closedCount": 12, "wins": 7,
+      "winRatePct": 58.3, "avgPnlPct": 2.4, "totalPnlUsd": 140.5 },
+    { "source": null, "openCount": 0, "closedCount": 20, "wins": 9,
+      "winRatePct": 45, "avgPnlPct": -0.3, "totalPnlUsd": -12 }
+  ],
+  "minClosed": 10
+}
+```
+Grouped case- and whitespace-insensitively, so `@cryptocred` and
+`@CryptoCred` are one row, labelled with the most recently typed spelling.
+`source: null` is the "not recorded" group and is kept, not dropped: it is
+the baseline a named source has to beat. `minClosed` is the sample size
+below which a win rate is noise; clients withhold it under that line.
+Sorted by closed count, most first.
+
+## `GET /api/trend`
+The daily market-structure read per symbol, from the last **closed** 1D bar.
+The worker refreshes it hourly; the label only moves on a new daily close.
+```json
+{
+  "trends": [{
+    "symbol": "BTCUSDT", "lastCloseTime": 1790640000000, "lastClose": 83664,
+    "trend": "up" | "down" | "sideways",
+    "event": "up_broken" | "down_broken" | null,
+    "previousTrend": "up", "changedAt": 1790726400000,
+    "ema": 75198, "emaPeriod": 200, "aboveEma": true,
+    "swingHighs": [{ "openTime": 0, "price": 79600 }, { "openTime": 0, "price": 87395 }],
+    "swingLows":  [{ "openTime": 0, "price": 74968 }, { "openTime": 0, "price": 82875 }],
+    "reasons": ["Đỉnh gần nhất … cao hơn đỉnh trước …", "Giá đóng trên EMA200 (…)."],
+    "computedAt": 1790730000000
+  }],
+  "fetch": { "lastAttemptAt": 0, "lastSuccessAt": 0, "consecutiveFailures": 0, "lastError": null }
+}
+```
+`up` = the last two swing highs and the last two swing lows are each higher
+(fractal pivots, 3 bars each side); `down` = both lower; anything else is
+`sideways`. `event` is set when the last close is below the latest swing low
+while lows were rising (`up_broken`), or above the latest swing high while
+highs were falling (`down_broken`) — closes only, never wicks. `ema` is null
+with fewer than `emaPeriod` daily bars. `previousTrend`/`changedAt` move only
+when the label changes on a new close. `fetch` says whether the job is
+running at all, as on `/api/flow`.
+
+## `GET /api/setups?limit=`
+4H entry setups, most recent first (limit 1–100, default 30), with per-kind
+stats and the job's health.
+```json
+{
+  "setups": [{
+    "id": "7", "symbol": "ETHUSDT", "kind": "pullback" | "breakout_retest",
+    "barOpenTime": 0, "detectedAt": 0, "level": 2600.15,
+    "entry": 2416.65, "stop": 2335.72, "target": 2665.99, "rr": 3.1, "atr": 40.2,
+    "reasons": ["…", "Kế hoạch: …"],
+    "status": "open" | "target" | "stop" | "expired",
+    "resolvedAt": null, "rMultiple": null
+  }],
+  "stats": [{ "kind": "pullback", "total": 3, "open": 1, "resolved": 2, "targets": 1, "stops": 1, "expired": 0, "avgR": 1.05 }],
+  "minResolved": 20,
+  "fetch": { "lastAttemptAt": 0, "lastSuccessAt": 0, "consecutiveFailures": 0, "lastError": null }
+}
+```
+`rMultiple` is in units of the planned risk (entry − stop): `+rr` at the
+target, `-1` at the stop, the last close's distance for `expired`. A bar
+that touched both levels is scored as the stop. Clients withhold hit rates
+below `minResolved` resolved setups. The last element of `reasons` is the
+plan as one sentence; clients that show entry/stop/target as fields drop it.
 
 ## `GET /api/flow`
 Macro context: total stablecoin circulating supply and how fast it's

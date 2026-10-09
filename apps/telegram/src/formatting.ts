@@ -1,4 +1,4 @@
-import type { GemRow, GemWatchDTO, LookupDTO, LatestSymbolState, OverviewRow, PriceLevels, SignalRow, StablecoinFlowDTO, StablecoinFlowWindowDTO, TradeDTO, TradeSummaryDTO } from './apiClient.js';
+import type { GemRow, GemWatchDTO, LookupDTO, LatestSymbolState, OverviewRow, PriceLevels, SignalRow, StablecoinFlowDTO, StablecoinFlowWindowDTO, TradeDTO, TradeSummaryDTO, TrendDTO, SetupDTO } from './apiClient.js';
 
 function healthLine(row: OverviewRow): string {
   const score = row.healthScore === null ? 'N/A' : String(row.healthScore);
@@ -177,6 +177,8 @@ export function formatTradeOpened(trade: TradeDTO): string {
   const lines = [
     `📓 Logged <b>${escapeHtml(trade.symbol)}</b> ${trade.side.toUpperCase()}`,
     `Entry: $${formatPrice(trade.entryPrice)}${trade.size !== null ? ` · size ${trade.size}` : ''}`,
+    ...(trade.source ? [`Nguồn: ${escapeHtml(trade.source)}`] : []),
+    ...(trade.thesis ? [`Lý do: ${escapeHtml(trade.thesis)}`] : []),
     '',
     `<i>/close ${escapeHtml(trade.symbol)} EXIT_PRICE when you're out.</i>`,
   ];
@@ -215,7 +217,7 @@ export function formatJournal(trades: TradeDTO[], summary: TradeSummaryDTO): str
   lines.push('');
 
   if (trades.length === 0) {
-    lines.push('No trades logged yet. Use /trade SYMBOL long|short ENTRY [SIZE] to start.');
+    lines.push('No trades logged yet. Use /trade SYMBOL spot ENTRY [SIZE] [NGUỒN] [| LÝ DO] to start.');
     return lines.join('\n');
   }
 
@@ -299,7 +301,9 @@ export function buildHelpText(symbols: string[]): string {
     '/watch SYMBOL — track a position you bought, get a sell alert here',
     '/watches — list your active watches',
     '/unwatch SYMBOL — stop tracking one',
-    '/trade SYMBOL long|short ENTRY [SIZE] — log a trade you took',
+    '/trade SYMBOL spot|long|short ENTRY [SIZE] [NGUỒN] [| LÝ DO] — ghi lệnh đã vào, vd /trade SOLUSDT spot 150 2 @CryptoCred | hồi về hỗ trợ 1D',
+    '/trend — xu hướng 1D của từng coin (đỉnh/đáy, EMA200)',
+    '/setups — setup 4H đang mở (vào / cắt lỗ / chốt lời) và kết quả các setup trước',
     '/close SYMBOL EXIT_PRICE — close your most recent open trade on that symbol',
     '/journal — your trade log + win rate / P&L summary',
     '/flow — stablecoin supply: money entering or leaving crypto',
@@ -356,5 +360,45 @@ export function formatLookup(data: LookupDTO): string {
     lines.push('');
     lines.push(`<i>Could not be read: ${escapeHtml(f.unknowns.join(', '))}</i>`);
   }
+  return lines.join('\n');
+}
+
+const TREND_TEXT: Record<TrendDTO['trend'], string> = { up: '🟢 Tăng', down: '🔴 Giảm', sideways: '⚪ Đi ngang' };
+
+/** /trend — the daily structure per symbol, with the reasons, because a label without them is a claim. */
+export function formatTrends(trends: TrendDTO[]): string {
+  if (trends.length === 0) return 'Chưa có dữ liệu xu hướng 1D — worker đọc nến ngày mỗi giờ, thử lại sau.';
+  const lines = ['<b>Xu hướng 1D</b> (nến ngày đã đóng)', ''];
+  for (const t of trends) {
+    const ema = t.aboveEma === null ? '' : ` · ${t.aboveEma ? 'trên' : 'dưới'} EMA${t.emaPeriod}`;
+    lines.push(`<b>${escapeHtml(t.symbol)}</b> ${formatPrice(t.lastClose)} — ${TREND_TEXT[t.trend]}${ema}`);
+    for (const r of t.reasons) lines.push(`  · ${escapeHtml(r)}`);
+    lines.push('');
+  }
+  lines.push('<i>Mô tả cấu trúc đỉnh/đáy, không phải dự báo.</i>');
+  return lines.join('\n');
+}
+
+const SETUP_KIND: Record<SetupDTO['kind'], string> = { pullback: 'Hồi về hỗ trợ', breakout_retest: 'Phá vùng rồi test lại' };
+const SETUP_END: Record<SetupDTO['status'], string> = { open: 'đang mở', target: '✅ chạm chốt lời', stop: '❌ dính cắt lỗ', expired: '⌛ hết hạn' };
+
+/** /setups — open plans first, then how the recent ones ended. */
+export function formatSetups(setups: SetupDTO[]): string {
+  const open = setups.filter((s) => s.status === 'open');
+  const done = setups.filter((s) => s.status !== 'open').slice(0, 5);
+  const lines = ['<b>Setup 4H</b>', ''];
+  if (open.length === 0) lines.push('Không có setup nào đang mở — phần lớn thời gian là vậy.');
+  for (const s of open) {
+    lines.push(`🎯 <b>${escapeHtml(s.symbol)}</b> — ${SETUP_KIND[s.kind]}`);
+    lines.push(`  Vào ~${formatPrice(s.entry)} · SL ${formatPrice(s.stop)} · TP ${formatPrice(s.target)} · R:R 1:${s.rr.toFixed(1)}`);
+  }
+  if (done.length > 0) {
+    lines.push('', 'Gần đây:');
+    for (const s of done) {
+      const r = s.rMultiple === null ? '' : ` (${s.rMultiple >= 0 ? '+' : ''}${s.rMultiple.toFixed(1)}R)`;
+      lines.push(`  ${escapeHtml(s.symbol)} ${SETUP_KIND[s.kind].toLowerCase()} — ${SETUP_END[s.status]}${r}`);
+    }
+  }
+  lines.push('', '<i>Ứng viên, không phải lệnh. Tự xem chart và BTC trước khi vào.</i>');
   return lines.join('\n');
 }

@@ -73,9 +73,27 @@ export function TradeRow({ trade, onChanged, nowMs }: TradeRowProps) {
             />
           </td>
           <td className="py-2 pr-3 text-slate-600">—</td>
-          <td className="py-2 pr-3">
+          <td className="space-y-1 py-2 pr-3">
             <input
-              className={cx(inputClass, 'w-32')}
+              aria-label="Source"
+              className={cx(inputClass, 'block w-40')}
+              placeholder="source"
+              maxLength={80}
+              value={editDraft.source}
+              onChange={(e) => setEditDraft((d) => ({ ...d, source: e.target.value }))}
+            />
+            <input
+              aria-label="Thesis"
+              className={cx(inputClass, 'block w-40')}
+              placeholder="thesis"
+              maxLength={2000}
+              value={editDraft.thesis}
+              onChange={(e) => setEditDraft((d) => ({ ...d, thesis: e.target.value }))}
+            />
+            <input
+              aria-label="Note"
+              className={cx(inputClass, 'block w-40')}
+              placeholder="note"
               value={editDraft.note}
               onChange={(e) => setEditDraft((d) => ({ ...d, note: e.target.value }))}
             />
@@ -128,7 +146,9 @@ export function TradeRow({ trade, onChanged, nowMs }: TradeRowProps) {
               </span>
             )}
           </td>
-          <td className="max-w-[14rem] truncate py-2 pr-3 text-slate-500">{trade.note ?? '—'}</td>
+          <td className="max-w-[16rem] py-2 pr-3 text-xs text-slate-500">
+            <TradeContext trade={trade} />
+          </td>
         </>
       )}
 
@@ -185,5 +205,25 @@ export function TradeRow({ trade, onChanged, nowMs }: TradeRowProps) {
         {error && <p className="mt-1 text-[11px] text-rose-400">{error}</p>}
       </td>
     </tr>
+  );
+}
+
+/**
+ * Source, thesis and note in one cell. The thesis is shown whole-ish and
+ * the note truncated: the thesis is what a closed trade gets read back
+ * against, so it is the one worth the space.
+ */
+function TradeContext({ trade }: { trade: Trade }) {
+  if (!trade.source && !trade.thesis && !trade.note) return <span className="text-slate-600">—</span>;
+  return (
+    <div className="space-y-0.5">
+      {trade.source && (
+        <span className="inline-block rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-violet-300">
+          {trade.source}
+        </span>
+      )}
+      {trade.thesis && <p className="line-clamp-2 text-slate-400" title={trade.thesis}>{trade.thesis}</p>}
+      {trade.note && <p className="truncate" title={trade.note}>{trade.note}</p>}
+    </div>
   );
 }

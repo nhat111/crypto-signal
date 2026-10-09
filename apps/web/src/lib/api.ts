@@ -16,6 +16,9 @@ import type {
   SymbolDetailResponse,
   Timeframe,
   Trade,
+  TradeSourcesResponse,
+  TrendResponse,
+  SetupsResponse,
   TradeSide,
   TradeSummary,
   TradesResponse,
@@ -153,6 +156,14 @@ export function getOutcomeDiagnostics(): Promise<StatusOutcomeDiagnostics> {
   return fetchJson<StatusOutcomeDiagnostics>('/api/status/outcomes');
 }
 
+export function getSetups(limit = 30): Promise<SetupsResponse> {
+  return fetchJson<SetupsResponse>(`/api/setups?limit=${limit}`);
+}
+
+export function getTrend(): Promise<TrendResponse> {
+  return fetchJson<TrendResponse>('/api/trend');
+}
+
 export function getFlow(): Promise<FlowResponse> {
   return fetchJson<FlowResponse>('/api/flow');
 }
@@ -179,12 +190,18 @@ export function getTradeSummary(): Promise<{ summary: TradeSummary }> {
   return fetchJson<{ summary: TradeSummary }>('/api/journal/summary');
 }
 
+export function getTradeSources(): Promise<TradeSourcesResponse> {
+  return fetchJson<TradeSourcesResponse>('/api/journal/sources');
+}
+
 export interface CreateTradeInput {
   symbol: string;
   side: TradeSide;
   entryPrice: number;
   size: number | null;
   note: string | null;
+  source: string | null;
+  thesis: string | null;
 }
 
 export function createTrade(input: CreateTradeInput): Promise<{ trade: Trade }> {
@@ -198,6 +215,8 @@ export interface UpdateTradeInput {
   exitPrice?: number | null;
   size?: number | null;
   note?: string | null;
+  source?: string | null;
+  thesis?: string | null;
 }
 
 export function updateTrade(id: string, patch: UpdateTradeInput): Promise<{ trade: Trade }> {

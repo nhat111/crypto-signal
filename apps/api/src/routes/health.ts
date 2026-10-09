@@ -24,6 +24,13 @@ const BUILD = resolveBuildInfo();
  * only indirect probes that require knowing in advance what changed.
  */
 export function registerHealthRoute(app: FastifyInstance, deps: ApiDeps): void {
+  // Liveness only — "is this process serving HTTP". This is what a
+  // platform healthcheck should point at (render.yaml does): /health goes
+  // 503 whenever Binance or the worker is unhappy, and a platform reading
+  // that as "this deploy is broken" times the deploy out and keeps the old
+  // build running — which is exactly what happened during a Binance IP ban.
+  app.get('/livez', async () => ({ status: 'alive' }));
+
   app.get('/health', async (_req, reply) => {
     const checks: Record<string, unknown> = {};
     let healthy = true;

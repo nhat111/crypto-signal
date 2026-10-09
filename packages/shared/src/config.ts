@@ -40,6 +40,10 @@ const envSchema = z.object({
    * · 1 kênh" can sit over a channel that will never receive anything.
    */
   TELEGRAM_ALERT_TEST: z.string().default(''),
+  // One morning message per day after the 1D close. On unless set to off/0/false.
+  DAILY_DIGEST: z.string().default('on'),
+  // Telegram message when a pullback / breakout-retest setup forms on 4H. On unless off/0/false.
+  SETUP_ALERTS: z.string().default('on'),
 
   SYMBOLS: z.string().default('BTCUSDT,ETHUSDT,SOLUSDT'),
   /** Futures-only symbols (no Binance Spot listing) — see ASSUMPTIONS.md §15. Tracked with a reduced indicator/signal set. */
@@ -59,10 +63,17 @@ const envSchema = z.object({
    */
   TELEGRAM_DEFAULT_TIMEFRAME: z.string().default('4h'),
 
-  BINANCE_SPOT_REST_BASE: z.string().default('https://api.binance.com'),
+  // Binance's market-data-only host. The spot adapter only ever reads
+  // /api/v3/klines, which it serves identically, and it answered when
+  // api.binance.com was refusing the server's IP — a Lookup then called
+  // NEARUSDT unlisted. Futures has no such host, so fapi stays as it is.
+  BINANCE_SPOT_REST_BASE: z.string().default('https://data-api.binance.vision'),
   BINANCE_SPOT_WS_BASE: z.string().default('wss://stream.binance.com:9443'),
   BINANCE_FUTURES_REST_BASE: z.string().default('https://fapi.binance.com'),
-  BINANCE_FUTURES_WS_BASE: z.string().default('wss://fstream.binance.com'),
+  // Market streams (klines, forceOrder) moved under /market. The bare host
+  // still accepts the connection and then sends nothing — the socket reads
+  // "open" on /status while no futures candle ever arrives.
+  BINANCE_FUTURES_WS_BASE: z.string().default('wss://fstream.binance.com/market'),
 
   THRESH_PRICE_CHANGE_PCT: numeric(0.3),
   THRESH_CVD_SKEW_RATIO: numeric(0.15),
@@ -151,6 +162,10 @@ export interface AppConfig {
   telegramApiRoot: string;
   telegramDefaultTimeframe: Timeframe;
   telegramAlertTest: boolean;
+  /** The once-a-day summary after the daily close. On by default; DAILY_DIGEST=off disables it. */
+  dailyDigest: boolean;
+  /** Push a message when a 4H entry setup forms. On by default; SETUP_ALERTS=off disables. */
+  setupAlerts: boolean;
   telegramAlertChatIds: string[];
   symbols: string[];
   /** Symbols tracked in reduced (Futures-only, no Spot) mode — disjoint from `symbols`. */
@@ -298,6 +313,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     timeframes,
     telegramDefaultTimeframe: pickDefaultTimeframe(parsed.TELEGRAM_DEFAULT_TIMEFRAME, timeframes),
     telegramAlertTest: isEnabledFlag(parsed.TELEGRAM_ALERT_TEST),
+    dailyDigest: !['off', '0', 'false', 'no'].includes(parsed.DAILY_DIGEST.trim().toLowerCase()),
+    setupAlerts: !['off', '0', 'false', 'no'].includes(parsed.SETUP_ALERTS.trim().toLowerCase()),
     binance: {
       spotRestBase: parsed.BINANCE_SPOT_REST_BASE,
       spotWsBase: parsed.BINANCE_SPOT_WS_BASE,
