@@ -1,14 +1,22 @@
 # Deployment
 
-Two hosts, because the workload splits cleanly: `apps/web` is stateless and
-serverless-friendly; `apps/worker` holds a permanent Binance WebSocket
-connection and `apps/api` serves it, so both need an always-on process —
-something Vercel's serverless functions don't provide.
+Two kinds of host, because the workload splits cleanly: `apps/web` is
+stateless and serverless-friendly; `apps/worker` holds a permanent Binance
+WebSocket connection and `apps/api` serves it, so both need an always-on
+process — something Vercel's serverless functions don't provide.
+
+The current setup is free and needs no credit card:
 
 ```
-Vercel            → apps/web (Next.js dashboard)
-Railway           → apps/worker + apps/api + Postgres (+ apps/telegram, optional)
+Vercel (free)           → apps/web                      (Next.js dashboard)
+Render free web service → worker + api (+ telegram)     (Dockerfile.allinone)
+Supabase free           → Postgres
+cron-job.org (free)     → pings /health so Render never sleeps
 ```
+
+Railway was the original backend host; its per-service setup is kept in the
+[appendix](#appendix-railway-paid-one-service-per-process) for anyone who
+moves back to a paid plan.
 
 ## Web dashboard — Vercel
 
@@ -16,40 +24,380 @@ Already deployed. To redeploy or set up again:
 
 1. Vercel → **Add New → Project → Import Git Repository** → `nhat111/crypto-signal`.
 2. **Root Directory**: `apps/web`. Framework auto-detects as Next.js.
-3. **Environment Variables**: `NEXT_PUBLIC_API_BASE_URL` = the Railway API's
-   public URL (see below) — this is baked in at build time, so changing it
-   requires a redeploy, not just a settings save.
+3. **Environment Variables**: `NEXT_PUBLIC_API_BASE_URL` = the backend's
+   public URL (`https://<service>.onrender.com`) — this is baked in at build
+   time, so changing it requires a redeploy, not just a settings save.
 4. Deploy. Future pushes to the connected branch redeploy automatically.
 
-## Backend — Railway
+## Backend — Render + Supabase
 
-Railway needs the Dashboard for two things a committed config file can't
-express: creating each service and pointing it at the right Dockerfile.
-Everything else (the Dockerfiles themselves, migrations) is already in the
-repo.
+`Dockerfile.allinone` runs worker + api (+ telegram) in **one** container
+(`scripts/start-all.sh`), because a free host gives one always-on service,
+not three. The code is the same as the per-service images; only the
+packaging differs.
 
-**Root Directory stays `/` (repo root) for every service below** — all four
-Dockerfiles (`Dockerfile.worker`, `.api`, `.telegram`) were written with a
-repo-root build context specifically so this works without per-service
-subdirectory juggling.
+1. **Postgres — Supabase.** New project, region Singapore. Project →
+   **Connect** → **Session pooler** URL (port 5432; *not* the transaction
+   pooler on 6543 — migrations take an advisory lock, which needs a session;
+   *not* the direct URL, which is IPv6-only). Append `?sslmode=no-verify`.
+   500MB free is roughly nine months at three symbols (~50MB/month).
+   Neon's free tier is not a fit: the worker writes all day, so the compute
+   never scales to zero and burns through the monthly compute hours.
+2. **Backend — Render.** New → **Blueprint** → this repo (reads
+   `render.yaml`), or New → Web Service → Docker, Dockerfile path
+   `Dockerfile.allinone`, instance type **Free**, region **Singapore or
+   Frankfurt — never a US region**: Binance answers US IPs with 451
+   "Service unavailable from a restricted location", and the worker then
+   collects nothing. Set `DATABASE_URL`, and optionally
+   `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ALERT_CHAT_IDS` and any variable from the
+   sections below (all on this one service). `PORT` is
+   set by Render and the api listens on it.
+   **Health Check Path must be `/livez`** (render.yaml sets it). Never
+   `/health`: it answers 503 whenever Binance or the worker is unhappy, and
+   Render then times the deploy out and silently keeps the old build.
+3. **Keep it awake.** A free Render service sleeps after 15 minutes without
+   an inbound request — and a sleeping worker collects nothing. On
+   cron-job.org, GET `https://<service>.onrender.com/health` every 10
+   minutes. 750 free instance-hours a month covers exactly one service
+   running all month, which is why everything is in one container.
+4. **Web — Vercel.** Set `NEXT_PUBLIC_API_BASE_URL` to the Render URL and
+   **Redeploy**.
 
-### Redeploying: order doesn't matter
+Coming from another database, moving the data is optional: `pg_dump` it into
+Supabase, or start fresh and run the historical replay (`BACKFILL_DAYS=30`,
+see below) — Binance only serves 30 days of open-interest history either way.
 
-**`worker` and `api` both run migrations at boot** (both Dockerfiles' CMD
-is `node db/migrate.mjs && npm run start …`), serialized behind a Postgres
-advisory lock — whichever starts first applies what's pending, the other
-blocks briefly and then finds nothing to do. So a service can never come up
-querying a table that doesn't exist yet, and you can redeploy them in any
-order. Migrations are idempotent; an extra redeploy is always safe.
+If api or worker exits, `start-all.sh` stops the container so Render
+restarts it; the bot restarts on its own and never takes the collector down.
 
-`telegram` runs no migrations (it only calls the API), but **does** need a
-restart to register new bot commands. `web` is on Vercel and only needs a
-redeploy when its own code or `NEXT_PUBLIC_API_BASE_URL` changed.
+### Where the variables go
 
-If a service crash-loops right after a deploy, check its logs for a failed
-migration first — the CMD chain means a migration error stops the service
-from starting at all, deliberately, rather than letting it serve queries
-against a half-applied schema.
+The sections below were written when worker, api and telegram were separate
+services, and still say which process reads each variable (`worker`, `api`).
+On Render they all run in the one service, so **set every variable on that
+service**. `NEXT_PUBLIC_API_BASE_URL` for the bot is set by `start-all.sh`
+(`http://127.0.0.1:$PORT`) — do not set it yourself.
+
+### Redeploying
+
+Migrations run at boot (`node db/migrate.mjs` is the first line of
+`start-all.sh`, and also of the per-service Dockerfiles' CMD), serialized
+behind a Postgres advisory lock, so a process can never come up querying a
+table that doesn't exist yet. Migrations are idempotent; an extra redeploy is
+always safe.
+
+The bot reads the symbol list from the api at boot to register its commands,
+so it needs a restart after a symbol is added; on Render that is any
+redeploy. `web` is on Vercel and only needs a redeploy when its own code or
+`NEXT_PUBLIC_API_BASE_URL` changed.
+
+If the service crash-loops right after a deploy, check its logs for a failed
+migration first — a migration error stops the container from starting at
+all, deliberately, rather than letting it serve queries against a
+half-applied schema.
+
+### Symbols
+
+`SYMBOLS`, `TIMEFRAMES` and all `THRESH_*` have working defaults — only set
+them to override. The worker registers each symbol in the `symbols` table at
+startup, and the api reads the list back from there (`getEnabledSymbols`), so
+nothing else needs symbol config.
+
+`FUTURES_ONLY_SYMBOLS` — comma-separated symbols with a Binance Futures
+listing but no Spot listing (e.g. `HYPEUSDT`). Reduced feature set, no Health
+Score, no fabricated spot data — see ASSUMPTIONS.md §15.
+
+### Sanity check
+
+`curl https://<service>.onrender.com/health` should return
+`{"status":"ok",...}` (or `"degraded"` with `no_data_yet` right after the
+first deploy, before the worker has produced a snapshot).
+
+**Do not point the platform's own healthcheck at `/health`.** It reports on
+things outside the api — collector freshness and the worker's heartbeat — so
+it answers "is the system working", not "is this process alive". Use
+`/livez` for that (render.yaml already does). Point external uptime
+monitoring at `/health` by all means; that is what it is for.
+
+### Health alerts on Telegram
+
+Set `TELEGRAM_ALERT_CHAT_IDS` on the **worker** (comma-separated chat ids)
+and it reports its own failures: a symbol that stops producing snapshots,
+a Binance socket that is not open, a background job that has never
+succeeded, and the collector losing its heartbeat.
+
+It reports **transitions only** — once when something breaks, once when it
+recovers, silence in between. That is deliberate: an alert repeating every
+cycle gets muted within a day, and a muted alert looks like coverage while
+providing none. Leave the variable unset and no alerting runs at all, and
+no queries are made for it.
+
+A restart re-announces whatever is still broken, because the "already told
+you" set lives in memory. One duplicate message after a deploy costs less
+than a table and a migration to avoid it.
+
+### Which timeframes are allowed to wake you
+
+The same chat ids also receive **signal** alerts, and those fire once per
+closed candle on **every** frame in `TIMEFRAMES` — so a 5m and a 15m candle
+push too. `TELEGRAM_DEFAULT_TIMEFRAME` does not change this: it only
+governs what the bot answers when you *ask* it something.
+
+Set `ALERT_TIMEFRAMES` on the **worker** to choose. For spot, `1h,4h`: a
+15m reading flips several times inside one decision, and 4h is the horizon
+`/performance` measures outcomes at.
+
+Filtering here silences Telegram only — every signal is still written and
+still scored, so `/signals` and `/performance` see the frames you muted.
+
+Two guards, because the failure mode is silence and silence looks like a
+calm market: a frame that is not in `TIMEFRAMES` is logged and ignored
+rather than obeyed, and if *every* name is unrecognised the whole list is
+ignored instead of turning alerting off. The boot log always states what
+is armed:
+
+```
+signal alerts armed for timeframes  alertTimeframes=["1h","4h"] collected=["5m","15m","1h","4h"]
+```
+
+`/status` says the same thing without a log, under **Kết nối Binance**:
+
+- `Khung được bắn: 1h, 4h` — the variable took effect.
+- `Khung được bắn: 5m, 15m, 1h, 4h` plus a grey note that nothing is being
+  filtered — either unset, or set to everything; the page does not guess
+  which.
+- An amber note naming a frame that is not in `TIMEFRAMES` — a typo, which
+  is dropped rather than obeyed and would otherwise look like a quiet
+  market.
+- No row at all — the worker predates the field and has not redeployed.
+
+### Morning digest and the 1D trend
+
+The worker reads each symbol's **daily** structure every hour (a few Binance
+requests) and, once per UTC day after the daily close — 07:00 in Vietnam —
+sends **one** summary to every alert chat: the 1D trend per coin, any coin
+whose structure just broke, Health/Risk on 4h, and the most severe 4h
+signals of the last 24h. It is on by default; `DAILY_DIGEST=off` on the
+worker turns it off. A restart never sends a second one for the same day,
+and a worker that was down all morning skips that day rather than sending
+yesterday's summary in the evening.
+
+With the digest on, most people want `ALERT_TIMEFRAMES=4h` (or nothing
+pushed at all besides the digest): the 5m and 15m signal alerts are what
+makes the bot noisy.
+
+### 4H entry setups
+
+On the same hourly run the worker reads the last 120 closed 4H bars of each
+spot symbol and looks for the two setups the TA guide teaches — a pullback
+rejected at the latest 1D swing low, and a high-volume break above the latest
+1D swing high that is then retested — only while the 1D structure is not
+down and price is above its EMA200, and only when the plan's R:R is at least
+1:2. A new setup is stored once (per symbol, kind and 4H bar) and pushed to
+the alert chats; `SETUP_ALERTS=off` stops the push but not the record. Every
+open setup is then followed until it touches its target or its stop (a bar
+touching both counts as the stop), or expires after 14 days at the last
+close, so `/setups` and the Overview panel show how they actually ended.
+
+Expect them to be rare. Replayed walk-forward over May–September 2026 on
+BTC/ETH/SOL — mostly a falling market — the rules produced three setups.
+That is the guide's "most of the time there is nothing to do", not a fault.
+
+## Did the deploy actually land?
+
+**Open `/status` in the dashboard.** It answers this and the checks below
+without a terminal, which matters because the times you most need it — a
+deploy from a phone, a job that has been failing all week — are exactly
+when psql and curl are not available. Four cards, each with its own
+verdict: the build serving, collector freshness per symbol, whether the
+outcome tracker is keeping up, and whether any background job is failing.
+
+The same thing over HTTP, if you have a shell:
+
+```bash
+curl -s <api-url>/health | jq '{status, version}'
+```
+
+```json
+{
+  "status": "ok",
+  "version": {
+    "commit": "66a894f",
+    "commitSource": "RENDER_GIT_COMMIT",
+    "startedAt": 1788019673995,
+    "uptimeMs": 918,
+    "schema": { "latest": "010_job_health.sql", "appliedAt": 1788019671224, "count": 10 }
+  }
+}
+```
+
+- **`commit`** — the build serving right now. Compare it to the commit you
+  pushed. If it still shows the old one, the deploy did not roll over.
+- **`uptimeMs`** — small means it just restarted. Large after you clicked
+  redeploy means nothing was redeployed.
+- **`schema.latest`** — the newest migration applied. Both api and worker
+  migrate at boot, so this is how you confirm a schema change went through.
+- **`commit: null`** — no platform variable was found. Not an error, and it
+  never turns `/health` red; set `GIT_COMMIT` by hand if your platform is
+  not among the ones read (`packages/shared/src/version.ts` lists them).
+
+The worker has no HTTP surface, so it writes its build into the database at
+boot and `/status` lists it under the api's own commit. Two different
+commits there means that service has not been redeployed yet — which is the
+normal way this goes wrong, since the services deploy one at a time. It
+also still logs the same fields on the `starting worker` line.
+
+On Render both run in one container, so the two commits always match. On a
+per-service host they can drift apart across a migration: whichever deploys
+first pulls the schema forward, and an old build then queries a newer
+schema. That is fine for additive migrations (every one here so far).
+
+## Proving the alert path actually works
+
+`/status` shows how many chats the worker could alert, which proves the
+variable was read and nothing more. A mistyped chat id counts exactly the
+same as a correct one — the send returns 400 and is swallowed, because an
+undeliverable alert must never take the collector down — so "đang bật · 1
+kênh" can sit over a channel that will never receive anything.
+
+To settle it, send a real message:
+
+1. Backend service → **Environment** → add `TELEGRAM_ALERT_TEST` = `1`
+2. Redeploy (or let the variable change redeploy it)
+3. A message arrives in each configured chat within a few seconds of boot
+4. The logs say `alert self-test: every chat received the message`, or
+   `alert self-test: some chats did NOT receive the message` naming each
+   failing id and Telegram's own reason — "chat not found" means the id is
+   wrong, "bot was blocked by the user" means somebody blocked the bot
+5. Remove the variable, or it sends again on every deploy
+
+`alert self-test asked for, but no chat ids are configured` means
+`TELEGRAM_ALERT_CHAT_IDS` is empty — a different problem from a wrong id,
+with a different fix.
+
+If **nothing at all** appears, work down this list; each line rules out the
+one above it:
+
+- `/status` → **build** → does `worker — commit` match what you pushed? An
+  older commit means this deploy predates the feature and the variable is
+  being read by nobody.
+- The boot log always prints `health alerts armed` with `selfTest: true` or
+  `false`. `false` with the variable set means it is on the wrong service
+  (it must be on `worker`) or misspelled; no such line at all means the
+  build is older than this feature.
+- `alert self-test starting` without a result line means the sends are
+  still in flight or the process died mid-boot — check for a crash.
+
+## Running the historical replay
+
+The free hosts give no shell inside a running container (Render's shell is a
+paid feature), so the replay is triggered by an environment variable instead:
+
+1. Backend service → **Environment** → add `BACKFILL_DAYS` = `30`
+2. Redeploy
+3. Watch the logs for `history replay complete`, then check `/status` →
+   **Tác vụ nền** for `history_backfill`
+4. Remove the variable when you are done (optional — see below)
+
+If the logs say `history replay already ran recently — skipping`, the
+20-hour cooldown is holding. Add `BACKFILL_FORCE=1` alongside
+`BACKFILL_DAYS` and redeploy to run anyway, then remove it. The cooldown
+exists so a crash-looping container cannot fire a fresh 30-day replay on
+every restart; forcing it is a deliberate, one-off act.
+
+When `/status` → **Chấm kết quả tín hiệu** shows a backlog with
+`Chấm được ngay` at 0, the **Vì sao chưa chấm được?** button on that card
+runs the two diagnostic queries and names the cause: no 5m candles at all,
+signals older than the candles held, a hole in the candles, or the
+resolver disagreeing with itself. It is a scan, so it runs only on that
+click, never on the page's 30-second poll — and it exists because the
+alternative was a psql session, which this platform only offers from a
+laptop.
+
+**5m is not optional.** Outcomes are priced off futures 5m candles, so a
+replay stores them for every symbol even when `TIMEFRAMES` leaves 5m out —
+without them every signal stays `pending` and `resolvableNow` is 0 forever,
+on `/status` → **Chấm kết quả tín hiệu**. They are stored for pricing only:
+no 5m signals are written, so excluding 5m from `TIMEFRAMES` still means
+no 5m rows on `/performance`. Live signals need live 5m candles, though —
+if `TIMEFRAMES` omits 5m, only the replayed window can ever be scored.
+
+It runs after the collector is already live and is never awaited, so live
+candle collection does not wait on it, and nothing it does can take the
+worker down.
+
+**It will not re-run on a restart.** Containers restart on their own — a
+crash loop, a platform migration, an out-of-memory kill — and a variable
+left set would otherwise fire a fresh 30-day replay, and hundreds of
+upstream requests, every single time. A successful run inside the last 20
+hours suppresses the next one, which also means the variable is safe to
+leave in place: it degrades to "replay at most once a day" rather than
+being something you must remember to remove.
+
+A value that is not a positive number is ignored with a warning rather than
+being guessed at, so a typo cannot quietly become some arbitrary window.
+
+**This is time-sensitive.** Binance serves open-interest history for the
+last 30 days only, so every day the replay goes unrun is a day of history
+that can never be recovered.
+
+If you do have a shell (a paid plan, or running locally against the
+production database), the same job is `node backfill.cjs` inside the worker
+image, or `npm run backfill -w @crypto-signal/worker` from a clone.
+
+## Enabling the small-cap discovery scanner (optional)
+
+A separate, opt-in subsystem — see ASSUMPTIONS.md §16 for what it can and
+cannot tell you before relying on it.
+
+On the **`worker`** service only, add:
+
+- `GEM_SCAN_ENABLED=true`
+- `GEM_CHAINS=solana` — comma-separated DexScreener chain slugs. `solana`
+  (RugCheck) and the EVM chains GoPlus covers (`bsc`, `ethereum`, `base`,
+  `polygon`, `arbitrum`, `avalanche`, `optimism`) have a safety screen;
+  anything else is surfaced with a "no screen" badge and no gate. Both
+  discovery feeds cover `solana`, `robinhood` and `bsc`; other chains run
+  on DexScreener's paid-promotion feeds alone, which is a much narrower
+  slice of the chain than it looks — `/status` names which source is
+  missing.
+- optionally `RUGCHECK_API_KEY` — without it, screening is attempted
+  unauthenticated and degrades to "unverified", never to "safe"
+
+Everything else has working defaults (`.env.example` lists them). No change
+is needed on `web` — it only reads what the worker persisted, through
+`api`. The bot needs a restart to register its `/gems` command.
+
+Migration `004_gem_scanner.sql` runs automatically on the worker's next
+boot. Give it one scan interval (default 30 min) before expecting anything
+in `/gems`, and note that the performance panel deliberately shows "not
+enough data yet" until 20 surfaced tokens have a recorded outcome.
+
+### Position watches ("/watch SYMBOL")
+
+Unlike the rest of the gem scanner, this one **does** need `api` configured
+too, not just `worker`: `/api/watches` reads its own `GEM_SCAN_ENABLED` and
+`GEM_WATCH_*` env vars to know the sell-trigger defaults for a new watch, so
+add the same `GEM_SCAN_ENABLED=true` (and optionally the `GEM_WATCH_*`
+overrides) to the **`api`** service's variables as well. Without it,
+`/watch` replies with "gem scanner is disabled" even while the worker is
+scanning fine. Migration `005_gem_watches.sql` runs automatically on the
+worker's next boot, same as the others. The bot needs a restart to register
+`/watch`, `/watches`, `/unwatch`.
+
+## Appendix: Railway (paid, one service per process)
+
+The original setup, before the Railway trial ran out. Everything above about
+variables, alerts and the replay applies unchanged; only the packaging
+differs: one service per process, each with its own Dockerfile.
+Railway needs the Dashboard to create each service and point it at the
+right Dockerfile; everything else is in the repo.
+
+**Root Directory stays `/` (repo root) for every service below** — the
+per-service Dockerfiles (`Dockerfile.worker`, `.api`, `.telegram`) were
+written with a repo-root build context specifically so this works without
+per-service subdirectory juggling. `worker` and `api` both run migrations at
+boot, so they can be redeployed in any order.
 
 ### 1. Create the project and databases
 
@@ -112,58 +460,6 @@ as a platform healthcheck it would have Railway restart the *api* when the
 someone else's. Point external uptime monitoring at it by all means; that
 is what it is for.
 
-### Health alerts on Telegram
-
-Set `TELEGRAM_ALERT_CHAT_IDS` on the **worker** (comma-separated chat ids)
-and it reports its own failures: a symbol that stops producing snapshots,
-a Binance socket that is not open, a background job that has never
-succeeded, and the collector losing its heartbeat.
-
-It reports **transitions only** — once when something breaks, once when it
-recovers, silence in between. That is deliberate: an alert repeating every
-cycle gets muted within a day, and a muted alert looks like coverage while
-providing none. Leave the variable unset and no alerting runs at all, and
-no queries are made for it.
-
-A restart re-announces whatever is still broken, because the "already told
-you" set lives in memory. One duplicate message after a deploy costs less
-than a table and a migration to avoid it.
-
-### Which timeframes are allowed to wake you
-
-The same chat ids also receive **signal** alerts, and those fire once per
-closed candle on **every** frame in `TIMEFRAMES` — so a 5m and a 15m candle
-push too. `TELEGRAM_DEFAULT_TIMEFRAME` does not change this: it only
-governs what the bot answers when you *ask* it something.
-
-Set `ALERT_TIMEFRAMES` on the **worker** to choose. For spot, `1h,4h`: a
-15m reading flips several times inside one decision, and 4h is the horizon
-`/performance` measures outcomes at.
-
-Filtering here silences Telegram only — every signal is still written and
-still scored, so `/signals` and `/performance` see the frames you muted.
-
-Two guards, because the failure mode is silence and silence looks like a
-calm market: a frame that is not in `TIMEFRAMES` is logged and ignored
-rather than obeyed, and if *every* name is unrecognised the whole list is
-ignored instead of turning alerting off. The boot log always states what
-is armed:
-
-```
-signal alerts armed for timeframes  alertTimeframes=["1h","4h"] collected=["5m","15m","1h","4h"]
-```
-
-`/status` says the same thing without a log, under **Kết nối Binance**:
-
-- `Khung được bắn: 1h, 4h` — the variable took effect.
-- `Khung được bắn: 5m, 15m, 1h, 4h` plus a grey note that nothing is being
-  filtered — either unset, or set to everything; the page does not guess
-  which.
-- An amber note naming a frame that is not in `TIMEFRAMES` — a typo, which
-  is dropped rather than obeyed and would otherwise look like a quiet
-  market.
-- No row at all — the worker predates the field and has not redeployed.
-
 ### 4. Telegram bot (optional)
 
 1. **New → GitHub Repo** → same repo, third service.
@@ -184,182 +480,7 @@ Back in Vercel: **Settings → Environment Variables** → set
 step 3.4 → **Redeploy** (env var changes don't apply retroactively to an
 already-built deployment).
 
-## Did the deploy actually land?
-
-**Open `/status` in the dashboard.** It answers this and the checks below
-without a terminal, which matters because the times you most need it — a
-deploy from a phone, a job that has been failing all week — are exactly
-when psql and curl are not available. Four cards, each with its own
-verdict: the build serving, collector freshness per symbol, whether the
-outcome tracker is keeping up, and whether any background job is failing.
-
-The same thing over HTTP, if you have a shell:
-
-```bash
-curl -s <api-url>/health | jq '{status, version}'
-```
-
-```json
-{
-  "status": "ok",
-  "version": {
-    "commit": "66a894f",
-    "commitSource": "RAILWAY_GIT_COMMIT_SHA",
-    "startedAt": 1788019673995,
-    "uptimeMs": 918,
-    "schema": { "latest": "010_job_health.sql", "appliedAt": 1788019671224, "count": 10 }
-  }
-}
-```
-
-- **`commit`** — the build serving right now. Compare it to the commit you
-  pushed. If it still shows the old one, the deploy did not roll over.
-- **`uptimeMs`** — small means it just restarted. Large after you clicked
-  redeploy means nothing was redeployed.
-- **`schema.latest`** — the newest migration applied. Both api and worker
-  migrate at boot, so this is how you confirm a schema change went through.
-- **`commit: null`** — no platform variable was found. Not an error, and it
-  never turns `/health` red; set `GIT_COMMIT` by hand if your platform is
-  not among the ones read (`packages/shared/src/version.ts` lists them).
-
-The worker has no HTTP surface, so it writes its build into the database at
-boot and `/status` lists it under the api's own commit. Two different
-commits there means that service has not been redeployed yet — which is the
-normal way this goes wrong, since the services deploy one at a time. It
-also still logs the same fields on the `starting worker` line.
-
-Redeploying only some services is normal, but the two must not drift apart
-across a migration: api and worker both run migrations, so whichever
-deploys first pulls the schema forward, and an old build then queries a
-newer schema. That is fine for additive migrations (every one here so far)
-and is why the order in the previous section is api first.
-
-### Morning digest and the 1D trend
-
-The worker reads each symbol's **daily** structure every hour (a few Binance
-requests) and, once per UTC day after the daily close — 07:00 in Vietnam —
-sends **one** summary to every alert chat: the 1D trend per coin, any coin
-whose structure just broke, Health/Risk on 4h, and the most severe 4h
-signals of the last 24h. It is on by default; `DAILY_DIGEST=off` on the
-worker turns it off. A restart never sends a second one for the same day,
-and a worker that was down all morning skips that day rather than sending
-yesterday's summary in the evening.
-
-With the digest on, most people want `ALERT_TIMEFRAMES=4h` (or nothing
-pushed at all besides the digest): the 5m and 15m signal alerts are what
-makes the bot noisy.
-
-### 4H entry setups
-
-On the same hourly run the worker reads the last 120 closed 4H bars of each
-spot symbol and looks for the two setups the TA guide teaches — a pullback
-rejected at the latest 1D swing low, and a high-volume break above the latest
-1D swing high that is then retested — only while the 1D structure is not
-down and price is above its EMA200, and only when the plan's R:R is at least
-1:2. A new setup is stored once (per symbol, kind and 4H bar) and pushed to
-the alert chats; `SETUP_ALERTS=off` stops the push but not the record. Every
-open setup is then followed until it touches its target or its stop (a bar
-touching both counts as the stop), or expires after 14 days at the last
-close, so `/setups` and the Overview panel show how they actually ended.
-
-Expect them to be rare. Replayed walk-forward over May–September 2026 on
-BTC/ETH/SOL — mostly a falling market — the rules produced three setups.
-That is the guide's "most of the time there is nothing to do", not a fault.
-
-## Proving the alert path actually works
-
-`/status` shows how many chats the worker could alert, which proves the
-variable was read and nothing more. A mistyped chat id counts exactly the
-same as a correct one — the send returns 400 and is swallowed, because an
-undeliverable alert must never take the collector down — so "đang bật · 1
-kênh" can sit over a channel that will never receive anything.
-
-To settle it, send a real message:
-
-1. Worker service → **Variables** → add `TELEGRAM_ALERT_TEST` = `1`
-2. Redeploy the worker (or let the variable change redeploy it)
-3. A message arrives in each configured chat within a few seconds of boot
-4. The logs say `alert self-test: every chat received the message`, or
-   `alert self-test: some chats did NOT receive the message` naming each
-   failing id and Telegram's own reason — "chat not found" means the id is
-   wrong, "bot was blocked by the user" means somebody blocked the bot
-5. Remove the variable, or it sends again on every deploy
-
-`alert self-test asked for, but no chat ids are configured` means
-`TELEGRAM_ALERT_CHAT_IDS` is empty — a different problem from a wrong id,
-with a different fix.
-
-If **nothing at all** appears, work down this list; each line rules out the
-one above it:
-
-- `/status` → **build** → does `worker — commit` match what you pushed? An
-  older commit means this deploy predates the feature and the variable is
-  being read by nobody.
-- The boot log always prints `health alerts armed` with `selfTest: true` or
-  `false`. `false` with the variable set means it is on the wrong service
-  (it must be on `worker`) or misspelled; no such line at all means the
-  build is older than this feature.
-- `alert self-test starting` without a result line means the sends are
-  still in flight or the process died mid-boot — check for a crash.
-
-## Running the historical replay
-
-Railway gives no shell inside a running container, so the replay is
-triggered by an environment variable instead:
-
-1. Worker service → **Variables** → add `BACKFILL_DAYS` = `30`
-2. Redeploy the worker
-3. Watch the logs for `history replay complete`, then check `/status` →
-   **Tác vụ nền** for `history_backfill`
-4. Remove the variable when you are done (optional — see below)
-
-If the logs say `history replay already ran recently — skipping`, the
-20-hour cooldown is holding. Add `BACKFILL_FORCE=1` alongside
-`BACKFILL_DAYS` and redeploy to run anyway, then remove it. The cooldown
-exists so a crash-looping container cannot fire a fresh 30-day replay on
-every restart; forcing it is a deliberate, one-off act.
-
-When `/status` → **Chấm kết quả tín hiệu** shows a backlog with
-`Chấm được ngay` at 0, the **Vì sao chưa chấm được?** button on that card
-runs the two diagnostic queries and names the cause: no 5m candles at all,
-signals older than the candles held, a hole in the candles, or the
-resolver disagreeing with itself. It is a scan, so it runs only on that
-click, never on the page's 30-second poll — and it exists because the
-alternative was a psql session, which this platform only offers from a
-laptop.
-
-**5m is not optional.** Outcomes are priced off futures 5m candles, so a
-replay stores them for every symbol even when `TIMEFRAMES` leaves 5m out —
-without them every signal stays `pending` and `resolvableNow` is 0 forever,
-on `/status` → **Chấm kết quả tín hiệu**. They are stored for pricing only:
-no 5m signals are written, so excluding 5m from `TIMEFRAMES` still means
-no 5m rows on `/performance`. Live signals need live 5m candles, though —
-if `TIMEFRAMES` omits 5m, only the replayed window can ever be scored.
-
-It runs after the collector is already live and is never awaited, so live
-candle collection does not wait on it, and nothing it does can take the
-worker down.
-
-**It will not re-run on a restart.** Containers restart on their own — a
-crash loop, a platform migration, an out-of-memory kill — and a variable
-left set would otherwise fire a fresh 30-day replay, and hundreds of
-upstream requests, every single time. A successful run inside the last 20
-hours suppresses the next one, which also means the variable is safe to
-leave in place: it degrades to "replay at most once a day" rather than
-being something you must remember to remove.
-
-A value that is not a positive number is ignored with a warning rather than
-being guessed at, so a typo cannot quietly become some arbitrary window.
-
-**This is time-sensitive.** Binance serves open-interest history for the
-last 30 days only, so every day the replay goes unrun is a day of history
-that can never be recovered.
-
-If you do have a shell (Railway CLI, or running locally against the
-production database), the same job is `node backfill.cjs` inside the worker
-image, or `npm run backfill -w @crypto-signal/worker` from a clone.
-
-## Keeping it inside Railway's $5 credit
+### Keeping it inside Railway's $5 credit
 
 Railway bills memory and CPU **per minute, per service**, so the thing that
 costs money here is how many processes sit running all month — not disk, and
@@ -399,93 +520,3 @@ they cost you:
 Storage is genuinely not the concern: the whole schema grows on the order of
 50MB a month at three symbols, and Railway charges cents per GB-month for it.
 The 30-day historical replay adds roughly 60MB once.
-
-## Free hosting without Railway (no credit card)
-
-When the Railway trial runs out, the whole backend fits on free tiers that
-ask for no card. The code is unchanged — only the packaging:
-`Dockerfile.allinone` runs worker + api (+ telegram) in **one** container
-(`scripts/start-all.sh`), because free hosts give one always-on service,
-not three.
-
-```
-Vercel (free)          → apps/web                      (unchanged)
-Render free web service → worker + api (+ telegram)     (Dockerfile.allinone)
-Supabase free          → Postgres
-cron-job.org (free)    → pings /health so Render never sleeps
-```
-
-1. **Postgres — Supabase.** New project, region Singapore. Project →
-   **Connect** → **Session pooler** URL (port 5432; *not* the transaction
-   pooler on 6543 — migrations take an advisory lock, which needs a session;
-   *not* the direct URL, which is IPv6-only). Append `?sslmode=no-verify`.
-   500MB free is roughly nine months at three symbols (~50MB/month).
-   Neon's free tier is not a fit: the worker writes all day, so the compute
-   never scales to zero and burns through the monthly compute hours.
-2. **Backend — Render.** New → **Blueprint** → this repo (reads
-   `render.yaml`), or New → Web Service → Docker, Dockerfile path
-   `Dockerfile.allinone`, instance type **Free**, region **Singapore or
-   Frankfurt — never a US region**: Binance answers US IPs with 451
-   "Service unavailable from a restricted location", and the worker then
-   collects nothing. Set `DATABASE_URL`, and optionally
-   `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ALERT_CHAT_IDS` and any worker variable
-   from the Railway sections above (all on this one service now). `PORT` is
-   set by Render and the api listens on it.
-   **Health Check Path must be `/livez`** (render.yaml sets it). Never
-   `/health`: it answers 503 whenever Binance or the worker is unhappy, and
-   Render then times the deploy out and silently keeps the old build.
-3. **Keep it awake.** A free Render service sleeps after 15 minutes without
-   an inbound request — and a sleeping worker collects nothing. On
-   cron-job.org, GET `https://<service>.onrender.com/health` every 10
-   minutes. 750 free instance-hours a month covers exactly one service
-   running all month, which is why everything is in one container.
-4. **Web — Vercel.** Set `NEXT_PUBLIC_API_BASE_URL` to the Render URL and
-   **Redeploy**.
-
-Moving existing data is optional: `pg_dump` the Railway database into
-Supabase before the trial ends, or start fresh and run the historical
-replay (`BACKFILL_DAYS=30`, see above) — Binance only serves 30 days of
-open-interest history either way.
-
-If api or worker exits, `start-all.sh` stops the container so Render
-restarts it; the bot restarts on its own and never takes the collector down.
-
-## Enabling the small-cap discovery scanner (optional)
-
-A separate, opt-in subsystem — see ASSUMPTIONS.md §16 for what it can and
-cannot tell you before relying on it.
-
-On the **`worker`** service only, add:
-
-- `GEM_SCAN_ENABLED=true`
-- `GEM_CHAINS=solana` — comma-separated DexScreener chain slugs. `solana`
-  (RugCheck) and the EVM chains GoPlus covers (`bsc`, `ethereum`, `base`,
-  `polygon`, `arbitrum`, `avalanche`, `optimism`) have a safety screen;
-  anything else is surfaced with a "no screen" badge and no gate. Both
-  discovery feeds cover `solana`, `robinhood` and `bsc`; other chains run
-  on DexScreener's paid-promotion feeds alone, which is a much narrower
-  slice of the chain than it looks — `/status` names which source is
-  missing.
-- optionally `RUGCHECK_API_KEY` — without it, screening is attempted
-  unauthenticated and degrades to "unverified", never to "safe"
-
-Everything else has working defaults (`.env.example` lists them). No change
-is needed on `web` — it only reads what the worker persisted, through
-`api`. The bot needs a restart to register its `/gems` command.
-
-Migration `004_gem_scanner.sql` runs automatically on the worker's next
-boot. Give it one scan interval (default 30 min) before expecting anything
-in `/gems`, and note that the performance panel deliberately shows "not
-enough data yet" until 20 surfaced tokens have a recorded outcome.
-
-### Position watches ("/watch SYMBOL")
-
-Unlike the rest of the gem scanner, this one **does** need `api` configured
-too, not just `worker`: `/api/watches` reads its own `GEM_SCAN_ENABLED` and
-`GEM_WATCH_*` env vars to know the sell-trigger defaults for a new watch, so
-add the same `GEM_SCAN_ENABLED=true` (and optionally the `GEM_WATCH_*`
-overrides) to the **`api`** service's variables as well. Without it,
-`/watch` replies with "gem scanner is disabled" even while the worker is
-scanning fine. Migration `005_gem_watches.sql` runs automatically on the
-worker's next boot, same as the others. The bot needs a restart to register
-`/watch`, `/watches`, `/unwatch`.

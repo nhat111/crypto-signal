@@ -3,7 +3,7 @@
 # service). Same bundles as Dockerfile.worker/.api/.telegram — only the
 # packaging differs. Railway users keep the per-service Dockerfiles.
 #
-# See DEPLOY.md → "Free hosting without Railway".
+# See DEPLOY.md → "Backend — Render + Supabase".
 FROM node:22-slim AS build
 WORKDIR /app
 
