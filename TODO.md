@@ -160,7 +160,8 @@ Check items as they land; each phase's commit message references the phase.
       tested by monkey-patching global fetch — the half that matters more
       was the half that could not be run the way production runs it.
       `alertPath.test.ts` now drives it over a real socket.
-- [ ] Measure worker memory on Railway (api was 71 MB; worker never checked).
+- [ ] Measure memory of the all-in-one container on Render free (512 MB limit;
+      api was 71 MB on Railway, worker never checked).
 - [x] Per-stream staleness on the Binance sockets. The connection-level
       watchdog is reset by any traffic, so one symbol could go silent for
       seventeen hours inside a socket the other three kept busy — the only

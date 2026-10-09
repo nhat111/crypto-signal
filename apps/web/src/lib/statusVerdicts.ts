@@ -101,7 +101,7 @@ export const DIAGNOSIS_TEXT: Record<OutcomeDiagnosis, { tone: Verdict; headline:
     tone: 'bad',
     headline: 'Không có nến 5m nào trong kho',
     detail:
-      'Kết quả được chấm bằng nến 5m futures. Không có cây nào thì không tín hiệu nào chấm được. Kiểm tra biến TIMEFRAMES trên Railway có chứa 5m không, và worker có đang chạy không.',
+      'Kết quả được chấm bằng nến 5m futures. Không có cây nào thì không tín hiệu nào chấm được. Kiểm tra biến TIMEFRAMES trên server backend (Render) có chứa 5m không, và worker có đang chạy không.',
   },
   'signals-predate-candles': {
     tone: 'warn',

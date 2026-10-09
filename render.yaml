@@ -1,7 +1,7 @@
 # Render Blueprint — free, no credit card. worker + api (+ telegram) run in
 # one free web service (Dockerfile.allinone). Postgres lives elsewhere
 # (Supabase free) because Render's free Postgres is deleted after 30 days.
-# See DEPLOY.md → "Free hosting without Railway".
+# See DEPLOY.md → "Backend — Render + Supabase".
 services:
   - type: web
     name: crypto-signal
