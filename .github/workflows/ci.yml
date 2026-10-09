@@ -51,6 +51,8 @@ jobs:
 
       - run: npm run typecheck
 
+      - run: npm run lint
+
       - run: npm test
 
       # Last, because it is the slowest and the least likely to be the
