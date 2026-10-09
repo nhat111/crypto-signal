@@ -25,13 +25,6 @@ import type { WorkerContext } from './context.js';
 
 const HORIZONS: OutcomeHorizon[] = ['15m', '1h', '4h', '24h'];
 
-const HORIZON_MS: Record<OutcomeHorizon, number> = {
-  '15m': 15 * 60_000,
-  '1h': 60 * 60_000,
-  '4h': 4 * 60 * 60_000,
-  '24h': 24 * 60 * 60_000,
-};
-
 /**
  * Phase 9 historical validation: fills price_after_* columns once each
  * horizon has actually elapsed.
