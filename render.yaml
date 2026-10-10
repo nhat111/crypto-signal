@@ -21,3 +21,6 @@ services:
         sync: false
       - key: TELEGRAM_ALERT_CHAT_IDS
         sync: false
+      # Vercel dashboard URL; enables the "Xem chart" link under /lookup.
+      - key: WEB_BASE_URL
+        sync: false

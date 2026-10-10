@@ -51,7 +51,9 @@ packaging differs.
    collects nothing. Set `DATABASE_URL`, and optionally
    `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ALERT_CHAT_IDS` and any variable from the
    sections below (all on this one service). `PORT` is
-   set by Render and the api listens on it.
+   set by Render and the api listens on it. Set `WEB_BASE_URL` to the Vercel
+   dashboard URL (e.g. `https://trackingticker.vercel.app`) and the bot's
+   `/lookup` replies end with a "Xem chart" link to the same lookup on the web.
    **Health Check Path must be `/livez`** (render.yaml sets it). Never
    `/health`: it answers 503 whenever Binance or the worker is unhappy, and
    Render then times the deploy out and silently keeps the old build.

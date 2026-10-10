@@ -76,6 +76,11 @@ describe('runLookup — exchange path', () => {
     expect(fetchBars).toHaveBeenCalledTimes(1 + GLANCE_TIMEFRAMES.filter((tf) => tf !== '4h').length);
   });
 
+  it('returns the bars it read, so the chart shows exactly what the numbers describe', async () => {
+    const result = await runLookup(deps({ fetchBars: async () => bars(120) }), 'BTC');
+    expect(result.kind === 'exchange' && result.bars).toEqual(bars(120));
+  });
+
   it('reads the other frames too, so one frame is never the whole answer', async () => {
     const result = await runLookup(deps(), 'BTC', { timeframe: '4h' });
     const frames = (result as { timeframes: Array<{ timeframe: string }> }).timeframes.map((t) => t.timeframe);

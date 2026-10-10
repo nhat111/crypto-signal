@@ -23,6 +23,10 @@ const envSchema = z.object({
   NEXT_PUBLIC_API_BASE_URL: z.string().default('http://localhost:4000'),
 
   TELEGRAM_BOT_TOKEN: z.string().default(''),
+  // The web dashboard's public URL (e.g. https://trackingticker.vercel.app).
+  // Optional: when set, /lookup ends with a link to the same lookup on the
+  // web, where it has a chart. Unset, the bot simply sends no link.
+  WEB_BASE_URL: z.string().default(''),
   // Telegram's own host by default. Overridable because the failure that
   // matters here — the bundler renaming a class node-fetch matches by name
   // — only happens inside the polling loop, which cannot be reached unless
@@ -159,6 +163,8 @@ export interface AppConfig {
   apiHost: string;
   apiBaseUrl: string;
   telegramBotToken: string;
+  /** Public web dashboard URL without a trailing slash, or '' when unset. */
+  webBaseUrl: string;
   telegramApiRoot: string;
   telegramDefaultTimeframe: Timeframe;
   telegramAlertTest: boolean;
@@ -306,6 +312,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     apiHost: parsed.API_HOST,
     apiBaseUrl: parsed.NEXT_PUBLIC_API_BASE_URL,
     telegramBotToken: parsed.TELEGRAM_BOT_TOKEN,
+    webBaseUrl: parsed.WEB_BASE_URL.trim().replace(/\/+$/, ''),
     telegramApiRoot: parsed.TELEGRAM_API_ROOT,
     telegramAlertChatIds: parsed.TELEGRAM_ALERT_CHAT_IDS.split(',').map((s) => s.trim()).filter(Boolean),
     symbols: parsed.SYMBOLS.split(',').map((s) => s.trim()).filter(Boolean),

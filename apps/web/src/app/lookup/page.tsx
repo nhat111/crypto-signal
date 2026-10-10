@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ApiError, getLookup } from '@/lib/api';
 import type { LookupResponse } from '@/lib/types';
 import { LookupResultView } from '@/components/lookup/LookupResultView';
-import { StatePanel } from '@/components/StatePanel';
+import { LoadingPanel, StatePanel } from '@/components/StatePanel';
 import { cx } from '@/lib/format';
-
-const TIMEFRAMES = ['15m', '1h', '4h'] as const;
+import { LOOKUP_TIMEFRAMES, lookupSearch, parseLookupParams } from '@/lib/lookupChart';
 
 /**
  * One box, two worlds.
@@ -18,28 +18,50 @@ const TIMEFRAMES = ['15m', '1h', '4h'] as const;
  * answer beside a fresh error is the worst of both.
  */
 export default function LookupPage() {
-  const [query, setQuery] = useState('');
-  const [timeframe, setTimeframe] = useState<string>('4h');
+  // useSearchParams suspends during prerender; the boundary keeps that to
+  // this page's content instead of client-rendering the whole route.
+  return (
+    <Suspense fallback={<LoadingPanel label="Loading lookup…" />}>
+      <LookupContent />
+    </Suspense>
+  );
+}
+
+function LookupContent() {
+  const params = useSearchParams();
+  // `/lookup?q=NEARUSDT&tf=1h` (the bot's "Xem chart" link) answers on
+  // open. Read once into the initial state: after that the URL follows the
+  // form, not the reverse.
+  const [initial] = useState(() => parseLookupParams(new URLSearchParams(params.toString())));
+  const [query, setQuery] = useState(initial.q);
+  const [timeframe, setTimeframe] = useState<string>(initial.tf);
   const [data, setData] = useState<LookupResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(initial.q !== '');
+  const openedFromLink = useRef(false);
+
+  useEffect(() => {
+    if (openedFromLink.current || initial.q === '') return;
+    openedFromLink.current = true;
+    fetchLookup(initial.q, initial.tf).then(({ data: d, error: e }) => {
+      setData(d);
+      setError(e);
+      setLoading(false);
+    });
+  }, [initial]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const q = query.trim();
     if (q === '' || loading) return;
+    // Keep the address bar on the current answer, so it can be shared.
+    window.history.replaceState(null, '', `/lookup${lookupSearch({ q, tf: timeframe })}`);
     setLoading(true);
     setError(null);
-    try {
-      setData(await getLookup(q, timeframe));
-    } catch (err) {
-      // The API's own reason is the answer here — "no pool on any DEX we
-      // cover" and "404" send you to two different places.
-      setError(err instanceof ApiError ? err.message : 'Không tra cứu được. Thử lại sau ít phút.');
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
+    const result = await fetchLookup(q, timeframe);
+    setData(result.data);
+    setError(result.error);
+    setLoading(false);
   }
 
   return (
@@ -68,7 +90,7 @@ export default function LookupPage() {
           <div>
             <span className="mb-1 block text-[11px] uppercase tracking-wide text-slate-500">Timeframe</span>
             <div className="flex overflow-hidden rounded-md border border-slate-700">
-              {TIMEFRAMES.map((tf) => (
+              {LOOKUP_TIMEFRAMES.map((tf) => (
                 <button
                   key={tf}
                   type="button"
@@ -101,4 +123,19 @@ export default function LookupPage() {
       {data && <LookupResultView result={data.result} />}
     </div>
   );
+}
+
+/**
+ * One lookup, as the page shows it. On failure the previous result is
+ * cleared rather than left standing, since a stale answer beside a fresh
+ * error is the worst of both.
+ */
+async function fetchLookup(q: string, tf: string): Promise<{ data: LookupResponse | null; error: string | null }> {
+  try {
+    return { data: await getLookup(q, tf), error: null };
+  } catch (err) {
+    // The API's own reason is the answer here — "no pool on any DEX we
+    // cover" and "404" send you to two different places.
+    return { data: null, error: err instanceof ApiError ? err.message : 'Không tra cứu được. Thử lại sau ít phút.' };
+  }
 }
