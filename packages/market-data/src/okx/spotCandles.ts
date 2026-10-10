@@ -2,14 +2,13 @@ import { z } from 'zod';
 import { fetchJsonValidated, type Logger } from '@crypto-signal/shared';
 
 /**
- * OKX spot candles: the fallback for a Lookup when Binance refuses this
- * server.
+ * OKX spot candles: the fallback when Binance refuses this server.
  *
  * Free hosts share their outbound IPs, so Binance can ban the server for
- * somebody else's traffic (418) and a Lookup then has nothing to read.
- * OKX lists most of the same USDT pairs and serves candles without a key.
- * Only Lookup uses this: the collector, signals and performance numbers
- * stay Binance-only, so nothing scored ever mixes two exchanges.
+ * somebody else's traffic (418). OKX lists most of the same USDT pairs and
+ * serves candles without a key. Used by Lookup and by the 1D trend read
+ * only: the collector, signals, setups and performance numbers stay
+ * Binance-only, so nothing scored ever mixes two exchanges.
  *
  * Shape verified against the live API: `data` is newest first, each row
  * `[ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]` as strings, `vol`
@@ -30,6 +29,10 @@ const UNKNOWN_INSTRUMENT = '51001';
 
 /** OKX caps /market/candles at 300 rows. */
 const MAX_LIMIT = 300;
+/** /market/history-candles (older bars, paged with `after`) caps at 100. */
+const MAX_HISTORY_LIMIT = 100;
+/** Enough pages for 400 daily bars; a bound so a bad cursor cannot loop. */
+const MAX_PAGES = 5;
 
 /**
  * Binance interval → OKX bar. `1Dutc` rather than `1D`: OKX's plain daily
@@ -54,6 +57,11 @@ export interface OkxBar {
   low: number;
   close: number;
   volume: number;
+}
+
+/** A bar that has closed, with Binance's closeTime convention (last ms of the bar). */
+export interface OkxClosedBar extends OkxBar {
+  closeTime: number;
 }
 
 export interface OkxSpotCandlesOptions {
@@ -86,7 +94,47 @@ export class OkxSpotCandles {
     const bar = BAR[interval];
     if (instId === null || bar === undefined) return [];
 
-    const url = `${this.baseUrl}/api/v5/market/candles?instId=${encodeURIComponent(instId)}&bar=${bar}&limit=${Math.min(limit, MAX_LIMIT)}`;
+    const page = await this.fetchPage('candles', instId, bar, Math.min(limit, MAX_LIMIT));
+    return page.sort((a, b) => a.openTime - b.openTime);
+  }
+
+  /**
+   * The last `limit` CLOSED daily bars, oldest first — the same contract as
+   * BinanceSpotAdapter.fetchClosedDailyBars, so the 1D trend read can take
+   * either. More than 300 bars needs history-candles, paged backwards.
+   */
+  async fetchClosedDailyBars(symbol: string, limit: number, now = Date.now()): Promise<OkxClosedBar[]> {
+    const instId = toOkxInstId(symbol);
+    if (instId === null) return [];
+
+    const DAY_MS = 86_400_000;
+    // +1: the newest row is usually the day still forming, dropped below.
+    const byOpen = new Map<number, OkxBar>();
+    let page = await this.fetchPage('candles', instId, '1Dutc', Math.min(limit + 1, MAX_LIMIT));
+    for (let n = 1; ; n += 1) {
+      for (const b of page) byOpen.set(b.openTime, b);
+      if (page.length === 0 || byOpen.size > limit || n >= MAX_PAGES) break;
+      const oldest = Math.min(...page.map((b) => b.openTime));
+      page = await this.fetchPage('history-candles', instId, '1Dutc', MAX_HISTORY_LIMIT, oldest);
+    }
+
+    return [...byOpen.values()]
+      .map((b) => ({ ...b, closeTime: b.openTime + DAY_MS - 1 }))
+      .filter((b) => b.closeTime < now)
+      .sort((a, b) => a.openTime - b.openTime)
+      .slice(-limit);
+  }
+
+  /** One page, newest first as OKX sends it. `after` asks for bars older than that open time. */
+  private async fetchPage(
+    endpoint: 'candles' | 'history-candles',
+    instId: string,
+    bar: string,
+    limit: number,
+    after?: number,
+  ): Promise<OkxBar[]> {
+    const cursor = after === undefined ? '' : `&after=${after}`;
+    const url = `${this.baseUrl}/api/v5/market/${endpoint}?instId=${encodeURIComponent(instId)}&bar=${bar}&limit=${limit}${cursor}`;
     const res = await fetchJsonValidated({
       url,
       schema: responseSchema,
@@ -98,11 +146,7 @@ export class OkxSpotCandles {
 
     if (res.code === UNKNOWN_INSTRUMENT) return [];
     if (res.code !== '0') throw new Error(`OKX ${res.code}: ${res.msg}`);
-
-    return res.data
-      .map(toOkxBar)
-      .filter((b): b is OkxBar => b !== null)
-      .sort((a, b) => a.openTime - b.openTime);
+    return res.data.map(toOkxBar).filter((b): b is OkxBar => b !== null);
   }
 }
 

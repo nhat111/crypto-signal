@@ -1,6 +1,6 @@
 import type { Pool } from 'pg';
 import type { AppConfig, Logger, SymbolId } from '@crypto-signal/shared';
-import type { BinanceFuturesAdapter, BinanceSpotAdapter, ConnectionStatus } from '@crypto-signal/market-data';
+import type { BinanceFuturesAdapter, BinanceSpotAdapter, ConnectionStatus, OkxSpotCandles } from '@crypto-signal/market-data';
 import type { SignalType } from '@crypto-signal/signal-engine';
 import type { GemConfig } from '@crypto-signal/gem-scanner';
 import type { SignalVerdict } from '@crypto-signal/db';
@@ -16,6 +16,8 @@ export interface WorkerContext {
   config: AppConfig;
   spotAdapter: BinanceSpotAdapter;
   futuresAdapter: BinanceFuturesAdapter;
+  /** Daily bars for the 1D trend when Binance refuses this server (shared free-host IPs get banned). Never used for anything scored. */
+  okxSpot?: OkxSpotCandles;
   states: Map<string, SymbolTimeframeState>;
   pairBuffer: CandlePairBuffer;
   /** Symbols with only a Binance Futures listing — routed straight to processFuturesOnlyCandle, never through pairBuffer (there's no spot side to wait for). */

@@ -21,6 +21,7 @@ import {
 import { detectSetups, readMarketStructure, resolveSetupOutcome, type MarketStructure, type OhlcvBar } from '@crypto-signal/indicators';
 import { SEVERITY_ORDER } from '@crypto-signal/signal-engine';
 import type { WorkerContext } from './context.js';
+import { OKX_SETUP_SKIP, OKX_TREND_REASON, fetchDailyBarsWithFallback } from './dailyBars.js';
 
 /** 400 closed days covers EMA200 with room for the seed window. */
 const DAILY_BARS = 400;
@@ -52,9 +53,18 @@ export async function runTrendCycle(ctx: WorkerContext, now = Date.now()): Promi
     ...ctx.config.futuresOnlySymbols.map((symbol) => ({ symbol, adapter: ctx.futuresAdapter })),
   ];
 
+  const okx = ctx.okxSpot ?? null;
   for (const { symbol, adapter } of symbols) {
     try {
-      const bars = await adapter.fetchClosedDailyBars(symbol, DAILY_BARS, now);
+      // Futures-only symbols have no spot pair to fall back to.
+      const { bars, source } = await fetchDailyBarsWithFallback(
+        (s, limit, at) => adapter.fetchClosedDailyBars(s, limit, at),
+        adapter === ctx.spotAdapter && okx ? (s, limit, at) => okx.fetchClosedDailyBars(s, limit, at) : null,
+        symbol,
+        DAILY_BARS,
+        now,
+      );
+      if (source !== 'binance') ctx.logger.warn({ symbol, source }, 'daily bars read from fallback — Binance refused the server');
       const structure = readMarketStructure(bars);
       if (!structure) {
         failures.push(`${symbol}: not enough daily history`);
@@ -72,12 +82,16 @@ export async function runTrendCycle(ctx: WorkerContext, now = Date.now()): Promi
           aboveEma: structure.aboveEma,
           swingHighs: structure.swingHighs,
           swingLows: structure.swingLows,
-          reasons: structure.reasons,
+          reasons: source === 'binance' ? structure.reasons : [...structure.reasons, OKX_TREND_REASON],
         }),
       );
       // Setups are spot-only: a futures-only symbol has no spot market to
       // buy on, and buying spot is the only thing these plans describe.
-      if (adapter === ctx.spotAdapter) {
+      // And Binance-only: a setup is a priced plan whose outcome is scored,
+      // so its bars must come from the exchange the scores are about.
+      if (adapter === ctx.spotAdapter && source !== 'binance') {
+        setupFailures.push(`${symbol}: ${OKX_SETUP_SKIP}`);
+      } else if (adapter === ctx.spotAdapter) {
         try {
           await scanSetups(ctx, symbol, bars, structure, now);
           setupScans += 1;
