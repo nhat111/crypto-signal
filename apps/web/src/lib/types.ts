@@ -716,6 +716,16 @@ export interface StatusResponse {
 
 /* ---------- On-demand lookup ---------- */
 
+/** One OHLCV bar of a Lookup, oldest first. */
+export interface LookupBar {
+  openTime: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
 export interface LookupLevel {
   price: number;
   distancePct: number;
@@ -807,6 +817,8 @@ export type LookupResult =
       source?: string;
       timeframe: string;
       technical: LookupTechnical;
+      /** The bars behind the read, for the chart. Optional: an API older than the chart sends none. */
+      bars?: LookupBar[];
       fundamentals: LookupExchangeFundamentals;
       triedSymbols: string[];
       /** Optional: an API deployed before the multi-frame glance sends none. */

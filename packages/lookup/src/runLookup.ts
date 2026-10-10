@@ -47,6 +47,8 @@ export interface ExchangeLookup {
   source: string;
   timeframe: string;
   technical: TechnicalRead;
+  /** The bars the read was computed from, oldest first, so the page can draw the same chart the numbers describe. */
+  bars: OhlcvBar[];
   fundamentals: ExchangeFundamentals;
   /** Symbols tried before this one matched, so a surprising result is explainable. */
   triedSymbols: string[];
@@ -154,6 +156,7 @@ async function lookupExchange(deps: LookupDeps, symbol: string, timeframe: strin
       source,
       timeframe,
       technical,
+      bars,
       timeframes: await glanceOtherTimeframes({ ...deps, fetchBars }, candidate, timeframe),
       fundamentals: {
         symbol: candidate,

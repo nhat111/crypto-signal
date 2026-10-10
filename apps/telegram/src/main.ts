@@ -192,7 +192,7 @@ async function main(): Promise<void> {
         await ctx.reply(res.reason);
         return;
       }
-      await ctx.reply(formatLookup(res.data), { parse_mode: 'HTML', link_preview_options: { is_disabled: true } });
+      await ctx.reply(formatLookup(res.data, config.webBaseUrl), { parse_mode: 'HTML', link_preview_options: { is_disabled: true } });
     } catch (err) {
       logger.error({ err, q }, '/lookup failed');
       await ctx.reply('Could not run that lookup right now — try again shortly.');

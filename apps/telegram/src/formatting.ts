@@ -265,7 +265,7 @@ function windowLine(w: StablecoinFlowWindowDTO | null): string {
 
 /** Token names/symbols come from on-chain metadata that anyone can set, so they're escaped before entering an HTML-parsed message. */
 export function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>');
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 /** Full precision with thousands separators — unlike formatLargeNumber, a price should never compact to "78.58K". */
@@ -323,7 +323,24 @@ export function buildHelpText(symbols: string[]): string {
  * recorded outcomes behind any of these numbers, and this codebase does
  * not make a claim it cannot back.
  */
-export function formatLookup(data: LookupDTO): string {
+/**
+ * The same lookup on the web page, which draws the chart this message can
+ * only describe. Keys match `parseLookupParams` in apps/web/src/lib/lookupChart.ts.
+ */
+export function lookupChartUrl(webBaseUrl: string, symbol: string, timeframe: string): string | null {
+  if (webBaseUrl === '') return null;
+  return `${webBaseUrl}/lookup?${new URLSearchParams({ q: symbol, tf: timeframe }).toString()}`;
+}
+
+/** The API sends `{ price, distancePct }`; interpolating it whole printed "[object Object]". */
+function levelText(level: number | { price: number; distancePct: number } | null): string {
+  if (level === null) return '—';
+  if (typeof level === 'number') return String(level);
+  const sign = level.distancePct > 0 ? '+' : '';
+  return `${level.price} (${sign}${level.distancePct.toFixed(1)}%)`;
+}
+
+export function formatLookup(data: LookupDTO, webBaseUrl = ''): string {
   const lines: string[] = [];
 
   if (data.result.kind === 'exchange') {
@@ -337,10 +354,12 @@ export function formatLookup(data: LookupDTO): string {
     if (t.rsi14 !== null) lines.push(`RSI 14: ${t.rsi14.toFixed(1)}`);
     if (t.atrPct !== null) lines.push(`ATR range: ${t.atrPct.toFixed(2)}%`);
     if (t.support !== null || t.resistance !== null) {
-      lines.push(`Nearest low/high: ${t.support ?? '—'} / ${t.resistance ?? '—'}`);
+      lines.push(`Nearest low/high: ${levelText(t.support)} / ${levelText(t.resistance)}`);
     }
     if (t.rangePositionPct !== null) lines.push(`Position in the ${t.barCount}-bar range: ${t.rangePositionPct.toFixed(0)}/100`);
     if (t.missing.length > 0) lines.push(`<i>Not enough history for: ${escapeHtml(t.missing.join(', '))}</i>`);
+    const chartUrl = lookupChartUrl(webBaseUrl, symbol, data.result.timeframe);
+    if (chartUrl) lines.push(`📈 <a href="${escapeHtml(chartUrl)}">Xem chart</a>`);
     lines.push('');
     lines.push('<i>Describes where price sits against its own history — not a recommendation.</i>');
     return lines.join('\n');

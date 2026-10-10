@@ -217,8 +217,9 @@ export interface LookupDTO {
           rsi14: number | null;
           trend: { direction: string; separationPct: number } | null;
           atrPct: number | null;
-          support: number | null;
-          resistance: number | null;
+          /** A bare number from an older API; the level with its distance from a newer one. */
+          support: number | { price: number; distancePct: number } | null;
+          resistance: number | { price: number; distancePct: number } | null;
           rangePositionPct: number | null;
           missing: string[];
         };

@@ -3,6 +3,7 @@ import { SafetyBadge } from '@/components/gems/SafetyBadge';
 import { formatTokenPrice, formatUsd } from '@/lib/format';
 import { apiPredatesReadings } from '@/lib/openPnl';
 import { Glossary, ONCHAIN_GLOSSARY, TECHNICAL_GLOSSARY } from './Glossary';
+import { LookupChart } from './LookupChart';
 
 /**
  * The answer to one lookup.
@@ -28,6 +29,13 @@ export function LookupResultView({ result }: { result: LookupResult }) {
             Binance đang chặn IP máy chủ, nên nến lấy từ {sourceLabel(result.source)}. Giá giữa hai sàn thường chỉ lệch rất ít,
             nhưng không khớp từng nến với Binance.
           </p>
+        )}
+        {result.bars && result.bars.length > 0 && (
+          <LookupChart
+            bars={result.bars}
+            support={asLevel(result.technical.support)?.price ?? null}
+            resistance={asLevel(result.technical.resistance)?.price ?? null}
+          />
         )}
         <TechnicalPanel read={result.technical} />
         {result.timeframes && result.timeframes.length > 0 && (
@@ -128,11 +136,11 @@ export function LookupResultView({ result }: { result: LookupResult }) {
   );
 }
 
-/** An older API sent a bare number here; a newer one sends the level with its distance. */
 function sourceLabel(source: string | undefined): string {
   return source && source !== 'binance' ? source.toUpperCase() : 'Binance';
 }
 
+/** An older API sent a bare number here; a newer one sends the level with its distance. */
 function asLevel(value: LookupLevel | number | null | undefined): LookupLevel | null {
   if (value === null || value === undefined) return null;
   return typeof value === 'number' ? { price: value, distancePct: 0 } : value;
