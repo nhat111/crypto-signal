@@ -69,6 +69,41 @@ describe('OkxSpotCandles.fetchBars', () => {
   });
 });
 
+describe('OkxSpotCandles.fetchClosedDailyBars', () => {
+  const DAY = 86_400_000;
+  const row = (openTime: number) => [String(openTime), '1', '2', '0.5', '1.5', '10', '0', '0', '1'];
+  // Newest first, like OKX.
+  const days = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => row((to - i) * DAY));
+
+  it('pages back through history-candles for more than 300 days and drops the forming day', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/market/candles?')) return okxResponse({ code: '0', msg: '', data: days(100, 400) });
+      const after = Number(/after=(\d+)/.exec(url)?.[1]) / DAY;
+      return okxResponse({ code: '0', msg: '', data: days(Math.max(0, after - 100), after - 1) });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    // Day 400 is still forming at this `now`.
+    const bars = await new OkxSpotCandles({ logger }).fetchClosedDailyBars('BTCUSDT', 350, 400 * DAY + 1000);
+    expect(bars).toHaveLength(350);
+    expect(bars[0]?.openTime).toBe(50 * DAY);
+    expect(bars.at(-1)?.openTime).toBe(399 * DAY);
+    expect(bars.at(-1)?.closeTime).toBe(400 * DAY - 1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('bar=1Dutc&limit=300');
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain(`history-candles?instId=BTC-USDT&bar=1Dutc&limit=100&after=${100 * DAY}`);
+  });
+
+  it('stops paging when history runs out', async () => {
+    const fetchMock = vi.fn(async (url: string) =>
+      okxResponse({ code: '0', msg: '', data: url.includes('/market/candles?') ? days(0, 10) : [] }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const bars = await new OkxSpotCandles({ logger }).fetchClosedDailyBars('BTCUSDT', 400, 20 * DAY);
+    expect(bars).toHaveLength(11);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('toOkxBar', () => {
   it('drops a row with a non-numeric field rather than inventing a value', () => {
     expect(toOkxBar(['1', 'x', '1', '1', '1', '1'])).toBeNull();
