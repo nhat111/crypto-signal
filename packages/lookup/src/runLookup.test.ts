@@ -125,6 +125,71 @@ describe('runLookup — exchange path', () => {
     expect(reason).not.toContain('is not listed');
   });
 
+  describe('fallback exchange when Binance refuses the server', () => {
+    const banned = Object.assign(new Error('Binance REST 418'), { status: 418 });
+
+    it('reads the bars from the fallback and says so', async () => {
+      const fallbackBars = vi.fn(async () => bars(120));
+      const binance = vi.fn(async () => {
+        throw banned;
+      });
+      const result = await runLookup(
+        deps({ fetchBars: binance, fallback: { source: 'okx', fetchBars: fallbackBars } }),
+        'nearusdt',
+      );
+      expect(result.kind).toBe('exchange');
+      if (result.kind !== 'exchange') return;
+      expect(result.source).toBe('okx');
+      expect(result.symbol).toBe('NEARUSDT');
+      // The glance frames come from the fallback too: the ban covers every call.
+      expect(result.timeframes.length).toBeGreaterThan(0);
+      expect(binance).toHaveBeenCalledTimes(1);
+      expect(fallbackBars).toHaveBeenCalledTimes(1 + GLANCE_TIMEFRAMES.filter((tf) => tf !== '4h').length);
+    });
+
+    it('never asks the fallback about a symbol Binance said does not exist', async () => {
+      const invalid = Object.assign(new Error('Binance REST 400'), { status: 400 });
+      const fallbackBars = vi.fn(async () => bars(120));
+      const result = await runLookup(
+        deps({ fetchBars: async () => { throw invalid; }, fallback: { source: 'okx', fetchBars: fallbackBars } }),
+        'NOPE',
+      );
+      expect(result.kind).toBe('not_found');
+      expect(fallbackBars).not.toHaveBeenCalled();
+    });
+
+    it('tries the other quotes on the fallback when it does not list the first', async () => {
+      const fallbackBars = vi.fn(async (symbol: string) => (symbol === 'NEARUSDC' ? bars(120) : []));
+      const result = await runLookup(
+        deps({ fetchBars: async () => { throw banned; }, fallback: { source: 'okx', fetchBars: fallbackBars } }),
+        'near',
+      );
+      expect(result.kind === 'exchange' && result.symbol).toBe('NEARUSDC');
+    });
+
+    it('keeps the Binance reason when the fallback has nothing either, and does not call the coin unlisted', async () => {
+      const result = await runLookup(
+        deps({ fetchBars: async () => { throw banned; }, fallback: { source: 'okx', fetchBars: async () => [] } }),
+        'nearusdt',
+      );
+      const reason = (result as { reason: string }).reason;
+      expect(reason).toContain('418');
+      expect(reason).toContain('OKX không niêm yết');
+      expect(reason).not.toContain('is not listed');
+    });
+
+    it('says the fallback is down too when it throws', async () => {
+      const result = await runLookup(
+        deps({
+          fetchBars: async () => { throw banned; },
+          fallback: { source: 'okx', fetchBars: async () => { throw new Error('timeout'); } },
+        }),
+        'nearusdt',
+      );
+      expect((result as { reason: string }).reason).toContain('OKX cũng không trả lời');
+    });
+  });
+
   it('still calls it unlisted when every refusal was Binance’s invalid-symbol 400', async () => {
     const invalid = Object.assign(new Error('Binance REST 400'), { status: 400 });
     const result = await runLookup(deps({ fetchBars: async () => { throw invalid; } }), 'NOPE');

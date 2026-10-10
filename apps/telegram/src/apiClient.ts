@@ -208,6 +208,8 @@ export interface LookupDTO {
     | {
         kind: 'exchange';
         symbol: string;
+        /** 'binance', or the fallback exchange when Binance refused the server. Absent from older APIs. */
+        source?: string;
         timeframe: string;
         technical: {
           barCount: number;
