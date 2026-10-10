@@ -19,7 +19,16 @@ export function LookupResultView({ result }: { result: LookupResult }) {
   if (result.kind === 'exchange') {
     return (
       <div className="space-y-4">
-        <Header title={result.symbol} subtitle={`Binance · ${result.timeframe} · ${result.technical.barCount} bars`} />
+        <Header
+          title={result.symbol}
+          subtitle={`${sourceLabel(result.source)} · ${result.timeframe} · ${result.technical.barCount} bars`}
+        />
+        {result.source && result.source !== 'binance' && (
+          <p className="rounded border border-amber-500/30 bg-amber-500/[0.08] px-2 py-1.5 text-[11px] font-semibold leading-relaxed text-amber-300">
+            Binance đang chặn IP máy chủ, nên nến lấy từ {sourceLabel(result.source)}. Giá giữa hai sàn thường chỉ lệch rất ít,
+            nhưng không khớp từng nến với Binance.
+          </p>
+        )}
         <TechnicalPanel read={result.technical} />
         {result.timeframes && result.timeframes.length > 0 && (
           <TimeframePanel chosen={result.timeframe} glances={result.timeframes} />
@@ -120,6 +129,10 @@ export function LookupResultView({ result }: { result: LookupResult }) {
 }
 
 /** An older API sent a bare number here; a newer one sends the level with its distance. */
+function sourceLabel(source: string | undefined): string {
+  return source && source !== 'binance' ? source.toUpperCase() : 'Binance';
+}
+
 function asLevel(value: LookupLevel | number | null | undefined): LookupLevel | null {
   if (value === null || value === undefined) return null;
   return typeof value === 'number' ? { price: value, distancePct: 0 } : value;

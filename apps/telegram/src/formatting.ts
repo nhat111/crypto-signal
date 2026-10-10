@@ -328,7 +328,10 @@ export function formatLookup(data: LookupDTO): string {
 
   if (data.result.kind === 'exchange') {
     const { symbol, technical: t } = data.result;
-    lines.push(`🔎 <b>${escapeHtml(symbol)}</b> · Binance · ${escapeHtml(data.result.timeframe)}`);
+    const fromFallback = data.result.source !== undefined && data.result.source !== 'binance';
+    const source = fromFallback ? (data.result.source ?? '').toUpperCase() : 'Binance';
+    lines.push(`🔎 <b>${escapeHtml(symbol)}</b> · ${escapeHtml(source)} · ${escapeHtml(data.result.timeframe)}`);
+    if (fromFallback) lines.push(`<i>Binance is refusing the server right now, so these bars come from ${escapeHtml(source)}.</i>`);
     lines.push(`Price ${t.lastPrice}`);
     if (t.trend) lines.push(`Structure: ${t.trend.direction === 'up' ? 'EMA20 > EMA50' : t.trend.direction === 'down' ? 'EMA20 < EMA50' : 'flat'} (${t.trend.separationPct.toFixed(2)}%)`);
     if (t.rsi14 !== null) lines.push(`RSI 14: ${t.rsi14.toFixed(1)}`);

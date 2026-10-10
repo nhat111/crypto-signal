@@ -803,6 +803,8 @@ export type LookupResult =
   | {
       kind: 'exchange';
       symbol: string;
+      /** 'binance', or the fallback exchange ('okx') when Binance refused the server. Optional: older APIs send none. */
+      source?: string;
       timeframe: string;
       technical: LookupTechnical;
       fundamentals: LookupExchangeFundamentals;

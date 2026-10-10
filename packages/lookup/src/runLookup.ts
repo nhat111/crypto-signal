@@ -17,6 +17,13 @@ import { buildTechnicalRead, type TechnicalRead } from './technicalRead.js';
 export interface LookupDeps {
   /** Closed bars for an exchange symbol, newest last. Empty when the symbol is not listed. */
   fetchBars(symbol: string, timeframe: string, limit: number): Promise<OhlcvBar[]>;
+  /**
+   * Another exchange's bars, same contract, used only when Binance failed
+   * for a reason that says nothing about the symbol (a ban, a rate limit, a
+   * geo-block, a network error). Free hosts share outbound IPs, so Binance
+   * can refuse this server for somebody else's traffic.
+   */
+  fallback?: { source: string; fetchBars(symbol: string, timeframe: string, limit: number): Promise<OhlcvBar[]> };
   /** Pairs matching a contract address, across chains. */
   searchPairs(query: string): Promise<GemPair[]>;
   /** Null when no screen covers the chain — never treated as a pass. */
@@ -36,6 +43,8 @@ export interface ExchangeLookup {
   kind: 'exchange';
   /** What was actually found on the exchange, which may differ from what was typed. */
   symbol: string;
+  /** Where the bars came from: 'binance', or the fallback's name when Binance refused this server. */
+  source: string;
   timeframe: string;
   technical: TechnicalRead;
   fundamentals: ExchangeFundamentals;
@@ -99,20 +108,40 @@ async function lookupExchange(deps: LookupDeps, symbol: string, timeframe: strin
   // about the symbol — reporting those as "not listed" told a user that
   // NEARUSDT does not exist on Binance.
   let upstreamFailure: string | null = null;
+  // Once Binance has refused this server, the rest of this lookup (other
+  // quotes, other frames) reads from the fallback: a ban covers every call.
+  let source = 'binance';
+  let fetchBars = deps.fetchBars;
+  let fallbackFailed = false;
 
   for (const candidate of candidates) {
     tried.push(candidate);
     let bars: OhlcvBar[] = [];
     try {
-      bars = await deps.fetchBars(candidate, timeframe, DEFAULT_BAR_LIMIT);
+      bars = await fetchBars(candidate, timeframe, DEFAULT_BAR_LIMIT);
     } catch (err) {
       // An unlisted symbol is a 400 from Binance, which is indistinguishable
       // here from a transient failure — so try the next quote asset rather
       // than declaring the token unlisted on one bad response.
-      deps.logger.warn({ err, candidate }, 'lookup: kline fetch failed, trying the next quote');
+      deps.logger.warn({ err, candidate, source }, 'lookup: kline fetch failed, trying the next quote');
       const status = (err as { status?: unknown } | null)?.status;
-      if (status !== 400) upstreamFailure = describeUpstreamFailure(status, err);
-      continue;
+      if (source !== 'binance') {
+        fallbackFailed = true;
+        continue;
+      }
+      if (status === 400) continue;
+      upstreamFailure = describeUpstreamFailure(status, err);
+      if (!deps.fallback) continue;
+
+      source = deps.fallback.source;
+      fetchBars = deps.fallback.fetchBars.bind(deps.fallback);
+      try {
+        bars = await fetchBars(candidate, timeframe, DEFAULT_BAR_LIMIT);
+      } catch (fallbackErr) {
+        deps.logger.warn({ err: fallbackErr, candidate, source }, 'lookup: fallback kline fetch failed too');
+        fallbackFailed = true;
+        continue;
+      }
     }
     if (bars.length === 0) continue;
 
@@ -122,9 +151,10 @@ async function lookupExchange(deps: LookupDeps, symbol: string, timeframe: strin
     return {
       kind: 'exchange',
       symbol: candidate,
+      source,
       timeframe,
       technical,
-      timeframes: await glanceOtherTimeframes(deps, candidate, timeframe),
+      timeframes: await glanceOtherTimeframes({ ...deps, fetchBars }, candidate, timeframe),
       fundamentals: {
         symbol: candidate,
         spotListed: true,
@@ -140,9 +170,15 @@ async function lookupExchange(deps: LookupDeps, symbol: string, timeframe: strin
   }
 
   if (upstreamFailure !== null) {
+    const fallbackNote =
+      source === 'binance'
+        ? ''
+        : fallbackFailed
+          ? ` Nguồn dự phòng ${source.toUpperCase()} cũng không trả lời.`
+          : ` Nguồn dự phòng ${source.toUpperCase()} không niêm yết mã này.`;
     return {
       kind: 'not_found',
-      reason: `Không lấy được dữ liệu "${symbol}" từ Binance lúc này (${upstreamFailure}). Đây KHÔNG có nghĩa là mã không niêm yết — thử lại sau ít phút, hoặc xem trang Status.`,
+      reason: `Không lấy được dữ liệu "${symbol}" từ Binance lúc này (${upstreamFailure}).${fallbackNote} Đây KHÔNG có nghĩa là mã không niêm yết trên Binance — thử lại sau ít phút, hoặc xem trang Status.`,
     };
   }
   return {

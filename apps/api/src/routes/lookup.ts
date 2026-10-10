@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { createLogger } from '@crypto-signal/shared';
-import { BinanceSpotAdapter } from '@crypto-signal/market-data';
+import { BinanceSpotAdapter, OkxSpotCandles } from '@crypto-signal/market-data';
 import {
   CompositeSafetySource,
   DexScreenerSource,
@@ -34,6 +34,9 @@ export function registerLookupRoute(app: FastifyInstance, deps: ApiDeps): void {
     wsBase: deps.config.binance.spotWsBase,
     logger,
   });
+  // Free hosts share outbound IPs, so Binance can ban this server for
+  // somebody else's traffic; OKX keeps a Lookup answering meanwhile.
+  const okx = new OkxSpotCandles({ logger });
   const dexscreener = new DexScreenerSource({ logger });
   const safety = new CompositeSafetySource(
     [new RugCheckSource({ logger, apiKey: deps.gemConfig?.rugcheckApiKey || undefined }), new GoPlusSource({ logger })],
@@ -61,6 +64,7 @@ export function registerLookupRoute(app: FastifyInstance, deps: ApiDeps): void {
             volume: c.volume,
           }));
         },
+        fallback: { source: 'okx', fetchBars: (symbol, tf, limit) => okx.fetchBars(symbol, tf, limit) },
         searchPairs: (query) => dexscreener.searchPairs(query),
         // supportsChain first: the composite answers `unknown` for a chain
         // nothing covers, and null is what says "no screen ran" rather
