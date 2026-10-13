@@ -1,5 +1,6 @@
 import {
   claimDailyDigest,
+  getCoinScanForDay,
   getAllAlertSubscribers,
   getOverview,
   getOpenTradeSetups,
@@ -21,6 +22,7 @@ import {
 import { detectSetups, readMarketStructure, resolveSetupOutcome, type MarketStructure, type OhlcvBar } from '@crypto-signal/indicators';
 import { SEVERITY_ORDER } from '@crypto-signal/signal-engine';
 import type { WorkerContext } from './context.js';
+import { formatCoinDigest } from './coinDigest.js';
 import { OKX_TREND_REASON, fetchDailyBarsWithFallback, type DailyBarSource } from './dailyBars.js';
 
 /** 400 closed days covers EMA200 with room for the seed window. */
@@ -32,6 +34,12 @@ const DAY_MS = 86_400_000;
  * it is skipped rather than sent late.
  */
 const DIGEST_WINDOW_MS = 12 * 60 * 60_000;
+/**
+ * The coin scan runs on the same hourly tick as this, so on a given morning
+ * either may finish first. The digest waits this long for the day's scan,
+ * then goes without it — a morning message an hour late beats one missing.
+ */
+const COIN_SCAN_WAIT_MS = 2 * 60 * 60_000;
 
 /**
  * Reads the daily structure for every tracked symbol, stores it, and — once
@@ -137,6 +145,10 @@ async function maybeSendDigest(ctx: WorkerContext, results: TrendUpsertResult[],
   const chatIds = Array.from(new Set([...ctx.config.telegramAlertChatIds, ...subscribers.map((s) => s.chatId)]));
   if (chatIds.length === 0) return;
 
+  const barDay = new Date(latestOpen).toISOString().slice(0, 10);
+  const coins = ctx.config.coinScan.enabled ? await getCoinScanForDay(ctx.pool, barDay) : [];
+  if (ctx.config.coinScan.enabled && coins.length === 0 && now - closedAt < COIN_SCAN_WAIT_MS) return;
+
   // The claim comes after every early return, so a skipped day stays
   // claimable — but before the send, so a restart mid-send cannot repeat it.
   const day = new Date(closedAt).toISOString().slice(0, 10);
@@ -148,7 +160,8 @@ async function maybeSendDigest(ctx: WorkerContext, results: TrendUpsertResult[],
       getOverview(ctx.pool, symbols, ['4h']),
       getRecentSignals(ctx.pool, { timeframes: ['4h'], limit: 100 }),
     ]);
-    const text = formatDigest(results, overview, signals.filter((s) => s.timestamp >= now - DAY_MS), closedAt);
+    const previousCoins = coins.length > 0 ? await getCoinScanForDay(ctx.pool, new Date(latestOpen - DAY_MS).toISOString().slice(0, 10)) : [];
+    const text = formatDigest(results, overview, signals.filter((s) => s.timestamp >= now - DAY_MS), closedAt, formatCoinDigest(coins, previousCoins));
 
     let delivered = 0;
     for (const chatId of chatIds) {
@@ -185,6 +198,7 @@ export function formatDigest(
   overview: OverviewRow[],
   signals: RecentSignalRow[],
   closedAt: number,
+  coinLines: string[] = [],
 ): string {
   const date = new Date(closedAt - 1).toISOString().slice(0, 10).split('-').reverse().join('/');
   const lines: string[] = [`☀️ <b>Tóm tắt sau nến 1D ngày ${date}</b>`, ''];
@@ -220,6 +234,7 @@ export function formatDigest(
       lines.push(`• ${escapeHtml(s.symbol)} — ${escapeHtml(s.signalType.replace(/_/g, ' '))} (${s.severity}, ${Math.round(s.confidence)}%)`);
     }
   }
+  if (coinLines.length > 0) lines.push('', ...coinLines);
   lines.push('', '<i>Xu hướng đọc theo đỉnh/đáy trên nến ngày đã đóng. Mô tả, không phải dự báo.</i>');
   return lines.join('\n');
 }

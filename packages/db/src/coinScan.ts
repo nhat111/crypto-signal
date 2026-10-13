@@ -137,6 +137,12 @@ export async function getLatestCoinScan(pool: Pool): Promise<{ day: string | nul
   return { day: mapped[0]?.day ?? null, rows: mapped };
 }
 
+/** One stored day's scan (YYYY-MM-DD), most-traded first; empty when that day was not scanned. */
+export async function getCoinScanForDay(pool: Pool, day: string): Promise<CoinScanRow[]> {
+  const { rows } = await pool.query(`SELECT ${COLUMNS} FROM coin_scan_rows WHERE day = $1::date ORDER BY volume_rank, symbol`, [day]);
+  return rows.map(toRow);
+}
+
 /** The last day a scan was stored, or null — how the hourly tick decides whether today's has already run. */
 export async function getLatestCoinScanDay(pool: Pool): Promise<string | null> {
   const { rows } = await pool.query(`SELECT to_char(max(day), 'YYYY-MM-DD') AS day FROM coin_scan_rows`);
