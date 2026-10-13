@@ -57,10 +57,19 @@ aggregates have no business running on an uptime probe.
   "worker": { "service": "worker", "lastHeartbeatAt": 0, "ageMs": 12000,
               "connections": { "spot": "open", "futures": "open",
                                "liquidation": "closed" },
-              "symbolIngest": { "BTCUSDT": 0, "HYPEUSDT": 0 } },
+              "symbolIngest": { "BTCUSDT": 0, "HYPEUSDT": 0 },
+              "memory": { "workerRssMb": 140, "workerPeakRssMb": 230,
+                          "containerUsedMb": 380, "containerLimitMb": 512,
+                          "containerPeakMb": 470 } | null },
   "serverTime": 0
 }
 ```
+
+`worker.memory` (MB) comes with each heartbeat: the container's cgroup
+usage and limit (null where the host exposes no cgroup; the limit falls back
+to `MEMORY_LIMIT_MB`), cgroup v2's peak when the kernel has it, and the
+worker's own RSS with its highest value since boot. Null from a worker that
+predates it.
 
 `version` is the build of the process answering the request — the api.
 `services` is every other service, each writing its own build into the

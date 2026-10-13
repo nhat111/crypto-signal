@@ -6,6 +6,7 @@ import {
   classifySymbol,
   collectorSummary,
   describeAlertTimeframes,
+  describeMemory,
   describeChainSources,
   describeFilteredSecurities,
   describeTrackedObservations,
@@ -622,5 +623,28 @@ describe('describeTrackedObservations', () => {
     // Absent is not zero: that worker had no watchlist, so there is no
     // failure to warn about.
     expect(describeTrackedObservations({ candidateCount: 39 })).toBeNull();
+  });
+});
+
+describe('describeMemory', () => {
+  const mem = (used: number | null, limit: number | null, peak: number | null = null) => ({
+    workerRssMb: 140,
+    workerPeakRssMb: 230,
+    containerUsedMb: used,
+    containerLimitMb: limit,
+    containerPeakMb: peak,
+  });
+
+  it('shows the container against its limit, coloured at 70% and 85%', () => {
+    expect(describeMemory(mem(300, 512))).toEqual({ value: '300/512 MB (59%) · worker 140 MB (đỉnh 230 MB)', tone: 'ok' });
+    expect(describeMemory(mem(380, 512, 470))).toEqual({ value: '380/512 MB (74%, đỉnh 470) · worker 140 MB (đỉnh 230 MB)', tone: 'warn' });
+    expect(describeMemory(mem(450, 512))?.tone).toBe('bad');
+  });
+
+  it('falls back to what it can see, and renders nothing for a worker that sends nothing', () => {
+    expect(describeMemory(mem(null, null))).toEqual({ value: 'worker 140 MB (đỉnh 230 MB)', tone: 'idle' });
+    expect(describeMemory(mem(300, null))?.value).toBe('container 300 MB · worker 140 MB (đỉnh 230 MB)');
+    expect(describeMemory(null)).toBeNull();
+    expect(describeMemory(undefined)).toBeNull();
   });
 });

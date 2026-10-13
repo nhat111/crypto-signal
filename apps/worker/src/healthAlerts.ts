@@ -5,6 +5,8 @@ import {
   getEnabledSymbols,
   getWorkerRuntime,
   HEARTBEAT_STALE_MS,
+  type JobHealth,
+  type WorkerMemory,
 } from '@crypto-signal/db';
 
 /**
@@ -24,8 +26,48 @@ import {
 /** A symbol older than this has stopped producing snapshots — matches /health and the status page. */
 const STALE_SNAPSHOT_MS = 15 * 60_000;
 
-/** Failures in a row with no success at all. One failure is an upstream hiccup. */
+/** Failures in a row before a job counts as broken. One failure is an upstream hiccup. */
 const BROKEN_JOB_FAILURES = 3;
+
+/**
+ * A job that used to work counts as broken once its last success is older
+ * than this as well. Six hours is past every hourly job's retries and one
+ * missed six-hourly run — and short of a day, which is how long the setup
+ * scan sat dead (68 failures from 10/10) while this alerter, which then
+ * only looked at jobs that had *never* succeeded, said nothing.
+ */
+const BROKEN_JOB_STALE_MS = 6 * 60 * 60_000;
+
+/** Container memory share that is worth waking someone for: a free host kills at 100% with no other trace. */
+const MEMORY_ALERT_SHARE = 0.85;
+
+const MAX_ERROR_CHARS_IN_ALERT = 160;
+
+/** The issue for one job, or null while it is healthy enough. Pure, so the rule is tested without a database. */
+export function jobIssue(job: JobHealth, nowMs: number): HealthIssue | null {
+  if (job.consecutiveFailures < BROKEN_JOB_FAILURES) return null;
+  const error = job.lastError ? ` Lỗi gần nhất: ${job.lastError.slice(0, MAX_ERROR_CHARS_IN_ALERT)}` : '';
+  if (job.lastSuccessAt === null) {
+    return { key: `job:${job.jobName}`, text: `Tác vụ ${job.jobName} hỏng — ${job.consecutiveFailures} lần chạy, chưa lần nào thành công.${error}` };
+  }
+  const sinceMs = nowMs - job.lastSuccessAt;
+  if (sinceMs < BROKEN_JOB_STALE_MS) return null;
+  return {
+    key: `job:${job.jobName}`,
+    text: `Tác vụ ${job.jobName} lỗi ${job.consecutiveFailures} lần liên tiếp — lần thành công cuối cách đây ${Math.round(sinceMs / 3_600_000)} giờ.${error}`,
+  };
+}
+
+/** The issue when the container is close to its memory ceiling, or null when it is not (or the limit is unknown). */
+export function memoryIssue(memory: WorkerMemory | null): HealthIssue | null {
+  if (!memory || memory.containerUsedMb === null || memory.containerLimitMb === null || memory.containerLimitMb <= 0) return null;
+  const share = memory.containerUsedMb / memory.containerLimitMb;
+  if (share < MEMORY_ALERT_SHARE) return null;
+  return {
+    key: 'memory:high',
+    text: `RAM container ${memory.containerUsedMb}/${memory.containerLimitMb} MB (${Math.round(share * 100)}%) — sát trần, dễ bị host khởi động lại.`,
+  };
+}
 
 export interface HealthIssue {
   /** Stable across cycles: it is what decides "already told you". */
@@ -60,6 +102,8 @@ export async function collectHealthIssues(pool: Pool, nowMs: number = Date.now()
   }
 
   if (runtime !== null) {
+    const memory = memoryIssue(runtime.memory);
+    if (memory) issues.push(memory);
     for (const [name, state] of Object.entries(runtime.connections)) {
       if (state !== 'open') {
         issues.push({ key: `ws:${name}`, text: `Kết nối ${name} tới Binance đang ở trạng thái "${state}".` });
@@ -99,12 +143,8 @@ export async function collectHealthIssues(pool: Pool, nowMs: number = Date.now()
   }
 
   for (const job of await getAllJobHealth(pool)) {
-    if (job.lastSuccessAt === null && job.consecutiveFailures >= BROKEN_JOB_FAILURES) {
-      issues.push({
-        key: `job:${job.jobName}`,
-        text: `Tác vụ ${job.jobName} hỏng — ${job.consecutiveFailures} lần chạy, chưa lần nào thành công.`,
-      });
-    }
+    const issue = jobIssue(job, nowMs);
+    if (issue) issues.push(issue);
   }
 
   return issues;

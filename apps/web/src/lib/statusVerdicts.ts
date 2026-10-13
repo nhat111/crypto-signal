@@ -503,3 +503,23 @@ export function describeTrackedObservations(chain: {
   }
   return null;
 }
+
+/**
+ * The memory row: container usage against its limit when the host exposes
+ * one, the worker's own RSS (and its peak since boot) always. Amber from
+ * 70%, red from 85% — the line the worker alerts on.
+ */
+export function describeMemory(memory: StatusWorkerRuntime['memory']): { value: string; tone: Verdict } | null {
+  if (!memory) return null;
+  const worker = `worker ${memory.workerRssMb} MB (đỉnh ${memory.workerPeakRssMb} MB)`;
+  if (memory.containerUsedMb === null) return { value: worker, tone: 'idle' };
+  if (memory.containerLimitMb === null || memory.containerLimitMb <= 0) {
+    return { value: `container ${memory.containerUsedMb} MB · ${worker}`, tone: 'idle' };
+  }
+  const share = memory.containerUsedMb / memory.containerLimitMb;
+  const peak = memory.containerPeakMb !== null ? `, đỉnh ${memory.containerPeakMb}` : '';
+  return {
+    value: `${memory.containerUsedMb}/${memory.containerLimitMb} MB (${Math.round(share * 100)}%${peak}) · ${worker}`,
+    tone: share >= 0.85 ? 'bad' : share >= 0.7 ? 'warn' : 'ok',
+  };
+}

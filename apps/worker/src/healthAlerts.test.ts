@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { diffIssues, formatOpened, formatClosed, runHealthAlertCycle, __resetAnnouncedForTests } from './healthAlerts.js';
+import { diffIssues, formatOpened, formatClosed, jobIssue, memoryIssue, runHealthAlertCycle, __resetAnnouncedForTests } from './healthAlerts.js';
 
 const issue = (key: string, text = key) => ({ key, text });
 
@@ -96,5 +96,50 @@ describe('runHealthAlertCycle', () => {
     const logger = { info: vi.fn(), error: vi.fn() } as never;
     await runHealthAlertCycle({ pool: poolWith(true), logger, notifier, chatIds: ['1', '2'] });
     expect(notifier.send).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('jobIssue', () => {
+  const H = 3_600_000;
+  const NOW = Date.UTC(2026, 9, 13, 12);
+  const job = (consecutiveFailures: number, lastSuccessAt: number | null, lastError: string | null = 'Binance REST 418') => ({
+    jobName: 'setup_scan',
+    lastAttemptAt: NOW,
+    lastSuccessAt,
+    consecutiveFailures,
+    lastError,
+  });
+
+  it('flags a job that used to work once it has failed repeatedly for hours — the case that went unseen for three days', () => {
+    const issue = jobIssue(job(68, NOW - 75 * H), NOW);
+    expect(issue?.key).toBe('job:setup_scan');
+    expect(issue?.text).toBe('Tác vụ setup_scan lỗi 68 lần liên tiếp — lần thành công cuối cách đây 75 giờ. Lỗi gần nhất: Binance REST 418');
+  });
+
+  it('stays quiet through a short outage or a single failure', () => {
+    expect(jobIssue(job(5, NOW - 2 * H), NOW)).toBeNull();
+    expect(jobIssue(job(1, NOW - 30 * H), NOW)).toBeNull();
+  });
+
+  it('still flags a job that has never succeeded', () => {
+    expect(jobIssue(job(3, null, null), NOW)?.text).toBe('Tác vụ setup_scan hỏng — 3 lần chạy, chưa lần nào thành công.');
+  });
+
+  it('keeps a long error from flooding the message', () => {
+    expect(jobIssue(job(3, null, 'x'.repeat(500)), NOW)?.text.length).toBeLessThan(260);
+  });
+});
+
+describe('memoryIssue', () => {
+  const mem = (used: number | null, limit: number | null) => ({ workerRssMb: 100, workerPeakRssMb: 120, containerUsedMb: used, containerLimitMb: limit, containerPeakMb: null });
+
+  it('flags the container near its ceiling and says by how much', () => {
+    expect(memoryIssue(mem(450, 512))).toEqual({ key: 'memory:high', text: 'RAM container 450/512 MB (88%) — sát trần, dễ bị host khởi động lại.' });
+  });
+
+  it('says nothing below the line, or when the limit cannot be known', () => {
+    expect(memoryIssue(mem(400, 512))).toBeNull();
+    expect(memoryIssue(mem(450, null))).toBeNull();
+    expect(memoryIssue(null)).toBeNull();
   });
 });

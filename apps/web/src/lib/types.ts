@@ -776,6 +776,14 @@ export interface StatusWorkerRuntime {
    * name that is not. Optional because a worker or API predating the field
    * sends nothing — which is not the same as "no frames are armed".
    */
+  /** Memory with the heartbeat (MB). Optional: older workers and APIs send none; null when unreadable. */
+  memory?: {
+    workerRssMb: number;
+    workerPeakRssMb: number;
+    containerUsedMb: number | null;
+    containerLimitMb: number | null;
+    containerPeakMb: number | null;
+  } | null;
   alertTimeframes?: {
     armed: string[];
     collected: string[];

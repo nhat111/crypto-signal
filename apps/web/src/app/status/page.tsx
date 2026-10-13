@@ -17,6 +17,7 @@ import {
   CHAIN_TEXT,
   classifySymbol,
   describeAlertTimeframes,
+  describeMemory,
   describeChainSources,
   describeFilteredSecurities,
   describeTrackedObservations,
@@ -217,6 +218,7 @@ function WorkerCard({ worker }: { worker: StatusWorkerRuntime | null }) {
       ) : (
         <>
           <Row label="Nhịp tim gần nhất" value={ago(worker.ageMs)} tone={stale ? 'bad' : 'ok'} />
+          <MemoryRow worker={worker} stale={stale} />
           {(['spot', 'futures', 'liquidation'] as const).map((key) => (
             <Row
               key={key}
@@ -238,6 +240,17 @@ function WorkerCard({ worker }: { worker: StatusWorkerRuntime | null }) {
       </p>
     </StatusCard>
   );
+}
+
+/**
+ * The container shares 512 MB on the free plan between api, worker and
+ * bot, and a host that kills it for memory leaves only a fresh boot time
+ * behind. This is the number that shows it coming.
+ */
+function MemoryRow({ worker, stale }: { worker: StatusWorkerRuntime; stale: boolean }) {
+  const memory = describeMemory(worker.memory);
+  if (!memory) return null;
+  return <Row label="RAM" value={stale ? `${memory.value} (cũ)` : memory.value} tone={stale ? 'idle' : memory.tone} />;
 }
 
 /* ---------------- collector ---------------- */

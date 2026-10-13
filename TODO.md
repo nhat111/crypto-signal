@@ -160,8 +160,10 @@ Check items as they land; each phase's commit message references the phase.
       tested by monkey-patching global fetch — the half that matters more
       was the half that could not be run the way production runs it.
       `alertPath.test.ts` now drives it over a real socket.
-- [ ] Measure memory of the all-in-one container on Render free (512 MB limit;
-      api was 71 MB on Railway, worker never checked).
+- [x] Measure memory of the all-in-one container on Render free (512 MB limit;
+      api was 71 MB on Railway, worker never checked). The heartbeat now
+      carries cgroup usage/limit and the worker's RSS + peak (migration 032),
+      shown on /status; the health alerter fires at 85% of the limit.
 - [x] Per-stream staleness on the Binance sockets. The connection-level
       watchdog is reset by any traffic, so one symbol could go silent for
       seventeen hours inside a socket the other three kept busy — the only
@@ -301,8 +303,10 @@ Check items as they land; each phase's commit message references the phase.
 - [x] 4H setups read OKX bars when Binance refuses the server, stamped with
       the exchange and resolved only on that exchange's bars
       (ASSUMPTIONS §19). The scan had been silently off for three days.
-- [ ] Say it in Telegram when a scheduled job has failed for hours (setup
-      scan, coin scan): today only /status shows it.
+- [x] Say it in Telegram when a scheduled job has failed for hours. The
+      health alerter already watched jobs, but only ones that had *never*
+      succeeded — so the setup scan's 68 failures after a past success
+      never alerted. Now: 3+ failures in a row and no success for 6 h.
 
 ## Known limitations (carried forward, not silently hidden)
 - [x] Components now render against older API payloads in the test suite
