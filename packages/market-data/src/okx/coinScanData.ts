@@ -39,8 +39,14 @@ const MIN_GAP_MS = 450;
 
 const envelope = <T extends z.ZodTypeAny>(data: T) => z.object({ code: z.string(), msg: z.string(), data });
 
-const instrumentsSchema = envelope(z.array(z.object({ instId: z.string(), instCategory: z.string().optional(), state: z.string() })));
-const tickersSchema = envelope(z.array(z.object({ instId: z.string(), last: z.string(), volCcy24h: z.string(), ts: z.string() })));
+const instrumentSchema = z.object({ instId: z.string(), instCategory: z.string().optional(), state: z.string() });
+const tickerSchema = z.object({ instId: z.string(), last: z.string(), volCcy24h: z.string(), ts: z.string() });
+// The parsers take zod's own output types rather than hand-written ones, so
+// they agree with the schema under any compiler settings (see `get`).
+type OkxInstrument = z.output<typeof instrumentSchema>;
+type OkxTicker = z.output<typeof tickerSchema>;
+const instrumentsSchema = envelope(z.array(instrumentSchema));
+const tickersSchema = envelope(z.array(tickerSchema));
 const rowsSchema = envelope(z.array(z.array(z.string())));
 const fundingSchema = envelope(z.array(z.object({ fundingRate: z.string(), fundingTime: z.string() })));
 
@@ -111,13 +117,21 @@ export class OkxCoinScanData {
   }
 
   /** `data`, or null when OKX says the instrument or coin is not covered. Throws on anything else. */
-  private async get<T>(path: string, schema: z.ZodType<{ code: string; msg: string; data: T }, z.ZodTypeDef, unknown>): Promise<T | null> {
+  // Generic over the `data` schema rather than over the envelope's output
+  // type: a `ZodType<{ code: string; … }>` parameter only type-checks under
+  // strictNullChecks, and Vercel's Fastify builder compiles this package
+  // without it (every zod field then reads as optional), which failed the
+  // API deploy while the repo's own strict typecheck passed.
+  private async get<D extends z.ZodTypeAny>(
+    path: string,
+    schema: z.ZodObject<{ code: z.ZodString; msg: z.ZodString; data: D }>,
+  ): Promise<z.output<D> | null> {
     const wait = this.nextAt - Date.now();
     this.nextAt = Math.max(Date.now(), this.nextAt) + this.minGapMs;
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
 
     const res = await fetchJsonValidated({ url: `${this.baseUrl}${path}`, schema, source: this.name, logger: this.opts.logger, timeoutMs: 15_000, maxRetries: 1 });
-    if (res.code === '0') return res.data;
+    if (res.code === '0') return res.data as z.output<D>;
     // 51001 "Instrument ID doesn't exist", 51012 "Token does not exist" (a
     // coin the taker-volume stats do not cover): not listed, not a failure.
     if (res.code === '51001' || res.code === '51012') return null;
@@ -125,10 +139,7 @@ export class OkxCoinScanData {
   }
 }
 
-export function parseSpotTickers(
-  instruments: Array<{ instId: string; instCategory?: string; state: string }>,
-  tickers: Array<{ instId: string; last: string; volCcy24h: string; ts: string }>,
-): Ticker24hRow[] {
+export function parseSpotTickers(instruments: OkxInstrument[], tickers: OkxTicker[]): Ticker24hRow[] {
   // A missing category (older payloads) is let through rather than
   // dropping every coin; the scan's own pegged-price check is the backstop.
   const coins = new Set(instruments.filter((i) => i.state === 'live' && (i.instCategory ?? '1') === '1').map((i) => i.instId));
@@ -137,7 +148,7 @@ export function parseSpotTickers(
     .map((t) => ({ symbol: toSymbol(t.instId), lastPrice: Number(t.last), quoteVolume: Number(t.volCcy24h), closeTime: Number(t.ts) }));
 }
 
-export function parseSwapTickers(tickers: Array<{ instId: string; last: string; volCcy24h: string; ts: string }>): Ticker24hRow[] {
+export function parseSwapTickers(tickers: OkxTicker[]): Ticker24hRow[] {
   return tickers
     .filter((t) => t.instId.endsWith('-USDT-SWAP'))
     .map((t) => ({ symbol: toSymbol(t.instId), lastPrice: Number(t.last), quoteVolume: Number(t.volCcy24h) * Number(t.last), closeTime: Number(t.ts) }));
