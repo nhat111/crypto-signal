@@ -19,6 +19,7 @@ import {
   formatSetups,
   formatTrends,
 } from './formatting.js';
+import { coinArg, formatCoinDetail, formatCoins } from './coinsFormat.js';
 import { botBuildLine } from './botBuildLine.js';
 import { launchWithHandover } from './launchWithHandover.js';
 import { retryOn429 } from './retryAfter.js';
@@ -332,6 +333,17 @@ async function main(): Promise<void> {
     }
   });
 
+  bot.command('coins', async (ctx) => {
+    try {
+      const data = await api.getCoins();
+      const symbol = coinArg(ctx.message.text);
+      await ctx.reply(symbol ? formatCoinDetail(data, symbol) : formatCoins(data), { parse_mode: 'HTML' });
+    } catch (err) {
+      logger.error({ err }, '/coins failed');
+      await ctx.reply('Không đọc được dữ liệu top coin lúc này — thử lại sau ít phút.');
+    }
+  });
+
   bot.command('close', async (ctx) => {
     const chatId = String(ctx.chat.id);
     const parts = ctx.message.text.split(/\s+/).slice(1);
@@ -413,6 +425,7 @@ async function main(): Promise<void> {
         { command: 'status', description: `Sức khỏe thị trường (mặc định ${config.telegramDefaultTimeframe})` },
         { command: 'trend', description: 'Xu hướng 1D: tăng / giảm / đi ngang' },
         { command: 'setups', description: 'Setup 4H: vào / cắt lỗ / chốt lời' },
+        { command: 'coins', description: 'Top coin: mạnh/yếu so với BTC, ai kéo giá' },
         { command: 'market', description: 'Heatmap across timeframes' },
         ...symbols.map((symbol) => ({ command: commandNameFor(symbol), description: `${symbol} detail` })),
         { command: 'signals', description: 'Tín hiệu gần đây (mặc định: khung bot bắn alert)' },

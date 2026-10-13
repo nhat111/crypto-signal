@@ -14,6 +14,7 @@ import { registerLookupRoute } from './lookup.js';
 import { registerStatusRoute } from './status.js';
 import { registerTrendRoute } from './trend.js';
 import { registerSetupsRoute } from './setups.js';
+import { registerCoinsRoute } from './coins.js';
 
 export function registerRoutes(app: FastifyInstance, deps: ApiDeps): void {
   registerHealthRoute(app, deps);
@@ -30,4 +31,5 @@ export function registerRoutes(app: FastifyInstance, deps: ApiDeps): void {
   registerStatusRoute(app, deps);
   registerTrendRoute(app, deps);
   registerSetupsRoute(app, deps);
+  registerCoinsRoute(app, deps);
 }

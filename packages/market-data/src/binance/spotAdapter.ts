@@ -1,6 +1,6 @@
 import type { Candle, Logger, SymbolId, Timeframe } from '@crypto-signal/shared';
-import type { ConnectionStatus, DailyBar, ExchangeAdapter, KlineQuery, Unsubscribe } from '../types.js';
-import { closedDailyBars, rawKlineToCandle, wsKlineToCandle, type WsKlinePayload } from '../normalizer.js';
+import type { ConnectionStatus, DailyBar, ExchangeAdapter, FlowBar, KlineQuery, Ticker24hRow, Unsubscribe } from '../types.js';
+import { closedDailyBars, closedFlowBars, rawKlineToCandle, rawTickerToTicker, wsKlineToCandle, type RawTicker24h, type WsKlinePayload } from '../normalizer.js';
 import { BinanceRestClient } from './rest.js';
 import { CombinedStreamClient } from './ws.js';
 import { klineStreamName, timeframeFromKlineStream } from './stream-names.js';
@@ -42,6 +42,18 @@ export class BinanceSpotAdapter implements ExchangeAdapter {
   async fetchClosedBars(symbol: SymbolId, interval: string, limit: number, now = Date.now()): Promise<DailyBar[]> {
     const raw = await this.rest.getKlines(symbol, interval, { limit });
     return closedDailyBars(raw, now);
+  }
+
+  /** Closed bars with quote and taker-buy volume, for the wide coin scan's flow read. */
+  async fetchClosedFlowBars(symbol: SymbolId, interval: string, limit: number, now = Date.now()): Promise<FlowBar[]> {
+    const raw = await this.rest.getKlines(symbol, interval, { limit });
+    return closedFlowBars(raw, now);
+  }
+
+  /** Every spot pair's 24h ticker in one request (weight 80) — how the coin scan finds the most-traded coins. */
+  async fetch24hTickers(): Promise<Ticker24hRow[]> {
+    const raw = await this.rest.get<RawTicker24h[]>('/api/v3/ticker/24hr');
+    return raw.map(rawTickerToTicker);
   }
 
   subscribeKlines(

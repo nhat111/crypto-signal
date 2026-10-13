@@ -475,6 +475,44 @@ with fewer than `emaPeriod` daily bars. `previousTrend`/`changedAt` move only
 when the label changes on a new close. `fetch` says whether the job is
 running at all, as on `/api/flow`.
 
+## `GET /api/coins`
+The wide coin scan: the latest day's read of the most-traded coins (top
+`COIN_SCAN_TOP_N` USDT spot pairs by 24h quote volume, stablecoins and
+wrapped tokens excluded, BTC always included). REST only, once a day after
+the daily close; most-traded first.
+```json
+{
+  "enabled": true,
+  "day": "2026-10-12",
+  "rows": [{
+    "day": "2026-10-12", "symbol": "SOLUSDT", "volumeRank": 3, "futuresSymbol": "SOLUSDT",
+    "close": 152.3, "spotQuoteVolume24h": 512000000,
+    "ret7d": -12.4, "ret30d": -1.9, "rs7d": -8.1, "rs30d": -1.9, "rsAboveSma20": false,
+    "downDayExcess": -0.4, "downDays": 14,
+    "takerSkew7d": -0.023, "takerSkew30d": 0.006,
+    "oiChange7dPct": 4.2, "fundingAvg7dPct": 0.0071, "spotPerpVolumeRatio": 0.31,
+    "flow": "spot_led" | "spot_and_leverage" | "leverage_led" | "short_covering" | "up_unconfirmed"
+          | "spot_selling" | "shorts_building" | "long_unwind" | "down_unconfirmed"
+          | "accumulation" | "distribution" | "leverage_building" | "quiet",
+    "reasons": ["Giá 7 ngày -12.4%.", "…"],
+    "unknowns": [],
+    "computedAt": 1791000000000
+  }],
+  "thresholds": { "priceMovePct": 3, "takerSkew": 0.03, "oiRisePct": 10, "oiFallPct": -10, "fundingElevatedPct": 0.03 },
+  "fetch": { "lastAttemptAt": 0, "lastSuccessAt": 0, "consecutiveFailures": 0, "lastError": null }
+}
+```
+Returns and `rs*` are percent; `rs` = (1 + coin) / (1 + BTC) − 1 over the
+same days, 0 for BTC itself. `rsAboveSma20`: the coin/BTC ratio closed above
+its 20-day mean. `downDayExcess`: mean daily return over BTC on the days BTC
+closed red in the last 30 (null under 5 such days). `takerSkew*` is
+(taker buy − taker sell) / spot quote volume, −1…1. `oiChange7dPct` is in
+contracts, so price alone cannot move it; `fundingAvg7dPct` is scaled to 8h
+whatever the perp's settlement interval. `flow` is the 7-day label (price
+direction first, then spot vs leverage); missing futures data never selects
+a leverage label and is listed in `unknowns`. No composite score. Empty
+`rows` with `enabled: true` means not run yet or failing — `fetch` says which.
+
 ## `GET /api/setups?limit=`
 4H entry setups, most recent first (limit 1–100, default 30), with per-kind
 stats and the job's health.

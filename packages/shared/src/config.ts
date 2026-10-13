@@ -48,6 +48,10 @@ const envSchema = z.object({
   DAILY_DIGEST: z.string().default('on'),
   // Telegram message when a pullback / breakout-retest setup forms on 4H. On unless off/0/false.
   SETUP_ALERTS: z.string().default('on'),
+  // The wide, REST-only read of the most-traded coins (/coins). On unless off/0/false.
+  COIN_SCAN: z.string().default('on'),
+  // How many coins it reads, by 24h spot volume. Each costs three REST requests a day.
+  COIN_SCAN_TOP_N: numeric(30),
 
   SYMBOLS: z.string().default('BTCUSDT,ETHUSDT,SOLUSDT'),
   /** Futures-only symbols (no Binance Spot listing) — see ASSUMPTIONS.md §15. Tracked with a reduced indicator/signal set. */
@@ -157,6 +161,44 @@ export interface ConfidenceWeights {
   historical: number;
 }
 
+/**
+ * The wide coin scan's labels. Every number here is a first guess, not a
+ * finding. The taker skew is the one with a measurement behind it: over
+ * 30-day windows ten majors drifted between −3.1% and +1.0% (2026-10,
+ * Binance spot), and a few percent is already a strong lean once a week of
+ * candles is summed (a single 5m candle needs 15% — THRESH_CVD_SKEW_RATIO).
+ * So 3% sits at the edge of ordinary drift. Funding is judged against
+ * Binance's own 0.01%/8h baseline rather than against zero. Recorded per
+ * day in coin_scan_rows so the labels can be judged against what price
+ * did next, the same way signals are.
+ */
+export interface CoinScanThresholds {
+  /** |7d return| at or above this is a move; below it, price is flat. */
+  priceMovePct: number;
+  /** 7d spot taker skew, (buy − sell) / total quote volume, that counts as net buying (or, negated, net selling). */
+  takerSkew: number;
+  /** 7d change in open interest, in contracts (not dollars, so price alone cannot move it), that counts as leverage building. */
+  oiRisePct: number;
+  /** Same, falling — positions closing. Negative. */
+  oiFallPct: number;
+  /** Average funding per 8h over 7d, in percent, that counts as longs paying up. */
+  fundingElevatedPct: number;
+}
+
+export interface CoinScanConfig {
+  enabled: boolean;
+  topN: number;
+  thresholds: CoinScanThresholds;
+}
+
+const COIN_SCAN_THRESHOLDS: CoinScanThresholds = {
+  priceMovePct: 3,
+  takerSkew: 0.03,
+  oiRisePct: 10,
+  oiFallPct: -10,
+  fundingElevatedPct: 0.03,
+};
+
 export interface AppConfig {
   databaseUrl: string;
   apiPort: number;
@@ -173,6 +215,7 @@ export interface AppConfig {
   /** Push a message when a 4H entry setup forms. On by default; SETUP_ALERTS=off disables. */
   setupAlerts: boolean;
   telegramAlertChatIds: string[];
+  coinScan: CoinScanConfig;
   symbols: string[];
   /** Symbols tracked in reduced (Futures-only, no Spot) mode — disjoint from `symbols`. */
   futuresOnlySymbols: string[];
@@ -315,6 +358,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     webBaseUrl: parsed.WEB_BASE_URL.trim().replace(/\/+$/, ''),
     telegramApiRoot: parsed.TELEGRAM_API_ROOT,
     telegramAlertChatIds: parsed.TELEGRAM_ALERT_CHAT_IDS.split(',').map((s) => s.trim()).filter(Boolean),
+    coinScan: {
+      enabled: isEnabledFlag(parsed.COIN_SCAN),
+      // Clamped: 0 would read as "the scan found nothing", and a few hundred
+      // is a few hundred REST calls into an IP that shares its ban with others.
+      topN: Math.min(100, Math.max(5, Math.round(parsed.COIN_SCAN_TOP_N) || 30)),
+      thresholds: COIN_SCAN_THRESHOLDS,
+    },
     symbols: parsed.SYMBOLS.split(',').map((s) => s.trim()).filter(Boolean),
     futuresOnlySymbols: parsed.FUTURES_ONLY_SYMBOLS.split(',').map((s) => s.trim()).filter(Boolean),
     timeframes,

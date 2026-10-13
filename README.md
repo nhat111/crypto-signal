@@ -47,7 +47,8 @@ unit-tested and free of I/O:
 Apps (`apps/*`):
 - `worker` — the only process that talks to Binance; owns the pipeline,
   scheduler (outcome tracking, retention, historical-score refresh),
-  and Telegram alert push.
+  the daily REST-only scan of the top coins by volume (`/coins`: strength
+  vs BTC and spot-vs-leverage flow), and Telegram alert push.
 - `api` — Fastify, read-only, reads Postgres. Shared domain layer for web
   + Telegram (rule: no duplicated business logic between them).
 - `web` — Next.js dashboard, pure client of `apps/api`.
