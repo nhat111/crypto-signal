@@ -285,7 +285,8 @@ Valid `severity` values: `INFO | LOW | MEDIUM | HIGH | EXTREME`.
       "positiveMovePct": 61.0,
       "negativeMovePct": 39.0,
       "medianMovePct": -0.42,
-      "sufficientData": true
+      "sufficientData": true,
+      "firingCount": 4120
     }
   ]
 }
@@ -305,7 +306,8 @@ read against:
 }
 ```
 It is what price did over the same horizon starting from an *arbitrary*
-moment: every futures 5m candle in the window the recorded outcomes span,
+moment: one window per horizon per symbol (starting on the horizon's own
+UTC grid, so windows never overlap) in the window the recorded outcomes span,
 measured the same way signal outcomes are (first candle at or after
 T + horizon, 30-minute tolerance). Without it a hit rate is unreadable — a
 signal at 55% has no edge if price rose 55% of the time anyway. All fields
@@ -332,6 +334,16 @@ replayed one. Run it with `npm run backfill -w @crypto-signal/worker` locally, o
 `node backfill.cjs` inside the deployed worker container (the image ships
 bundles, not a workspace). `BACKFILL_DAYS` is the same variable either way; `BACKFILL_SYMBOLS`
 and `BACKFILL_TIMEFRAMES` narrow it further. It is a one-shot job, not a scheduled one, and is safe to re-run.
+
+**Samples are episodes, not rows.** A rule that stays true writes a signal
+on every candle close and every timeframe, and those rows are priced off
+almost the same future candles. Counting them separately shrank the
+significance margin without adding information. So a firing only counts
+when the same type has been quiet on that symbol for at least one horizon;
+`sampleCount` is the number of such episodes and `firingCount` is how many
+resolved rows they were folded from. Episodes on different symbols at the
+same moment are still correlated (BTC, ETH and SOL move together), so the
+margin stays somewhat optimistic.
 
 `positiveMovePct`/`negativeMovePct` are percentages of samples that moved
 up/down (spec §24 "Positive move: 61%"), NOT the average magnitude.

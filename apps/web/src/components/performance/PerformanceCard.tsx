@@ -40,7 +40,11 @@ export function PerformanceCard({ result, baseline }: PerformanceCardProps) {
       )}
 
       <p className="mt-3 text-[11px] text-slate-500">
-        {sampleCount.toLocaleString('vi-VN')} mẫu · khung {horizon}
+        {sampleCount.toLocaleString('vi-VN')} mẫu
+        {result.firingCount !== undefined && result.firingCount > sampleCount
+          ? ` (gộp từ ${result.firingCount.toLocaleString('vi-VN')} lần kêu liên tiếp)`
+          : ''}{' '}
+        · khung {horizon}
       </p>
     </div>
   );

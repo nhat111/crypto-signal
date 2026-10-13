@@ -179,21 +179,74 @@ export interface SignalPerformance {
   costPct: number;
   /** Minimum sample size before we'll report a number at all (spec §24: "phải được tính từ historical data thực tế", never claimed without evidence). */
   sufficientData: boolean;
+  /**
+   * Resolved firings before they were collapsed into episodes — how many
+   * rows the old count was. `sampleCount` is the number of independent
+   * episodes the figures above are computed from; the gap between the two
+   * is how much the rule repeats itself.
+   */
+  firingCount: number;
 }
 
 const MIN_SAMPLES = 30;
 
+/**
+ * Only the first firing of each episode counts as a sample.
+ *
+ * The pipeline writes a signal every time a candle closes with the rule
+ * still true, on every timeframe it watches. A condition that holds for
+ * three hours on the 5m frame is ~36 rows, plus the same moment again on
+ * 15m and 1h — and all of them are priced off nearly the same future
+ * candles. Counting them as independent samples is what made ~10.000
+ * SELLING_ABSORPTION outcomes a month look like overwhelming evidence:
+ * the two-proportion margin shrinks with √n, so every repeat narrowed it
+ * without adding any information, and a verdict could be "worse" on a
+ * handful of real events.
+ *
+ * A firing starts a new episode when the same type has been silent on the
+ * same symbol for at least one horizon, across all timeframes. That makes
+ * the kept windows of one (symbol, type) non-overlapping by construction:
+ * the next kept firing is at least one horizon after the last firing of
+ * the previous episode, which is at or after its start.
+ *
+ * What it does not fix: BTC, ETH and SOL move together, so episodes on
+ * different symbols at the same moment are still correlated. The margin
+ * remains somewhat optimistic for that reason, just far less than before.
+ */
+const EPISODE_STARTS_SQL = (sourceParam: string | null) => `
+  SELECT s.signal_id
+  FROM (
+    SELECT signal_id, timestamp,
+           lag(timestamp) OVER (PARTITION BY symbol ORDER BY timestamp, signal_id) AS prev_at
+    FROM market_signals
+    WHERE signal_type = $1 ${sourceParam ? `AND source = ${sourceParam}` : ''}
+  ) s
+  WHERE s.prev_at IS NULL OR s.timestamp - s.prev_at >= ($2 || ' milliseconds')::interval`;
+
 export async function getSignalPerformance(pool: Pool, signalType: string, horizon: OutcomeHorizon, source?: DataSource): Promise<SignalPerformance> {
   const moveCol = HORIZON_MOVE_COLUMN[horizon];
 
-  const { rows } = await pool.query(
-    `SELECT o.${moveCol} AS move
-     FROM signal_outcomes o
-     JOIN market_signals s ON s.signal_id = o.signal_id
-     WHERE s.signal_type = $1 AND o.${moveCol} IS NOT NULL
-       ${source ? 'AND s.source = $2' : ''}`,
-    source ? [signalType, source] : [signalType],
-  );
+  const params: unknown[] = [signalType, HORIZON_MS[horizon]];
+  if (source) params.push(source);
+
+  const [{ rows }, { rows: firingRows }] = await Promise.all([
+    pool.query(
+      `SELECT o.${moveCol} AS move
+       FROM signal_outcomes o
+       JOIN (${EPISODE_STARTS_SQL(source ? '$3' : null)}) e ON e.signal_id = o.signal_id
+       WHERE o.${moveCol} IS NOT NULL`,
+      params,
+    ),
+    pool.query(
+      `SELECT count(*)::int AS n
+       FROM signal_outcomes o
+       JOIN market_signals s ON s.signal_id = o.signal_id
+       WHERE s.signal_type = $1 AND o.${moveCol} IS NOT NULL
+         ${source ? 'AND s.source = $2' : ''}`,
+      source ? [signalType, source] : [signalType],
+    ),
+  ]);
+  const firingCount = Number(firingRows[0]?.n ?? 0);
 
   const moves = rows.map((r) => Number(r.move)).sort((a, b) => a - b);
   const sampleCount = moves.length;
@@ -211,6 +264,7 @@ export async function getSignalPerformance(pool: Pool, signalType: string, horiz
       netNegativeMovePct: null,
       costPct: ROUND_TRIP_COST_PCT,
       sufficientData: false,
+      firingCount,
     };
   }
 
@@ -233,6 +287,7 @@ export async function getSignalPerformance(pool: Pool, signalType: string, horiz
     netNegativeMovePct: Math.round((netNegative / sampleCount) * 1000) / 10,
     costPct: ROUND_TRIP_COST_PCT,
     sufficientData: sampleCount >= MIN_SAMPLES,
+    firingCount,
   };
 }
 
@@ -320,8 +375,15 @@ export async function getBaselinePerformance(pool: Pool, horizon: OutcomeHorizon
      WHERE base.market = 'futures' AND base.timeframe = '5m'
        AND base.open_time >= to_timestamp($3/1000.0)
        AND base.open_time <= to_timestamp($4/1000.0)
-       AND base.close > 0`,
-    [horizonMs, horizonMs + LOOKAHEAD_MS, fromMs, toMs, ROUND_TRIP_COST_PCT],
+       AND base.close > 0
+       -- One window per horizon per symbol: starts on the horizon's own
+       -- grid (every 00:00 UTC for 24h, every quarter hour for 15m), so
+       -- consecutive windows of a symbol never overlap. Every 5m candle
+       -- used to start a window, which at 24h counted each day 288 times
+       -- and made the control look far more certain than it was. Same
+       -- reasoning as EPISODE_STARTS_SQL on the signal side.
+       AND mod((extract(epoch from base.open_time) * 1000)::bigint, $6::bigint) = 0`,
+    [horizonMs, horizonMs + LOOKAHEAD_MS, fromMs, toMs, ROUND_TRIP_COST_PCT, horizonMs],
   );
 
   const n = Number(rows[0]?.n ?? 0);

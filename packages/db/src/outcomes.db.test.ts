@@ -134,7 +134,10 @@ describe.skipIf(!hasTestDatabase)('cost-adjusted performance against real Postgr
   const START = NOW - 6 * 3_600_000;
   const iso = (ms: number) => new Date(ms).toISOString();
 
-  async function outcome(movePct: number, atMs = START + 60_000): Promise<void> {
+  // Each default outcome is its own episode: one horizon (15m) after the
+  // last, so none is folded into the one before it.
+  let nextAt = START + 60_000;
+  async function outcome(movePct: number, atMs = (nextAt += 15 * 60_000)): Promise<void> {
     const { rows } = await pool.query(
       `INSERT INTO market_signals
          (symbol, timeframe, signal_type, severity, confidence, timestamp, reasons, metrics,
@@ -168,6 +171,7 @@ describe.skipIf(!hasTestDatabase)('cost-adjusted performance against real Postgr
   });
 
   beforeEach(async () => {
+    nextAt = START + 60_000;
     await pool.query('DELETE FROM signal_outcomes');
     await pool.query('DELETE FROM market_signals');
     await pool.query('DELETE FROM market_candles');
@@ -240,6 +244,119 @@ describe.skipIf(!hasTestDatabase)('cost-adjusted performance against real Postgr
     const base = await getBaselinePerformance(pool, '15m');
     expect(base.netPositiveMovePct).toBe(100);
     expect(base.netNegativeMovePct).toBe(0);
+  });
+});
+
+describe.skipIf(!hasTestDatabase)('independent samples against real Postgres', () => {
+  let pool: Pool;
+  const START = Date.parse('2026-09-02T06:00:00Z');
+  const MIN = 60_000;
+  const iso = (ms: number) => new Date(ms).toISOString();
+
+  async function firing(
+    atMs: number,
+    movePct: number,
+    opts: { symbol?: string; timeframe?: string; source?: string } = {},
+  ): Promise<void> {
+    const { rows } = await pool.query(
+      `INSERT INTO market_signals
+         (symbol, timeframe, signal_type, severity, confidence, timestamp, reasons, metrics,
+          price, risk_score, futures_cvd, open_interest, funding_rate, volume, source)
+       VALUES ($1,$2,'SELLING_ABSORPTION_POSSIBLE','MEDIUM',0.6,$3,'[]'::jsonb,'{}'::jsonb,
+               100,10,0,0,0,0,$4) RETURNING signal_id`,
+      [opts.symbol ?? 'BTCUSDT', opts.timeframe ?? '5m', iso(atMs), opts.source ?? 'live'],
+    );
+    await pool.query(
+      `INSERT INTO signal_outcomes (signal_id, price_at_signal, move_after_15m_pct) VALUES ($1, 100, $2)`,
+      [rows[0].signal_id, movePct],
+    );
+  }
+
+  beforeAll(async () => {
+    pool = createTestPool();
+  });
+
+  beforeEach(async () => {
+    await pool.query('DELETE FROM signal_outcomes');
+    await pool.query('DELETE FROM market_signals');
+    await pool.query('DELETE FROM market_candles');
+  });
+
+  afterAll(async () => {
+    await pool.end();
+  });
+
+  it('counts a rule that stays on as one sample, not one per candle', async () => {
+    // An hour of back-to-back 5m firings: twelve rows, one event. Only the
+    // first carries a win, so a count that kept any of the others would
+    // show it.
+    for (let i = 0; i < 12; i += 1) await firing(START + i * 5 * MIN, i === 0 ? 1 : -1);
+
+    const perf = await getSignalPerformance(pool, 'SELLING_ABSORPTION_POSSIBLE', '15m');
+    expect(perf.sampleCount).toBe(1);
+    expect(perf.positiveMovePct).toBe(100);
+    expect(perf.firingCount).toBe(12);
+  });
+
+  it('folds the same moment on another timeframe into the same episode', async () => {
+    await firing(START, 1, { timeframe: '5m' });
+    await firing(START, 1, { timeframe: '15m' });
+    await firing(START, 1, { timeframe: '1h' });
+
+    const perf = await getSignalPerformance(pool, 'SELLING_ABSORPTION_POSSIBLE', '15m');
+    expect(perf.sampleCount).toBe(1);
+    expect(perf.firingCount).toBe(3);
+  });
+
+  it('starts a new episode once the rule has been quiet for a full horizon', async () => {
+    await firing(START, 1);
+    await firing(START + 10 * MIN, 1); // inside the first window: same episode
+    await firing(START + 25 * MIN, -1); // 15m after the last firing: new episode
+    await firing(START + 34 * MIN, -1); // 9m later: same episode as the one before
+
+    const perf = await getSignalPerformance(pool, 'SELLING_ABSORPTION_POSSIBLE', '15m');
+    expect(perf.sampleCount).toBe(2);
+    expect(perf.positiveMovePct).toBe(50);
+  });
+
+  it('keeps simultaneous episodes on different symbols apart', async () => {
+    await firing(START, 1, { symbol: 'BTCUSDT' });
+    await firing(START, 1, { symbol: 'ETHUSDT' });
+
+    const perf = await getSignalPerformance(pool, 'SELLING_ABSORPTION_POSSIBLE', '15m');
+    expect(perf.sampleCount).toBe(2);
+  });
+
+  it('does not let a firing from another source swallow one it was asked about', async () => {
+    await firing(START, 1, { source: 'live' });
+    await firing(START + 5 * MIN, -1, { source: 'backfill' });
+
+    const backfill = await getSignalPerformance(pool, 'SELLING_ABSORPTION_POSSIBLE', '15m', 'backfill');
+    expect(backfill.sampleCount).toBe(1);
+    expect(backfill.positiveMovePct).toBe(0);
+  });
+
+  it('starts baseline windows on the horizon grid only, so they do not overlap', async () => {
+    // The baseline needs recorded outcomes to bound its window.
+    await firing(START, 1);
+    await firing(START + 2 * 3_600_000, 1);
+
+    // Two hours of 5m candles from 06:00. Windows may start at :00, :15,
+    // :30, :45 and need a candle 15m later: 06:00 … 07:30 is seven. Every
+    // candle used to start one, which was twenty-one overlapping windows.
+    for (let i = 0; i < 24; i += 1) {
+      const openMs = START + i * 5 * MIN;
+      await pool.query(
+        `INSERT INTO market_candles
+           (symbol, market, timeframe, open_time, close_time, open, high, low, close, volume,
+            quote_volume, trades, taker_buy_base_volume, taker_buy_quote_volume, taker_sell_base_volume, source)
+         VALUES ('BTCUSDT','futures','5m',$1,$2,100,111,99,$3,10,1000,5,5,500,5,'backfill')`,
+        [iso(openMs), iso(openMs + 299_999), 100 + i],
+      );
+    }
+
+    const base = await getBaselinePerformance(pool, '15m');
+    expect(base.sampleCount).toBe(7);
   });
 });
 
