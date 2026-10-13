@@ -783,3 +783,22 @@ three requests per coin plus two ticker calls. Decisions:
   every row, so the labels and the RS ranking can later be judged against
   the next 7–30 days the same way signals are. Not judged yet: there is no
   claim here that a label or a high RS predicts anything.
+
+## 19. 4H setups when Binance refuses the server
+The setup scan used to skip any symbol whose daily bars came from the OKX
+fallback, on the grounds that a scored plan must come from the exchange
+the scores are about. On the shared Render IP that meant no setup scan at
+all from 10/10 to 13/10 (68 failed runs), with nothing in Telegram to say
+so. Now:
+
+- When the daily bars come from OKX, the 4H bars do too
+  (`OkxSpotCandles.fetchClosedBars`; OKX's 4H grid is the same UTC grid as
+  Binance's), and the setup is stored with `exchange = 'okx'`
+  (migration 030). The alert, `/setups` and the web panel say so.
+- A setup is resolved only on bars from the exchange that found it: a
+  stop is judged on that venue's wicks. A Binance setup found before a ban
+  waits for Binance bars; 120 4H bars reach back 20 days, past the 14-day
+  expiry, so its first touch is still found when Binance answers again.
+- The per-kind stats still pool both exchanges. For BTC/ETH/SOL the gap
+  between venues is a few basis points against ATR-sized stops; the
+  column exists so the stats can be split if that ever stops being true.

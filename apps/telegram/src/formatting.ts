@@ -412,7 +412,7 @@ export function formatSetups(setups: SetupDTO[]): string {
   const lines = ['<b>Setup 4H</b>', ''];
   if (open.length === 0) lines.push('Không có setup nào đang mở — phần lớn thời gian là vậy.');
   for (const s of open) {
-    lines.push(`🎯 <b>${escapeHtml(s.symbol)}</b> — ${SETUP_KIND[s.kind]}`);
+    lines.push(`🎯 <b>${escapeHtml(s.symbol)}</b> — ${SETUP_KIND[s.kind]}${s.exchange === 'okx' ? ' <i>(nến OKX)</i>' : ''}`);
     lines.push(`  Vào ~${formatPrice(s.entry)} · SL ${formatPrice(s.stop)} · TP ${formatPrice(s.target)} · R:R 1:${s.rr.toFixed(1)}`);
   }
   if (done.length > 0) {

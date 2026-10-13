@@ -473,6 +473,8 @@ export interface TradeSetup {
   status: 'open' | 'target' | 'stop' | 'expired';
   resolvedAt: number | null;
   rMultiple: number | null;
+  /** Whose bars found it (and resolve it). Absent from APIs older than the OKX fallback, which only used Binance. */
+  exchange?: 'binance' | 'okx';
 }
 
 export interface TradeSetupStats {

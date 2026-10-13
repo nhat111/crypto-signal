@@ -2,6 +2,8 @@ import type { Pool } from 'pg';
 
 export type SetupKind = 'pullback' | 'breakout_retest';
 export type SetupStatus = 'open' | 'target' | 'stop' | 'expired';
+/** Whose bars found the setup — and the only bars it is ever resolved with. */
+export type SetupExchange = 'binance' | 'okx';
 
 export interface TradeSetupRow {
   id: string;
@@ -19,6 +21,7 @@ export interface TradeSetupRow {
   status: SetupStatus;
   resolvedAt: number | null;
   rMultiple: number | null;
+  exchange: SetupExchange;
 }
 
 export interface NewTradeSetup {
@@ -32,9 +35,11 @@ export interface NewTradeSetup {
   rr: number;
   atr: number;
   reasons: string[];
+  /** Defaults to Binance, which is what every setup before the OKX fallback was. */
+  exchange?: SetupExchange;
 }
 
-const COLUMNS = `id, symbol, kind, level, entry, stop, target, rr, atr, reasons, status, r_multiple,
+const COLUMNS = `id, symbol, kind, level, entry, stop, target, rr, atr, reasons, status, r_multiple, exchange,
   extract(epoch from bar_open_time)*1000 AS bar_open_ms,
   extract(epoch from detected_at)*1000 AS detected_ms,
   extract(epoch from resolved_at)*1000 AS resolved_ms`;
@@ -56,17 +61,18 @@ function toRow(r: Record<string, unknown>): TradeSetupRow {
     status: r['status'] as SetupStatus,
     resolvedAt: r['resolved_ms'] === null ? null : Number(r['resolved_ms']),
     rMultiple: r['r_multiple'] === null ? null : Number(r['r_multiple']),
+    exchange: (r['exchange'] as SetupExchange | undefined) ?? 'binance',
   };
 }
 
 /** Inserts a setup unless this symbol/kind/bar is already recorded. Returns the row only when it is new — that is the alert trigger. */
 export async function insertTradeSetup(pool: Pool, s: NewTradeSetup): Promise<TradeSetupRow | null> {
   const { rows } = await pool.query(
-    `INSERT INTO trade_setups (symbol, kind, bar_open_time, level, entry, stop, target, rr, atr, reasons)
-     VALUES ($1, $2, to_timestamp($3/1000.0), $4, $5, $6, $7, $8, $9, $10)
+    `INSERT INTO trade_setups (symbol, kind, bar_open_time, level, entry, stop, target, rr, atr, reasons, exchange)
+     VALUES ($1, $2, to_timestamp($3/1000.0), $4, $5, $6, $7, $8, $9, $10, $11)
      ON CONFLICT (symbol, kind, bar_open_time) DO NOTHING
      RETURNING ${COLUMNS}`,
-    [s.symbol, s.kind, s.barOpenTime, s.level, s.entry, s.stop, s.target, s.rr, s.atr, JSON.stringify(s.reasons)],
+    [s.symbol, s.kind, s.barOpenTime, s.level, s.entry, s.stop, s.target, s.rr, s.atr, JSON.stringify(s.reasons), s.exchange ?? 'binance'],
   );
   return rows[0] ? toRow(rows[0]) : null;
 }
