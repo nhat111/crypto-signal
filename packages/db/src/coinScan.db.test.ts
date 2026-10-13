@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import type { CoinRead } from '@crypto-signal/indicators';
 import { createTestPool, hasTestDatabase, lockTestTables } from './testPool.js';
 import { getCoinScanForDay, getLatestCoinScan, getLatestCoinScanDay, saveCoinScan } from './coinScan.js';
+import { getCoinScanEdge } from './coinScanEdge.js';
 
 const LOCK = 991_028;
 
@@ -86,6 +87,22 @@ describe.skipIf(!hasTestDatabase)('coin scan rows against real Postgres', () => 
     await saveCoinScan(pool, '2099-02-02', [{ read: read('SOLUSDT'), volumeRank: 3, futuresSymbol: null, spotQuoteVolume24h: 1 }]);
     expect((await getCoinScanForDay(pool, '2099-02-01')).map((r) => r.symbol)).toEqual(['ETHUSDT']);
     expect(await getCoinScanForDay(pool, '2099-02-03')).toEqual([]);
+  });
+
+  it('feeds the stored days into the edge evaluation, closes and exchanges intact', async () => {
+    // 2099-01-08 is day 47487, a multiple of 7: a cohort day on the 7-day grid.
+    await saveCoinScan(pool, '2099-01-08', [
+      { read: read('BTCUSDT', { close: 100 }), volumeRank: 1, futuresSymbol: null, spotQuoteVolume24h: 1 },
+      { read: read('SOLUSDT', { close: 10 }), volumeRank: 2, futuresSymbol: null, spotQuoteVolume24h: 1 },
+    ]);
+    await saveCoinScan(pool, '2099-01-15', [
+      { read: read('BTCUSDT', { close: 110 }), volumeRank: 1, futuresSymbol: null, spotQuoteVolume24h: 1 },
+      { read: read('SOLUSDT', { close: 12 }), volumeRank: 2, futuresSymbol: null, spotQuoteVolume24h: 1 },
+    ]);
+    const binance = (await getCoinScanEdge(pool, 7)).find((r) => r.exchange === 'binance');
+    const spot = binance?.flows.find((f) => f.flow === 'spot_led');
+    expect(spot?.group.samples).toBeGreaterThanOrEqual(1);
+    expect(spot?.group.hitPct).toBe(100);
   });
 
   it('records which exchange a day was read from', async () => {

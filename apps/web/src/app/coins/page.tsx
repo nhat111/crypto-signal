@@ -8,6 +8,7 @@ import { cx, formatRelativeTime } from '@/lib/format';
 import { FLOW_META, sortCoins, type CoinSort } from '@/lib/coinFlow';
 import type { CoinFlow, CoinsResponse } from '@/lib/types';
 import { CoinTable, FlowBadge } from '@/components/coins/CoinTable';
+import { CoinEdgePanel } from '@/components/coins/CoinEdgePanel';
 import { LoadingPanel, StatePanel } from '@/components/StatePanel';
 
 /** The scan changes once a day; a ten-minute poll only catches the morning's run. */
@@ -55,6 +56,8 @@ export default function CoinsPage() {
 
       <Body state={coins} rows={rows} tracked={tracked} sort={sort} onSort={setSort} />
 
+      <CoinEdgePanel />
+
       <section className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
         <h2 className="mb-2 text-sm font-semibold text-slate-200">Nhãn dòng tiền đọc thế nào</h2>
         <dl className="grid gap-2 text-xs sm:grid-cols-2">
@@ -69,8 +72,7 @@ export default function CoinsPage() {
           {coins.data?.thresholds
             ? `Ngưỡng: giá ±${coins.data.thresholds.priceMovePct}% trong 7 ngày là có chuyển động; spot lệch ±${(coins.data.thresholds.takerSkew * 100).toFixed(0)}% khối lượng là mua/bán ròng; OI ${coins.data.thresholds.oiRisePct > 0 ? '+' : ''}${coins.data.thresholds.oiRisePct}% / ${coins.data.thresholds.oiFallPct}% theo hợp đồng; funding từ ${coins.data.thresholds.fundingElevatedPct}%/8h là long trả cao. `
             : ''}
-          Các ngưỡng là giả định ban đầu, chưa được kiểm chứng; mỗi ngày quét được lưu lại để sau này đo xem nhãn nào
-          thật sự đi trước giá. Mô tả 7–30 ngày đã qua, không phải dự báo — mạnh hơn BTC chưa phải là lý do để mua.
+          Các ngưỡng là giả định ban đầu; bảng Kiểm chứng ở trên đo xem nhãn nào thật sự đi trước giá. Mô tả 7–30 ngày đã qua, không phải dự báo — mạnh hơn BTC chưa phải là lý do để mua.
         </p>
       </section>
     </div>

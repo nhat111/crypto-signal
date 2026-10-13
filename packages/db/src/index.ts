@@ -26,3 +26,4 @@ export * from './stablecoinSupply.js';
 export * from './jobHealth.js';
 export * from './serviceBuild.js';
 export * from './workerRuntime.js';
+export * from './coinScanEdge.js';
