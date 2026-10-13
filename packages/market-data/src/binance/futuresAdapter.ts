@@ -9,8 +9,17 @@ import type {
   Timeframe,
 } from '@crypto-signal/shared';
 import { timeframeToOpenInterestPeriod } from '@crypto-signal/shared';
-import type { ConnectionStatus, DailyBar, FuturesAdapter, KlineQuery, Unsubscribe } from '../types.js';
-import { closedDailyBars, forceOrderToLiquidation, rawKlineToCandle, wsKlineToCandle, type ForceOrderPayload, type WsKlinePayload } from '../normalizer.js';
+import type { ConnectionStatus, DailyBar, FuturesAdapter, KlineQuery, Ticker24hRow, Unsubscribe } from '../types.js';
+import {
+  closedDailyBars,
+  forceOrderToLiquidation,
+  rawKlineToCandle,
+  rawTickerToTicker,
+  wsKlineToCandle,
+  type ForceOrderPayload,
+  type RawTicker24h,
+  type WsKlinePayload,
+} from '../normalizer.js';
 import { BinanceRestClient } from './rest.js';
 import { CombinedStreamClient } from './ws.js';
 import { KLINE_STREAM_STALE_MS } from '../streamHealth.js';
@@ -135,6 +144,22 @@ export class BinanceFuturesAdapter implements FuturesAdapter {
       sumOpenInterest: Number(r.sumOpenInterest),
       sumOpenInterestValue: Number(r.sumOpenInterestValue),
     }));
+  }
+
+  /**
+   * Daily open interest, oldest first. The collected timeframes stop at 4h,
+   * so this asks for period=1d directly instead of going through
+   * timeframeToOpenInterestPeriod. Binance keeps 30 days of it.
+   */
+  async fetchDailyOpenInterest(symbol: SymbolId, limit: number): Promise<Array<{ timestamp: number; contracts: number }>> {
+    const raw = await this.rest.get<RawOpenInterestHist[]>('/futures/data/openInterestHist', { symbol, period: '1d', limit });
+    return raw.map((r) => ({ timestamp: r.timestamp, contracts: Number(r.sumOpenInterest) }));
+  }
+
+  /** Every perpetual's 24h ticker in one request (weight 40). */
+  async fetch24hTickers(): Promise<Ticker24hRow[]> {
+    const raw = await this.rest.get<RawTicker24h[]>('/fapi/v1/ticker/24hr');
+    return raw.map(rawTickerToTicker);
   }
 
   async fetchCurrentOpenInterest(symbol: SymbolId): Promise<{ symbol: SymbolId; openInterest: number; time: number }> {

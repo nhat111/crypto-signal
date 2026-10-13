@@ -21,6 +21,7 @@ import { runHealthAlertCycle } from './healthAlerts.js';
 import { runAlertSelfTest } from './alertSelfTest.js';
 import { runStablecoinFlowCycle } from './stablecoinFlow.js';
 import { runTrendCycle } from './trendCycle.js';
+import { runCoinScanCycle } from './coinScan.js';
 import type { WorkerContext } from './context.js';
 
 const HORIZONS: OutcomeHorizon[] = ['15m', '1h', '4h', '24h'];
@@ -201,6 +202,13 @@ export function startSchedulers(ctx: WorkerContext): () => void {
   // re-read an unchanged bar and write nothing new.
   timers.push(setInterval(() => void runTrendCycle(ctx).catch((err) => ctx.logger.error({ err }, 'trend cycle failed')), 60 * 60_000));
   void runTrendCycle(ctx).catch((err) => ctx.logger.error({ err }, 'initial trend cycle failed'));
+
+  // The wide coin scan: REST only, once a day after the daily close. Hourly
+  // ticks are a no-op once the day is stored, and retry it when it is not.
+  if (ctx.config.coinScan.enabled) {
+    timers.push(setInterval(() => void runCoinScanCycle(ctx).catch((err) => ctx.logger.error({ err }, 'coin scan failed')), 60 * 60_000));
+    void runCoinScanCycle(ctx).catch((err) => ctx.logger.error({ err }, 'initial coin scan failed'));
+  }
 
   timers.push(setInterval(() => void runOutcomeTracker(ctx).catch((err) => ctx.logger.error({ err }, 'outcome tracker failed')), 5 * 60_000));
   timers.push(setInterval(() => void refreshHistoricalScores(ctx).catch((err) => ctx.logger.error({ err }, 'historical score refresh failed')), 10 * 60_000));

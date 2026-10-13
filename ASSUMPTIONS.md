@@ -738,3 +738,35 @@ flat market cannot manufacture a shock out of noise. Both are guesses at
 "rare enough to be worth reading", not measured thresholds — the
 `/performance` tab is what will eventually say whether either number is
 right, and until it has 30 recorded outcomes per type it will say so.
+
+## 18. Wide coin scan (`/coins`)
+The deep pipeline (WebSocket klines on every timeframe, OI, funding,
+liquidations) costs memory per symbol, and the free host has 512 MB. So the
+wider list is a separate, REST-only read: once a day, for the top
+`COIN_SCAN_TOP_N` (default 30) USDT spot pairs by 24h quote volume — about
+three requests per coin plus two ticker calls. Decisions:
+
+- **Universe by spot volume**, not market cap: Binance has no market-cap
+  endpoint, and volume is what makes a coin readable at all. Stablecoins,
+  fiat and wrapped tokens are excluded by name; anything whose last 30
+  closes stayed within 2% is skipped as pegged (this caught `UUSDT`, which
+  no list had). BTC is always included — it is the yardstick.
+- **Perp matching** tries `X`, `1000X`, `1000000X`. OI change is a ratio,
+  so the multiplier cancels.
+- **Relative strength, not a score.** RS vs BTC (7d/30d), the ratio against
+  its 20-day mean, and the average excess return on BTC's red days are
+  separate columns. Ranking defaults to 30-day RS.
+- **Flow label from 7 days**: price direction (±3%) first, then spot taker
+  skew, OI change in contracts and funding scaled to 8h. Thresholds live in
+  `CoinScanThresholds` (shared config) and are first guesses; the taker
+  skew threshold (3%) is set just outside the −3.1%…+1.0% that ten majors'
+  30-day skew drifted within when measured (2026-10).
+- **Futures refused ≠ scan failed.** A 418 ban or a 451/403 region block on
+  the futures host leaves the spot read intact and says so per coin; the
+  sandbox this was built in gets 451 from `fapi.binance.com`, which is how
+  this case was found. A refused spot host fails the run, and the hourly
+  tick retries it.
+- **Stored per day** (`coin_scan_rows`, migration 028) with the close on
+  every row, so the labels and the RS ranking can later be judged against
+  the next 7–30 days the same way signals are. Not judged yet: there is no
+  claim here that a label or a high RS predicts anything.

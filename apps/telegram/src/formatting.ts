@@ -304,6 +304,7 @@ export function buildHelpText(symbols: string[]): string {
     '/trade SYMBOL spot|long|short ENTRY [SIZE] [NGUỒN] [| LÝ DO] — ghi lệnh đã vào, vd /trade SOLUSDT spot 150 2 @CryptoCred | hồi về hỗ trợ 1D',
     '/trend — xu hướng 1D của từng coin (đỉnh/đáy, EMA200)',
     '/setups — setup 4H đang mở (vào / cắt lỗ / chốt lời) và kết quả các setup trước',
+    '/coins [COIN] — top coin theo volume: mạnh/yếu so với BTC, spot hay đòn bẩy kéo giá (vd: /coins SOL)',
     '/close SYMBOL EXIT_PRICE — close your most recent open trade on that symbol',
     '/journal — your trade log + win rate / P&L summary',
     '/flow — stablecoin supply: money entering or leaving crypto',

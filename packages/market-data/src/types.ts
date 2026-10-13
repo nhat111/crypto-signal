@@ -45,6 +45,20 @@ export interface DailyBar {
   volume: number;
 }
 
+/** A closed bar plus quote volume and its taker-buy part — what a week-long spot buy/sell skew is summed from. */
+export interface FlowBar extends DailyBar {
+  quoteVolume: number;
+  takerBuyQuoteVolume: number;
+}
+
+/** One symbol's 24h ticker, numbers parsed. */
+export interface Ticker24hRow {
+  symbol: string;
+  lastPrice: number;
+  quoteVolume: number;
+  closeTime: number;
+}
+
 export interface KlineQuery {
   limit?: number;
   startTime?: number;

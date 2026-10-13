@@ -74,6 +74,7 @@ export const JOB_STABLECOIN_FLOW = 'stablecoin_flow';
 export const JOB_TREND_1D = 'trend_1d';
 export const JOB_DAILY_DIGEST = 'daily_digest';
 export const JOB_SETUP_SCAN = 'setup_scan';
+export const JOB_COIN_SCAN = 'coin_scan';
 
 /** Every recorded job, for the operator status page. Ordered by name so the page does not reshuffle between polls. */
 export async function getAllJobHealth(pool: Pool): Promise<JobHealth[]> {

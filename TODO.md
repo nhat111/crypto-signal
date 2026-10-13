@@ -268,6 +268,22 @@ Check items as they land; each phase's commit message references the phase.
       `extreme_pump`, the "market baseline" is a momentum baseline and
       should be split by reason.
 
+## Phase 18 — Wide coin scan (`/coins`)
+- [x] REST-only daily read of the top N coins by spot volume (default 30),
+      separate from the WebSocket pipeline so the list can grow without
+      the memory cost of a tracked symbol.
+- [x] Relative strength vs BTC (7d/30d, ratio vs its 20-day mean, excess
+      return on BTC's red days) and a 7-day flow label (spot taker skew,
+      OI in contracts, funding scaled to 8h). No composite score.
+- [x] `/api/coins`, `/coins` web page, `/coins [COIN]` Telegram command.
+- [x] Futures refused (418 / 451 / 403) keeps the spot read and says so.
+- [ ] Judge it: once ~60 days are stored, compare the forward 7d/30d
+      return of the top RS quintile against the bottom one, and each flow
+      label against the baseline — the same test signals get. Until then
+      the page claims nothing predictive.
+- [ ] Thesis drivers beyond price and flow (DefiLlama TVL / fees, chain
+      stablecoin supply, token unlocks) — step 2 of the plan.
+
 ## Known limitations (carried forward, not silently hidden)
 - [x] Components now render against older API payloads in the test suite
       (`apps/web/src/lib/legacyPayload.test.ts`). The optional fields are

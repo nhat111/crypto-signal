@@ -12,3 +12,4 @@ export * from './snapshot.js';
 export * from './technicals.js';
 export * from './structure.js';
 export * from './setups.js';
+export * from './coinScan.js';

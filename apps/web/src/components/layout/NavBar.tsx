@@ -9,6 +9,7 @@ import { useTrackedSymbols } from '@/lib/useTrackedSymbols';
 const LINKS = [
   { href: '/', label: 'Overview' },
   { href: '/signals', label: 'Signals' },
+  { href: '/coins', label: 'Coins' },
   { href: '/gems', label: 'Gems' },
   { href: '/lookup', label: 'Lookup' },
   { href: '/journal', label: 'Journal' },

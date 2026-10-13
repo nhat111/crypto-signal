@@ -18,6 +18,7 @@ import type {
   Trade,
   TradeSourcesResponse,
   TrendResponse,
+  CoinsResponse,
   SetupsResponse,
   TradeSide,
   TradeSummary,
@@ -158,6 +159,10 @@ export function getOutcomeDiagnostics(): Promise<StatusOutcomeDiagnostics> {
 
 export function getSetups(limit = 30): Promise<SetupsResponse> {
   return fetchJson<SetupsResponse>(`/api/setups?limit=${limit}`);
+}
+
+export function getCoins(): Promise<CoinsResponse> {
+  return fetchJson<CoinsResponse>('/api/coins');
 }
 
 export function getTrend(): Promise<TrendResponse> {

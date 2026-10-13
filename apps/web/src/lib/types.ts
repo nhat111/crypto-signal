@@ -390,6 +390,65 @@ export interface TrendResponse {
   fetch: { lastAttemptAt: number | null; lastSuccessAt: number | null; consecutiveFailures: number; lastError: string | null } | null;
 }
 
+/* ---------- Wide coin scan (/coins) ---------- */
+
+export type CoinFlow =
+  | 'spot_led'
+  | 'spot_and_leverage'
+  | 'leverage_led'
+  | 'short_covering'
+  | 'up_unconfirmed'
+  | 'spot_selling'
+  | 'shorts_building'
+  | 'long_unwind'
+  | 'down_unconfirmed'
+  | 'accumulation'
+  | 'distribution'
+  | 'leverage_building'
+  | 'quiet';
+
+/** One coin's daily read. Percent fields are in percent; takerSkew is a ratio (−1…1). */
+export interface CoinScanRow {
+  day: string;
+  symbol: string;
+  volumeRank: number;
+  futuresSymbol: string | null;
+  close: number;
+  spotQuoteVolume24h: number;
+  ret7d: number | null;
+  ret30d: number | null;
+  rs7d: number | null;
+  rs30d: number | null;
+  rsAboveSma20: boolean | null;
+  downDayExcess: number | null;
+  downDays: number;
+  takerSkew7d: number | null;
+  takerSkew30d: number | null;
+  oiChange7dPct: number | null;
+  fundingAvg7dPct: number | null;
+  spotPerpVolumeRatio: number | null;
+  flow: CoinFlow;
+  reasons: string[];
+  unknowns: string[];
+  computedAt: number;
+}
+
+export interface CoinScanThresholds {
+  priceMovePct: number;
+  takerSkew: number;
+  oiRisePct: number;
+  oiFallPct: number;
+  fundingElevatedPct: number;
+}
+
+export interface CoinsResponse {
+  enabled: boolean;
+  day: string | null;
+  rows: CoinScanRow[];
+  thresholds: CoinScanThresholds;
+  fetch: { lastAttemptAt: number | null; lastSuccessAt: number | null; consecutiveFailures: number; lastError: string | null } | null;
+}
+
 /* ---------- 4H entry setups ---------- */
 
 export type SetupKind = 'pullback' | 'breakout_retest';

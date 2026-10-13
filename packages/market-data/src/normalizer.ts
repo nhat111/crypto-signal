@@ -1,4 +1,4 @@
-import type { DailyBar } from './types.js';
+import type { DailyBar, FlowBar, Ticker24hRow } from './types.js';
 import type { Candle, LiquidationEvent, Market, SymbolId, Timeframe } from '@crypto-signal/shared';
 import { timeframeToMs } from '@crypto-signal/shared';
 
@@ -180,4 +180,37 @@ export function closedDailyBars(raw: RawKline[], now: number): DailyBar[] {
       close: Number(r[4]),
       volume: Number(r[5]),
     }));
+}
+
+/**
+ * Closed bars with the two volume fields the wide coin scan's flow read
+ * needs: quote volume and the taker-buy share of it. Kept apart from
+ * DailyBar so the structure read's type does not grow fields it ignores.
+ */
+export function closedFlowBars(raw: RawKline[], now: number): FlowBar[] {
+  return raw
+    .filter((r) => r[6] < now)
+    .map((r) => ({
+      openTime: r[0],
+      closeTime: r[6],
+      open: Number(r[1]),
+      high: Number(r[2]),
+      low: Number(r[3]),
+      close: Number(r[4]),
+      volume: Number(r[5]),
+      quoteVolume: Number(r[7]),
+      takerBuyQuoteVolume: Number(r[10]),
+    }));
+}
+
+/** Binance's /ticker/24hr row, spot and futures alike — only the fields the coin scan reads. */
+export interface RawTicker24h {
+  symbol: string;
+  lastPrice: string;
+  quoteVolume: string;
+  closeTime: number;
+}
+
+export function rawTickerToTicker(raw: RawTicker24h): Ticker24hRow {
+  return { symbol: raw.symbol, lastPrice: Number(raw.lastPrice), quoteVolume: Number(raw.quoteVolume), closeTime: raw.closeTime };
 }

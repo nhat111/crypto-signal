@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CandleSequenceGuard, rawKlineToCandle, wsKlineToCandle, forceOrderToLiquidation, type RawKline, type WsKlinePayload, type ForceOrderPayload } from './normalizer.js';
+import { CandleSequenceGuard, closedFlowBars, rawTickerToTicker, rawKlineToCandle, wsKlineToCandle, forceOrderToLiquidation, type RawKline, type WsKlinePayload, type ForceOrderPayload } from './normalizer.js';
 
 const RAW: RawKline = [1700000000000, '100', '110', '90', '105', '1000', 1700000299999, '105000', 500, '600', '63000', '0'];
 
@@ -99,5 +99,29 @@ describe('CandleSequenceGuard', () => {
     // Skips two 5m buckets (300_000ms and 600_000ms), lands on the third.
     const result = guard.accept(candleAt(1_700_000_900_000));
     expect(result).toEqual({ accepted: true, gapCandles: 2 });
+  });
+});
+
+describe('closedFlowBars', () => {
+  it('keeps quote and taker-buy quote volume, and drops the bar still forming', () => {
+    const raw: RawKline[] = [
+      [1000, '1', '2', '0.5', '1.5', '10', 1999, '15', 7, '6', '9', '0'],
+      [2000, '1.5', '2', '1', '1.8', '4', 2999, '7', 3, '1', '2', '0'],
+    ];
+    const bars = closedFlowBars(raw, 2500);
+    expect(bars).toEqual([
+      { openTime: 1000, closeTime: 1999, open: 1, high: 2, low: 0.5, close: 1.5, volume: 10, quoteVolume: 15, takerBuyQuoteVolume: 9 },
+    ]);
+  });
+});
+
+describe('rawTickerToTicker', () => {
+  it('parses the string fields Binance sends', () => {
+    expect(rawTickerToTicker({ symbol: 'SOLUSDT', lastPrice: '150.5', quoteVolume: '1234567.8', closeTime: 42 })).toEqual({
+      symbol: 'SOLUSDT',
+      lastPrice: 150.5,
+      quoteVolume: 1234567.8,
+      closeTime: 42,
+    });
   });
 });

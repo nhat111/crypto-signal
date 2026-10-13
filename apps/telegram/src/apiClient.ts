@@ -177,6 +177,50 @@ export interface TrendDTO {
   reasons: string[];
 }
 
+export type CoinFlowDTO =
+  | 'spot_led'
+  | 'spot_and_leverage'
+  | 'leverage_led'
+  | 'short_covering'
+  | 'up_unconfirmed'
+  | 'spot_selling'
+  | 'shorts_building'
+  | 'long_unwind'
+  | 'down_unconfirmed'
+  | 'accumulation'
+  | 'distribution'
+  | 'leverage_building'
+  | 'quiet';
+
+/** One coin from the wide scan (/api/coins). Percent fields are already in percent. */
+export interface CoinScanDTO {
+  day: string;
+  symbol: string;
+  volumeRank: number;
+  futuresSymbol: string | null;
+  close: number;
+  ret7d: number | null;
+  ret30d: number | null;
+  rs7d: number | null;
+  rs30d: number | null;
+  rsAboveSma20: boolean | null;
+  downDayExcess: number | null;
+  downDays: number;
+  takerSkew7d: number | null;
+  oiChange7dPct: number | null;
+  fundingAvg7dPct: number | null;
+  flow: CoinFlowDTO;
+  reasons: string[];
+  unknowns: string[];
+}
+
+export interface CoinsResponseDTO {
+  enabled: boolean;
+  day: string | null;
+  rows: CoinScanDTO[];
+  fetch: { lastSuccessAt: number | null; consecutiveFailures: number; lastError: string | null } | null;
+}
+
 export interface TradeSummaryDTO {
   openCount: number;
   closedCount: number;
@@ -370,6 +414,10 @@ export class ApiClient {
 
   getTrend(): Promise<{ trends: TrendDTO[] }> {
     return this.get('/api/trend');
+  }
+
+  getCoins(): Promise<CoinsResponseDTO> {
+    return this.get('/api/coins');
   }
 
   getSetups(limit = 10): Promise<{ setups: SetupDTO[]; minResolved: number }> {
