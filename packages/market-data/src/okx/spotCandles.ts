@@ -6,9 +6,10 @@ import { fetchJsonValidated, type Logger } from '@crypto-signal/shared';
  *
  * Free hosts share their outbound IPs, so Binance can ban the server for
  * somebody else's traffic (418). OKX lists most of the same USDT pairs and
- * serves candles without a key. Used by Lookup and by the 1D trend read
- * only: the collector, signals, setups and performance numbers stay
- * Binance-only, so nothing scored ever mixes two exchanges.
+ * serves candles without a key. Used by Lookup, the 1D trend read and the
+ * 4H setup scan. The collector, signals and performance numbers stay
+ * Binance-only; a setup records which exchange found it and is resolved
+ * only on that exchange's bars, so no score mixes two venues.
  *
  * Shape verified against the live API: `data` is newest first, each row
  * `[ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]` as strings, `vol`
@@ -45,6 +46,13 @@ const BAR: Record<string, string> = {
   '1h': '1H',
   '4h': '4H',
   '1d': '1Dutc',
+};
+
+const INTERVAL_MS: Record<string, number> = {
+  '5m': 5 * 60_000,
+  '15m': 15 * 60_000,
+  '1h': 60 * 60_000,
+  '4h': 4 * 60 * 60_000,
 };
 
 /** Quotes Lookup tries, longest first so FDUSD is not read as ...USD. */
@@ -96,6 +104,24 @@ export class OkxSpotCandles {
 
     const page = await this.fetchPage('candles', instId, bar, Math.min(limit, MAX_LIMIT));
     return page.sort((a, b) => a.openTime - b.openTime);
+  }
+
+  /**
+   * The last `limit` CLOSED bars of an intraday interval, oldest first,
+   * with Binance's closeTime convention — the same contract as
+   * BinanceSpotAdapter.fetchClosedBars. OKX's 4H bars open at 00/04/08…
+   * Hong Kong time, which is the same UTC grid as Binance's (UTC+8 is a
+   * whole number of 4h steps), so a bar here and there cover the same hours.
+   */
+  async fetchClosedBars(symbol: string, interval: string, limit: number, now = Date.now()): Promise<OkxClosedBar[]> {
+    const ms = INTERVAL_MS[interval];
+    if (ms === undefined) return [];
+    // +1: the newest row is usually the bar still forming, dropped below.
+    const bars = await this.fetchBars(symbol, interval, limit + 1);
+    return bars
+      .map((b) => ({ ...b, closeTime: b.openTime + ms - 1 }))
+      .filter((b) => b.closeTime < now)
+      .slice(-limit);
   }
 
   /**

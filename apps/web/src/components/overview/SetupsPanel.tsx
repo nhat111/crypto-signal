@@ -54,6 +54,11 @@ export function SetupsPanel({ data }: { data: SetupsResponse }) {
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h3 className="font-bold text-slate-100">
                   {s.symbol} <span className="text-xs font-semibold text-sky-300">· {KIND[s.kind]}</span>
+                  {s.exchange === 'okx' && (
+                    <span className="ml-1.5 rounded border border-slate-700 px-1 py-px text-[10px] font-medium text-slate-400" title="Nến lấy từ OKX vì Binance đang chặn IP máy chủ">
+                      OKX
+                    </span>
+                  )}
                 </h3>
                 <span className="text-[11px] text-slate-500">{formatRelativeTime(s.detectedAt)}</span>
               </div>

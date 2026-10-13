@@ -92,11 +92,23 @@ describe('formatSetupAlert', () => {
       status: 'open',
       resolvedAt: null,
       rMultiple: null,
+      exchange: 'binance',
     });
     expect(text).toContain('SOLUSDT 4H — Hồi về hỗ trợ');
     expect(text).toContain('Vào ~114 · Cắt lỗ 110.8 · Chốt lời 124.95');
     expect(text).toContain('R:R 1:3.4');
     expect(text).toMatch(/3\.1[23] SOL/);
     expect(text).not.toContain('Kế hoạch:');
+    expect(text).not.toContain('OKX');
+  });
+
+  it('says when the bars came from OKX', async () => {
+    const { formatSetupAlert } = await import('./trendCycle.js');
+    const text = formatSetupAlert({
+      id: '2', symbol: 'ETHUSDT', kind: 'breakout_retest', barOpenTime: 0, detectedAt: 0, level: 2600, entry: 2610,
+      stop: 2550, target: 2800, rr: 3.2, atr: 40, reasons: ['Kế hoạch: …'], status: 'open', resolvedAt: null, rMultiple: null,
+      exchange: 'okx',
+    });
+    expect(text).toContain('lấy từ OKX');
   });
 });

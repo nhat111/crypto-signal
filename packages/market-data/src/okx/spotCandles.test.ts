@@ -110,3 +110,27 @@ describe('toOkxBar', () => {
     expect(toOkxBar(['1', '1', '1'])).toBeNull();
   });
 });
+
+describe('OkxSpotCandles.fetchClosedBars', () => {
+  it('drops the 4H bar still forming and gives closed ones Binance-style close times', async () => {
+    const H4 = 4 * 3_600_000;
+    const t0 = Date.UTC(2026, 9, 13, 0);
+    const fetchMock = vi.fn(async (_url: string) =>
+      okxResponse({
+        code: '0',
+        msg: '',
+        data: [t0 + 2 * H4, t0 + H4, t0].map((ts) => [String(ts), '1', '2', '0.5', '1.5', '10', '15', '15', '0']),
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const bars = await new OkxSpotCandles({ logger }).fetchClosedBars('SOLUSDT', '4h', 5, t0 + 2 * H4 + 60_000);
+    expect(bars.map((b) => b.openTime)).toEqual([t0, t0 + H4]);
+    expect(bars[1]?.closeTime).toBe(t0 + 2 * H4 - 1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('bar=4H');
+  });
+
+  it('returns nothing for an interval it does not map', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+    expect(await new OkxSpotCandles({ logger }).fetchClosedBars('SOLUSDT', '3d', 5)).toEqual([]);
+  });
+});

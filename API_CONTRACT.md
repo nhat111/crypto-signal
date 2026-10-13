@@ -528,13 +528,16 @@ stats and the job's health.
     "entry": 2416.65, "stop": 2335.72, "target": 2665.99, "rr": 3.1, "atr": 40.2,
     "reasons": ["…", "Kế hoạch: …"],
     "status": "open" | "target" | "stop" | "expired",
-    "resolvedAt": null, "rMultiple": null
+    "resolvedAt": null, "rMultiple": null,
+    "exchange": "binance" | "okx"
   }],
   "stats": [{ "kind": "pullback", "total": 3, "open": 1, "resolved": 2, "targets": 1, "stops": 1, "expired": 0, "avgR": 1.05 }],
   "minResolved": 20,
   "fetch": { "lastAttemptAt": 0, "lastSuccessAt": 0, "consecutiveFailures": 0, "lastError": null }
 }
 ```
+`exchange`: whose bars found the setup (`okx` when Binance refused the
+server); a setup is resolved only on that exchange's bars.
 `rMultiple` is in units of the planned risk (entry − stop): `+rr` at the
 target, `-1` at the stop, the last close's distance for `expired`. A bar
 that touched both levels is scored as the stop. Clients withhold hit rates
