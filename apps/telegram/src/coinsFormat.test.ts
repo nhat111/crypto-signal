@@ -48,6 +48,13 @@ describe('formatCoins', () => {
     expect(text).toContain('Spot mua ròng 7 ngày: BTC, NEW');
   });
 
+  it('says when the day was read from OKX instead of Binance', () => {
+    const rows = [row('BTCUSDT', 0), row('SOLUSDT', 5)];
+    expect(formatCoins({ ...data(rows), exchange: 'okx' })).toContain('Nguồn: OKX');
+    expect(formatCoins(data(rows))).not.toContain('OKX');
+    expect(formatCoinDetail({ ...data(rows), exchange: 'okx' }, 'SOLUSDT')).toContain('Hạng volume #1 trên OKX');
+  });
+
   it('says why the list is empty', () => {
     expect(formatCoins({ enabled: false, day: null, rows: [], fetch: null })).toContain('đang tắt');
     const failing = formatCoins({ enabled: true, day: null, rows: [], fetch: { lastSuccessAt: null, consecutiveFailures: 2, lastError: 'IP <banned>' } });

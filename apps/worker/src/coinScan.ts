@@ -1,4 +1,12 @@
-import { getLatestCoinScanDay, JOB_COIN_SCAN, recordJobFailure, recordJobSuccess, saveCoinScan, type CoinScanInput } from '@crypto-signal/db';
+import {
+  getLatestCoinScanDay,
+  JOB_COIN_SCAN,
+  recordJobFailure,
+  recordJobSuccess,
+  saveCoinScan,
+  type CoinScanExchange,
+  type CoinScanInput,
+} from '@crypto-signal/db';
 import {
   BENCHMARK_SYMBOL,
   fundingPer8h,
@@ -9,7 +17,7 @@ import {
   type CoinUniverseEntry,
   type Ticker24h,
 } from '@crypto-signal/indicators';
-import { BinanceRestError, type BinanceFuturesAdapter, type BinanceSpotAdapter } from '@crypto-signal/market-data';
+import { BinanceRestError, type BinanceFuturesAdapter, type BinanceSpotAdapter, type OkxCoinScanData } from '@crypto-signal/market-data';
 import type { CoinScanConfig } from '@crypto-signal/shared';
 import type { WorkerContext } from './context.js';
 
@@ -40,6 +48,22 @@ export function binanceCoinScanSource(spot: BinanceSpotAdapter, futures: Binance
     dailyBars: (symbol, now) => spot.fetchClosedFlowBars(symbol, '1d', DAILY_BARS, now),
     dailyOpenInterest: async (symbol) => (await futures.fetchDailyOpenInterest(symbol, OI_POINTS)).map((p) => p.contracts),
     funding7d: async (symbol, now) => fundingPer8h(await futures.fetchFundingRateHistory(symbol, { startTime: now - 7 * DAY_MS, limit: 200 })),
+  };
+}
+
+/**
+ * The same reads from OKX, for when Binance refuses this server. Spot,
+ * perps and taker split all from OKX, so one stored day never mixes two
+ * exchanges' order flow — their taker skews disagree in sign on some coins
+ * (BNB, TRX), which is a real difference between venues, not noise.
+ */
+export function okxCoinScanSource(okx: OkxCoinScanData): CoinScanSource {
+  return {
+    spotTickers: () => okx.spotTickers(),
+    futuresTickers: () => okx.swapTickers(),
+    dailyBars: (symbol, now) => okx.dailyFlowBars(symbol, DAILY_BARS, now),
+    dailyOpenInterest: (symbol) => okx.dailyOpenInterest(symbol, OI_POINTS),
+    funding7d: async (symbol, now) => fundingPer8h(await okx.fundingHistory(symbol, now - 7 * DAY_MS)),
   };
 }
 
@@ -144,6 +168,29 @@ async function readLeverage(source: CoinScanSource, entry: CoinUniverseEntry, no
   return { oi, funding };
 }
 
+/**
+ * Binance first; OKX only when Binance refused the server outright. Any
+ * other Binance failure is a bug or a bad answer and is rethrown, not
+ * papered over with a second exchange.
+ */
+export async function scanWithFallback(
+  binance: CoinScanSource,
+  okx: CoinScanSource | null,
+  config: CoinScanConfig,
+  now: number,
+): Promise<{ result: CoinScanResult; exchange: CoinScanExchange; binanceError: string | null }> {
+  try {
+    return { result: await scanCoins(binance, config, now), exchange: 'binance', binanceError: null };
+  } catch (err) {
+    if (!okx || !isRefused(err)) throw err;
+    try {
+      return { result: await scanCoins(okx, config, now), exchange: 'okx', binanceError: message(err) };
+    } catch (okxErr) {
+      throw new Error(`${message(err)} — OKX fallback failed too: ${message(okxErr)}`);
+    }
+  }
+}
+
 /** The day whose daily bar most recently closed, as YYYY-MM-DD. */
 export function lastClosedDay(now: number): string {
   return new Date(Math.floor(now / DAY_MS) * DAY_MS - DAY_MS).toISOString().slice(0, 10);
@@ -160,11 +207,17 @@ export async function runCoinScanCycle(ctx: WorkerContext, now = Date.now(), sou
   if ((await getLatestCoinScanDay(ctx.pool)) === lastClosedDay(now)) return;
 
   try {
-    const result = await scanCoins(source ?? binanceCoinScanSource(ctx.spotAdapter, ctx.futuresAdapter), ctx.config.coinScan, now);
+    const { result, exchange, binanceError } = await scanWithFallback(
+      source ?? binanceCoinScanSource(ctx.spotAdapter, ctx.futuresAdapter),
+      source ? null : ctx.okxCoinScan ? okxCoinScanSource(ctx.okxCoinScan) : null,
+      ctx.config.coinScan,
+      now,
+    );
     if (result.inputs.length === 0) throw new Error(`no coin could be read: ${result.skipped.join('; ')}`);
-    await saveCoinScan(ctx.pool, result.day, result.inputs);
+    await saveCoinScan(ctx.pool, result.day, result.inputs, exchange);
     await recordJobSuccess(ctx.pool, JOB_COIN_SCAN);
-    ctx.logger.info({ day: result.day, coins: result.inputs.length, skipped: result.skipped }, 'coin scan stored');
+    if (binanceError) ctx.logger.warn({ binanceError }, 'coin scan read from OKX — Binance refused the server');
+    ctx.logger.info({ day: result.day, exchange, coins: result.inputs.length, skipped: result.skipped }, 'coin scan stored');
   } catch (err) {
     await recordJobFailure(ctx.pool, JOB_COIN_SCAN, err).catch(() => undefined);
     throw err;

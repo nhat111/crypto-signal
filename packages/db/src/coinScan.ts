@@ -1,6 +1,9 @@
 import type { Pool } from 'pg';
 import type { CoinFlow, CoinRead } from '@crypto-signal/indicators';
 
+/** Which exchange a stored day was read from. One day is one exchange, never a mix. */
+export type CoinScanExchange = 'binance' | 'okx';
+
 /** One coin's read for one day, as stored and as served by /api/coins. */
 export interface CoinScanRow {
   /** YYYY-MM-DD, the UTC day of the last closed daily bar. */
@@ -25,6 +28,7 @@ export interface CoinScanRow {
   flow: CoinFlow;
   reasons: string[];
   unknowns: string[];
+  exchange: CoinScanExchange;
   computedAt: number;
 }
 
@@ -60,13 +64,14 @@ function toRow(r: Record<string, unknown>): CoinScanRow {
     flow: r['flow'] as CoinFlow,
     reasons: r['reasons'] as string[],
     unknowns: r['unknowns'] as string[],
+    exchange: r['exchange'] as CoinScanExchange,
     computedAt: Math.round(Number(r['computed_at_ms'])),
   };
 }
 
 const COLUMNS = `to_char(day, 'YYYY-MM-DD') AS day_text, symbol, volume_rank, futures_symbol, close, spot_quote_volume_24h,
   ret_7d, ret_30d, rs_7d, rs_30d, rs_above_sma20, down_day_excess, down_days, taker_skew_7d, taker_skew_30d,
-  oi_change_7d_pct, funding_avg_7d_pct, spot_perp_volume_ratio, flow, reasons, unknowns,
+  oi_change_7d_pct, funding_avg_7d_pct, spot_perp_volume_ratio, flow, reasons, unknowns, exchange,
   extract(epoch from computed_at)*1000 AS computed_at_ms`;
 
 /**
@@ -75,7 +80,7 @@ const COLUMNS = `to_char(day, 'YYYY-MM-DD') AS day_text, symbol, volume_rank, fu
  * for that day — the stored day must be one scan, not the union of several
  * with different universes.
  */
-export async function saveCoinScan(pool: Pool, day: string, inputs: CoinScanInput[]): Promise<void> {
+export async function saveCoinScan(pool: Pool, day: string, inputs: CoinScanInput[], exchange: CoinScanExchange = 'binance'): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -84,8 +89,8 @@ export async function saveCoinScan(pool: Pool, day: string, inputs: CoinScanInpu
       await client.query(
         `INSERT INTO coin_scan_rows (day, symbol, volume_rank, futures_symbol, close, spot_quote_volume_24h,
            ret_7d, ret_30d, rs_7d, rs_30d, rs_above_sma20, down_day_excess, down_days, taker_skew_7d, taker_skew_30d,
-           oi_change_7d_pct, funding_avg_7d_pct, spot_perp_volume_ratio, flow, reasons, unknowns)
-         VALUES ($1::date, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
+           oi_change_7d_pct, funding_avg_7d_pct, spot_perp_volume_ratio, flow, reasons, unknowns, exchange)
+         VALUES ($1::date, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`,
         [
           day,
           r.symbol,
@@ -108,6 +113,7 @@ export async function saveCoinScan(pool: Pool, day: string, inputs: CoinScanInpu
           r.flow,
           JSON.stringify(r.reasons),
           JSON.stringify(r.unknowns),
+          exchange,
         ],
       );
     }

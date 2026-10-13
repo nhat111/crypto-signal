@@ -217,6 +217,8 @@ export interface CoinScanDTO {
 export interface CoinsResponseDTO {
   enabled: boolean;
   day: string | null;
+  /** Absent from APIs older than the OKX fallback, which only ever read Binance. */
+  exchange?: 'binance' | 'okx' | null;
   rows: CoinScanDTO[];
   fetch: { lastSuccessAt: number | null; consecutiveFailures: number; lastError: string | null } | null;
 }

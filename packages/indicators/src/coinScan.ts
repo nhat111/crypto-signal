@@ -263,6 +263,7 @@ export function readCoin(input: CoinReadInput): CoinRead | null {
 
   const skew7 = takerSkew(bars, 7);
   const skew30 = takerSkew(bars, 30);
+  if (skew7 === null) unknowns.push('Không có số liệu mua/bán chủ động trên spot — không biết spot mua hay bán ròng.');
 
   let oiChange: number | null = null;
   const oi = input.oiContracts;

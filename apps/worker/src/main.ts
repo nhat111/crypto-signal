@@ -1,6 +1,6 @@
 import pg from 'pg';
 import { createLogger, loadConfig, resolveBuildInfo } from '@crypto-signal/shared';
-import { BinanceFuturesAdapter, BinanceSpotAdapter, OkxSpotCandles } from '@crypto-signal/market-data';
+import { BinanceFuturesAdapter, BinanceSpotAdapter, OkxCoinScanData, OkxSpotCandles } from '@crypto-signal/market-data';
 import { getWorkerRuntime, insertLiquidation, recordServiceBuild, SERVICE_WORKER } from '@crypto-signal/db';
 import { loadGemConfig } from '@crypto-signal/gem-scanner';
 import { buildStates, connectionStatusToState, type WorkerContext } from './context.js';
@@ -59,6 +59,7 @@ async function main(): Promise<void> {
     spotAdapter,
     futuresAdapter,
     okxSpot: new OkxSpotCandles({ logger }),
+    okxCoinScan: new OkxCoinScanData({ logger }),
     states: buildStates(allSymbols, config.timeframes),
     pairBuffer: new CandlePairBuffer(),
     futuresOnlySymbolSet: new Set(config.futuresOnlySymbols),

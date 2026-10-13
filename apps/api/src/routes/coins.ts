@@ -15,6 +15,8 @@ export function registerCoinsRoute(app: FastifyInstance, deps: ApiDeps): void {
     return {
       enabled: deps.config.coinScan.enabled,
       day: scan.day,
+      // One day is read from one exchange; null before the first scan.
+      exchange: scan.rows[0]?.exchange ?? null,
       rows: scan.rows,
       thresholds: deps.config.coinScan.thresholds,
       fetch: health

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CoinDailyBar, Ticker24h } from '@crypto-signal/indicators';
 import { BinanceRestError } from '@crypto-signal/market-data';
 import type { CoinScanConfig } from '@crypto-signal/shared';
-import { lastClosedDay, scanCoins, type CoinScanSource } from './coinScan.js';
+import { lastClosedDay, scanCoins, scanWithFallback, type CoinScanSource } from './coinScan.js';
 
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 9, 13, 3); // 13/10 03:00 UTC — the 12/10 bar is the last closed one
@@ -117,5 +117,40 @@ describe('scanCoins', () => {
       },
     });
     await expect(scanCoins(src, CONFIG, NOW)).rejects.toBe(ban);
+  });
+});
+
+describe('scanWithFallback', () => {
+  const ban = new BinanceRestError('banned', 418, undefined);
+
+  it('reads Binance when Binance answers, and never asks OKX', async () => {
+    const okx = source({ spotTickers: async () => Promise.reject(new Error('should not be called')) });
+    const out = await scanWithFallback(source(), okx, CONFIG, NOW);
+    expect(out.exchange).toBe('binance');
+    expect(out.binanceError).toBeNull();
+    expect(okx.calls).toEqual([]);
+  });
+
+  it('reads the whole day from OKX when Binance refuses the server', async () => {
+    const okx = source();
+    const out = await scanWithFallback(source({ spotTickers: async () => Promise.reject(ban) }), okx, CONFIG, NOW);
+    expect(out.exchange).toBe('okx');
+    expect(out.binanceError).toContain('banned');
+    expect(out.result.inputs.map((i) => i.read.symbol)).toEqual(['BTCUSDT', 'ETHUSDT']);
+  });
+
+  it('does not paper over a Binance answer that is wrong rather than refused', async () => {
+    const broken = new Error('unexpected shape');
+    await expect(scanWithFallback(source({ spotTickers: async () => Promise.reject(broken) }), source(), CONFIG, NOW)).rejects.toBe(broken);
+  });
+
+  it('names both failures when OKX fails too', async () => {
+    const out = scanWithFallback(
+      source({ spotTickers: async () => Promise.reject(ban) }),
+      source({ spotTickers: async () => Promise.reject(new Error('OKX 50011: too many requests')) }),
+      CONFIG,
+      NOW,
+    );
+    await expect(out).rejects.toThrow(/banned — OKX fallback failed too: OKX 50011/);
   });
 });

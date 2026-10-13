@@ -78,5 +78,12 @@ describe.skipIf(!hasTestDatabase)('coin scan rows against real Postgres', () => 
     await saveCoinScan(pool, '2099-01-03', [{ read: read('AAAUSDT', { close: 200 }), volumeRank: 1, futuresSymbol: null, spotQuoteVolume24h: 1 }]);
     const { rows } = await getLatestCoinScan(pool);
     expect(rows.map((r) => [r.symbol, r.close])).toEqual([['AAAUSDT', 200]]);
+    expect(rows[0]?.exchange).toBe('binance');
+  });
+
+  it('records which exchange a day was read from', async () => {
+    await saveCoinScan(pool, '2099-01-04', [{ read: read('BTCUSDT'), volumeRank: 1, futuresSymbol: 'BTCUSDT', spotQuoteVolume24h: 1 }], 'okx');
+    const { rows } = await getLatestCoinScan(pool);
+    expect(rows[0]?.exchange).toBe('okx');
   });
 });

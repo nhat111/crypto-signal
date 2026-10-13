@@ -484,6 +484,7 @@ the daily close; most-traded first.
 {
   "enabled": true,
   "day": "2026-10-12",
+  "exchange": "binance" | "okx" | null,
   "rows": [{
     "day": "2026-10-12", "symbol": "SOLUSDT", "volumeRank": 3, "futuresSymbol": "SOLUSDT",
     "close": 152.3, "spotQuoteVolume24h": 512000000,
@@ -496,6 +497,7 @@ the daily close; most-traded first.
           | "accumulation" | "distribution" | "leverage_building" | "quiet",
     "reasons": ["Giá 7 ngày -12.4%.", "…"],
     "unknowns": [],
+    "exchange": "binance",
     "computedAt": 1791000000000
   }],
   "thresholds": { "priceMovePct": 3, "takerSkew": 0.03, "oiRisePct": 10, "oiFallPct": -10, "fundingElevatedPct": 0.03 },
@@ -510,7 +512,9 @@ closed red in the last 30 (null under 5 such days). `takerSkew*` is
 contracts, so price alone cannot move it; `fundingAvg7dPct` is scaled to 8h
 whatever the perp's settlement interval. `flow` is the 7-day label (price
 direction first, then spot vs leverage); missing futures data never selects
-a leverage label and is listed in `unknowns`. No composite score. Empty
+a leverage label and is listed in `unknowns`. `exchange` says where the
+whole day was read from: `okx` when Binance refused the server (volume
+ranks, taker flow, OI and funding are then OKX's). No composite score. Empty
 `rows` with `enabled: true` means not run yet or failing — `fetch` says which.
 
 ## `GET /api/setups?limit=`

@@ -161,6 +161,13 @@ describe('readCoin', () => {
     expect(r?.unknowns).toEqual([]);
   });
 
+  it('says when there is no taker split to read, instead of calling the week balanced', () => {
+    const noTaker = bars(trend(40, 0.01)).map((b) => ({ ...b, quoteVolume: 0, takerBuyQuoteVolume: 0 }));
+    const r = readCoin({ ...base, symbol: 'XYZUSDT', bars: noTaker });
+    expect(r?.takerSkew7d).toBeNull();
+    expect(r?.unknowns.some((u) => u.includes('mua/bán chủ động'))).toBe(true);
+  });
+
   it('tells "futures unreadable this time" apart from "no perpetual"', () => {
     const r = readCoin({ ...base, symbol: 'ETHUSDT', bars: bars(trend(40, 0.01)), futuresUnreadable: true });
     expect(r?.unknowns).toHaveLength(1);
