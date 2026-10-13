@@ -122,6 +122,17 @@ Check items as they land; each phase's commit message references the phase.
 - [ ] Signal rarity: ~10.000 SELLING_ABSORPTION outcomes in a month means
       the rule is nearly always on. Thresholds need tuning against recorded
       outcomes now that there are some (see also Phase 17's weights).
+- [x] Count episodes, not rows. A rule that stays on wrote one outcome per
+      candle close per timeframe, all priced off nearly the same future
+      candles, and the baseline started a window on every 5m candle (288
+      overlapping windows a day at 24h). Both narrowed the significance
+      margin without adding information. Performance now keeps only the
+      first firing of an episode (same type quiet on the symbol for one
+      horizon), reports `firingCount` next to it, and the baseline starts
+      windows on the horizon's own grid.
+- [ ] Episodes on different symbols at the same moment are still
+      correlated (BTC/ETH/SOL move together). A block bootstrap by day would
+      cover it; not done.
 
 ## Phase 13 — Testing
 - [x] Unit tests: Healthy Rally, Leveraged Rally, Short Covering, Long
@@ -219,6 +230,11 @@ Check items as they land; each phase's commit message references the phase.
 - [ ] `robinhood` still has no safety screen — its EVM id is known but
       GoPlus coverage of a chain that new is not verified. Tokens there
       stay unverified, and the alert now says so above the score.
+- [x] Rugs count as outcomes (migration 033): a pool missing a day past
+      the horizon, or drained below a fifth of its liquidity, is written
+      off at −100% on both the picks and the control group, with
+      `outcome_basis_*` saying which. They used to stay pending forever or
+      count at their last quote, and clogged the pending queue.
 - [ ] Holder-growth and social signals.
 - [x] Answer whether the score works at all before tuning it: outcomes are
       split into fixed score bands and the top band is judged against the

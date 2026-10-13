@@ -500,6 +500,26 @@ average return would hide exactly that. The performance surface reports
 "not enough data yet" below 20 recorded outcomes rather than quoting a win
 rate off a handful of samples.
 
+**Rugs are outcomes, not gaps** (migration 033). Each priced outcome
+carries an `outcome_basis_<horizon>`:
+- `observed`: a quote with liquidity still there. The move is real.
+- `pool_gone`: no pair a full day (`GEM_POOL_GONE_GRACE_MS`) past the
+  horizon. Written off at −100%, price 0. Never on a pass where the feed
+  returned nothing for the whole chain, which is a feed problem, not a
+  chain-wide rug.
+- `liquidity_collapsed`: liquidity under a fifth of what it was at scan,
+  the same line `liquidityCollapsePct` uses. Written off at −100%; the
+  quote is kept in `price_after_*`.
+
+Before this, a vanished pool stayed pending forever and a drained one
+counted at its last quote. Doing that to both sides is only fair if the
+picks and the controls rug at the same rate, which is the thing being
+measured. It also clogged the oldest-first pending queue: dead rows sat
+at its head and newer outcomes behind them waited. The rule applies to
+both the scanner's picks and the control group. The migration re-applies
+the collapse rule to 7d rows already recorded (their liquidity was stored).
+24h rows from before it stay as recorded.
+
 ### Known limitations
 
 - Solana only for safety screening. HyperEVM pair data is available through

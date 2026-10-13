@@ -358,16 +358,85 @@ const HORIZON_MOVE_COLUMN: Record<GemHorizon, string> = {
   '7d': 'move_after_7d_pct',
 };
 
+/** How an outcome was arrived at. See migration 033 for the rules. */
+export type GemOutcomeBasis = 'observed' | 'pool_gone' | 'liquidity_collapsed';
+
+export interface ResolvedGemOutcome {
+  /** Price written to `price_after_*`: the quote when there was one, 0 when the pool is gone. */
+  price: number;
+  movePct: number;
+  basis: GemOutcomeBasis;
+}
+
+/**
+ * How long past its horizon a token may have no pair before it counts as
+ * gone. A missing pair can be a feed hiccup; a full day of missing pairs
+ * across repeated passes is a pool that is not coming back.
+ */
+export const GEM_POOL_GONE_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/** Below this share of its at-scan liquidity a pool counts as drained. Same line as `liquidityCollapsePct`. */
+export const GEM_LIQUIDITY_COLLAPSE_SHARE = 0.2;
+
+/**
+ * Turns a fresh quote (or its absence) into an outcome, or null when it is
+ * too early to say.
+ *
+ * Leaving a vanished pool pending forever kept the worst outcome out of
+ * every hit rate, and counting a drained pool at its last quote scored a
+ * token nobody can sell as a win. Both are written off at -100% instead.
+ *
+ * `feedAnswered` must be false when the source returned nothing at all for
+ * the chain: an empty answer is a feed problem, not proof that every pool
+ * on the chain died, and writing them all off would be the mirror image of
+ * the bias this exists to remove.
+ */
+export function resolveGemOutcome(input: {
+  priceAtScan: number;
+  liquidityAtScanUsd: number | null;
+  quote: { priceUsd: number | null; liquidityUsd: number | null } | null;
+  overdueMs: number;
+  feedAnswered: boolean;
+}): ResolvedGemOutcome | null {
+  const { priceAtScan, liquidityAtScanUsd, quote, overdueMs, feedAnswered } = input;
+
+  if (!quote || quote.priceUsd === null) {
+    if (feedAnswered && overdueMs >= GEM_POOL_GONE_GRACE_MS) return { price: 0, movePct: -100, basis: 'pool_gone' };
+    return null;
+  }
+
+  if (
+    liquidityAtScanUsd !== null &&
+    liquidityAtScanUsd > 0 &&
+    quote.liquidityUsd !== null &&
+    quote.liquidityUsd < liquidityAtScanUsd * GEM_LIQUIDITY_COLLAPSE_SHARE
+  ) {
+    return { price: quote.priceUsd, movePct: -100, basis: 'liquidity_collapsed' };
+  }
+
+  const movePct = priceAtScan > 0 ? ((quote.priceUsd - priceAtScan) / priceAtScan) * 100 : 0;
+  return { price: quote.priceUsd, movePct, basis: 'observed' };
+}
+
+const HORIZON_BASIS_COLUMN: Record<GemHorizon, string> = {
+  '24h': 'outcome_basis_24h',
+  '7d': 'outcome_basis_7d',
+};
+
 export interface PendingGemOutcome {
   scanId: string;
   chainId: string;
   tokenAddress: string;
   priceAtScan: number;
+  liquidityAtScanUsd: number | null;
+  /** When the horizon elapsed, so the tracker can tell a late quote from a pool that is gone. */
+  dueAt: number;
 }
 
 export async function getGemsPendingOutcome(pool: Pool, horizon: GemHorizon, nowMs: number, limit = 200): Promise<PendingGemOutcome[]> {
   const { rows } = await pool.query(
-    `SELECT o.scan_id, s.chain_id, s.token_address, o.price_at_scan
+    `SELECT o.scan_id, s.chain_id, s.token_address, o.price_at_scan, o.liquidity_at_scan_usd,
+            extract(epoch from s.scanned_at)*1000 AS scanned_ms
      FROM gem_outcomes o
      JOIN gem_scans s ON s.scan_id = o.scan_id
      WHERE o.${HORIZON_PRICE_COLUMN[horizon]} IS NULL
@@ -381,6 +450,8 @@ export async function getGemsPendingOutcome(pool: Pool, horizon: GemHorizon, now
     chainId: r.chain_id,
     tokenAddress: r.token_address,
     priceAtScan: Number(r.price_at_scan),
+    liquidityAtScanUsd: r.liquidity_at_scan_usd === null ? null : Number(r.liquidity_at_scan_usd),
+    dueAt: Math.round(Number(r.scanned_ms)) + HORIZON_MS[horizon],
   }));
 }
 
@@ -388,18 +459,18 @@ export async function recordGemOutcome(
   pool: Pool,
   scanId: string,
   horizon: GemHorizon,
-  price: number,
+  outcome: ResolvedGemOutcome,
   priceAtScan: number,
   liquidityUsd: number | null,
 ): Promise<void> {
-  const movePct = priceAtScan > 0 ? ((price - priceAtScan) / priceAtScan) * 100 : 0;
-  const liquidityAssignment = horizon === '7d' ? ', liquidity_after_7d_usd = $5' : '';
-  const params: unknown[] = [price, movePct, scanId, priceAtScan];
+  const liquidityAssignment = horizon === '7d' ? ', liquidity_after_7d_usd = $6' : '';
+  const params: unknown[] = [outcome.price, outcome.movePct, scanId, priceAtScan, outcome.basis];
   if (horizon === '7d') params.push(liquidityUsd);
 
   await pool.query(
     `UPDATE gem_outcomes
-     SET ${HORIZON_PRICE_COLUMN[horizon]} = $1, ${HORIZON_MOVE_COLUMN[horizon]} = $2, updated_at = now()${liquidityAssignment}
+     SET ${HORIZON_PRICE_COLUMN[horizon]} = $1, ${HORIZON_MOVE_COLUMN[horizon]} = $2,
+         ${HORIZON_BASIS_COLUMN[horizon]} = $5, updated_at = now()${liquidityAssignment}
      WHERE scan_id = $3 AND price_at_scan = $4`,
     params,
   );
@@ -740,6 +811,8 @@ export interface PendingGemBaseline {
   chainId: string;
   tokenAddress: string;
   priceAtObservation: number;
+  liquidityAtObservationUsd: number | null;
+  dueAt: number;
 }
 
 export async function getBaselinePendingOutcome(
@@ -749,7 +822,8 @@ export async function getBaselinePendingOutcome(
   limit = 200,
 ): Promise<PendingGemBaseline[]> {
   const { rows } = await pool.query(
-    `SELECT candidate_id, chain_id, token_address, price_usd
+    `SELECT candidate_id, chain_id, token_address, price_usd, liquidity_usd,
+            extract(epoch from observed_at)*1000 AS observed_ms
      FROM gem_baseline_candidates
      WHERE ${HORIZON_PRICE_COLUMN[horizon]} IS NULL
        AND observed_at <= to_timestamp($1/1000.0)
@@ -762,6 +836,8 @@ export async function getBaselinePendingOutcome(
     chainId: r.chain_id,
     tokenAddress: r.token_address,
     priceAtObservation: Number(r.price_usd),
+    liquidityAtObservationUsd: r.liquidity_usd === null ? null : Number(r.liquidity_usd),
+    dueAt: Math.round(Number(r.observed_ms)) + HORIZON_MS[horizon],
   }));
 }
 
@@ -769,18 +845,17 @@ export async function recordGemBaselineOutcome(
   pool: Pool,
   candidateId: string,
   horizon: GemHorizon,
-  price: number,
-  priceAtObservation: number,
+  outcome: ResolvedGemOutcome,
   liquidityUsd: number | null,
 ): Promise<void> {
-  const movePct = priceAtObservation > 0 ? ((price - priceAtObservation) / priceAtObservation) * 100 : 0;
-  const liquidityAssignment = horizon === '7d' ? ', liquidity_after_7d_usd = $4' : '';
-  const params: unknown[] = [price, movePct, candidateId];
+  const liquidityAssignment = horizon === '7d' ? ', liquidity_after_7d_usd = $5' : '';
+  const params: unknown[] = [outcome.price, outcome.movePct, candidateId, outcome.basis];
   if (horizon === '7d') params.push(liquidityUsd);
 
   await pool.query(
     `UPDATE gem_baseline_candidates
-     SET ${HORIZON_PRICE_COLUMN[horizon]} = $1, ${HORIZON_MOVE_COLUMN[horizon]} = $2, updated_at = now()${liquidityAssignment}
+     SET ${HORIZON_PRICE_COLUMN[horizon]} = $1, ${HORIZON_MOVE_COLUMN[horizon]} = $2,
+         ${HORIZON_BASIS_COLUMN[horizon]} = $4, updated_at = now()${liquidityAssignment}
      WHERE candidate_id = $3`,
     params,
   );
