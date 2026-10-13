@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
 import type { CoinRead } from '@crypto-signal/indicators';
 import { createTestPool, hasTestDatabase, lockTestTables } from './testPool.js';
-import { getLatestCoinScan, getLatestCoinScanDay, saveCoinScan } from './coinScan.js';
+import { getCoinScanForDay, getLatestCoinScan, getLatestCoinScanDay, saveCoinScan } from './coinScan.js';
 
 const LOCK = 991_028;
 
@@ -79,6 +79,13 @@ describe.skipIf(!hasTestDatabase)('coin scan rows against real Postgres', () => 
     const { rows } = await getLatestCoinScan(pool);
     expect(rows.map((r) => [r.symbol, r.close])).toEqual([['AAAUSDT', 200]]);
     expect(rows[0]?.exchange).toBe('binance');
+  });
+
+  it('reads one named day, and nothing for a day that was not scanned', async () => {
+    await saveCoinScan(pool, '2099-02-01', [{ read: read('ETHUSDT'), volumeRank: 2, futuresSymbol: null, spotQuoteVolume24h: 1 }]);
+    await saveCoinScan(pool, '2099-02-02', [{ read: read('SOLUSDT'), volumeRank: 3, futuresSymbol: null, spotQuoteVolume24h: 1 }]);
+    expect((await getCoinScanForDay(pool, '2099-02-01')).map((r) => r.symbol)).toEqual(['ETHUSDT']);
+    expect(await getCoinScanForDay(pool, '2099-02-03')).toEqual([]);
   });
 
   it('records which exchange a day was read from', async () => {

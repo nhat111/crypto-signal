@@ -64,6 +64,15 @@ describe('formatDigest', () => {
   });
 });
 
+describe('formatDigest coin section', () => {
+  it('puts the coin lines after the signals and before the footer, and adds nothing without them', () => {
+    const withCoins = formatDigest([result()], overview, [], CLOSED_AT, ['🪙 <b>Top 30 coin</b>', 'Chi tiết: /coins']);
+    expect(withCoins.indexOf('Tín hiệu 4h')).toBeLessThan(withCoins.indexOf('🪙'));
+    expect(withCoins.indexOf('Chi tiết: /coins')).toBeLessThan(withCoins.indexOf('Mô tả, không phải dự báo'));
+    expect(formatDigest([result()], overview, [], CLOSED_AT)).not.toContain('🪙');
+  });
+});
+
 describe('formatSetupAlert', () => {
   it('gives the three numbers, R:R and the guide’s example size, and keeps the plan line out of the bullets', async () => {
     const { formatSetupAlert } = await import('./trendCycle.js');

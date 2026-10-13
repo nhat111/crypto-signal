@@ -280,6 +280,9 @@ Check items as they land; each phase's commit message references the phase.
 - [x] Whole-day OKX fallback when Binance refuses the server (the first
       production scan hit a spot 418). Days are tagged with their exchange
       so the later judgement can split them.
+- [x] Morning digest carries a short coin section: the three strongest vs
+      BTC with their flow, and coins that turned to spot buying since the
+      day before (same exchange only). Waits up to 2h for the day's scan.
 - [ ] Judge it (per exchange — see ASSUMPTIONS §18): once ~60 days are stored, compare the forward 7d/30d
       return of the top RS quintile against the bottom one, and each flow
       label against the baseline — the same test signals get. Until then
