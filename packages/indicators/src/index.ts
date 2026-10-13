@@ -13,3 +13,4 @@ export * from './technicals.js';
 export * from './structure.js';
 export * from './setups.js';
 export * from './coinScan.js';
+export * from './coinFundamentals.js';

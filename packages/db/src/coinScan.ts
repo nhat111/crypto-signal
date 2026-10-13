@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import type { CoinFlow, CoinRead } from '@crypto-signal/indicators';
+import type { CoinFlow, CoinFundamentals, CoinRead } from '@crypto-signal/indicators';
 
 /** Which exchange a stored day was read from. One day is one exchange, never a mix. */
 export type CoinScanExchange = 'binance' | 'okx';
@@ -29,6 +29,8 @@ export interface CoinScanRow {
   reasons: string[];
   unknowns: string[];
   exchange: CoinScanExchange;
+  /** Null for days before fundamentals were read, or when DefiLlama could not be. */
+  fundamentals: CoinFundamentals | null;
   computedAt: number;
 }
 
@@ -37,6 +39,7 @@ export interface CoinScanInput {
   volumeRank: number;
   futuresSymbol: string | null;
   spotQuoteVolume24h: number;
+  fundamentals?: CoinFundamentals | null;
 }
 
 const num = (v: unknown): number | null => (v === null || v === undefined ? null : Number(v));
@@ -65,13 +68,14 @@ function toRow(r: Record<string, unknown>): CoinScanRow {
     reasons: r['reasons'] as string[],
     unknowns: r['unknowns'] as string[],
     exchange: r['exchange'] as CoinScanExchange,
+    fundamentals: (r['fundamentals'] as CoinFundamentals | null) ?? null,
     computedAt: Math.round(Number(r['computed_at_ms'])),
   };
 }
 
 const COLUMNS = `to_char(day, 'YYYY-MM-DD') AS day_text, symbol, volume_rank, futures_symbol, close, spot_quote_volume_24h,
   ret_7d, ret_30d, rs_7d, rs_30d, rs_above_sma20, down_day_excess, down_days, taker_skew_7d, taker_skew_30d,
-  oi_change_7d_pct, funding_avg_7d_pct, spot_perp_volume_ratio, flow, reasons, unknowns, exchange,
+  oi_change_7d_pct, funding_avg_7d_pct, spot_perp_volume_ratio, flow, reasons, unknowns, exchange, fundamentals,
   extract(epoch from computed_at)*1000 AS computed_at_ms`;
 
 /**
@@ -85,12 +89,12 @@ export async function saveCoinScan(pool: Pool, day: string, inputs: CoinScanInpu
   try {
     await client.query('BEGIN');
     await client.query('DELETE FROM coin_scan_rows WHERE day = $1::date', [day]);
-    for (const { read: r, volumeRank, futuresSymbol, spotQuoteVolume24h } of inputs) {
+    for (const { read: r, volumeRank, futuresSymbol, spotQuoteVolume24h, fundamentals } of inputs) {
       await client.query(
         `INSERT INTO coin_scan_rows (day, symbol, volume_rank, futures_symbol, close, spot_quote_volume_24h,
            ret_7d, ret_30d, rs_7d, rs_30d, rs_above_sma20, down_day_excess, down_days, taker_skew_7d, taker_skew_30d,
-           oi_change_7d_pct, funding_avg_7d_pct, spot_perp_volume_ratio, flow, reasons, unknowns, exchange)
-         VALUES ($1::date, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`,
+           oi_change_7d_pct, funding_avg_7d_pct, spot_perp_volume_ratio, flow, reasons, unknowns, exchange, fundamentals)
+         VALUES ($1::date, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`,
         [
           day,
           r.symbol,
@@ -114,6 +118,7 @@ export async function saveCoinScan(pool: Pool, day: string, inputs: CoinScanInpu
           JSON.stringify(r.reasons),
           JSON.stringify(r.unknowns),
           exchange,
+          fundamentals ? JSON.stringify(fundamentals) : null,
         ],
       );
     }

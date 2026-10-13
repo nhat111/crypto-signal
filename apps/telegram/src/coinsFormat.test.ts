@@ -72,6 +72,15 @@ describe('formatCoinDetail', () => {
     expect(text).toContain('Không đọc được:\n• Không đọc được funding 7 ngày.');
   });
 
+  it('adds the DefiLlama drivers, and their unknowns with the rest', () => {
+    const fundamentals = { chain: { name: 'Near' }, protocol: { name: 'near-protocol' }, bull: ['TVL trên chain Near 30N +84% ($245.2M).'], bear: [], unknowns: ['x'] };
+    const text = formatCoinDetail(data([row('NEARUSDT', 100, { fundamentals })]), 'NEARUSDT');
+    expect(text).toContain('<b>Cơ bản</b> (DefiLlama: chain Near · protocol near-protocol)');
+    expect(text).toContain('▲ TVL trên chain Near 30N +84% ($245.2M).');
+    expect(text).toContain('Không đọc được:\n• x');
+    expect(formatCoinDetail(data([row('NEARUSDT', 100)]), 'NEARUSDT')).not.toContain('Cơ bản');
+  });
+
   it('says when the coin is outside the scanned list', () => {
     expect(formatCoinDetail(data([row('BTCUSDT', 0)]), 'XYZUSDT')).toContain('XYZ không nằm trong top 1');
   });
