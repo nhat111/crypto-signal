@@ -50,7 +50,9 @@ export function formatCoins(data: CoinsResponseDTO): string {
 
   const ranked = data.rows.filter((c) => c.symbol !== 'BTCUSDT' && strength(c) !== null).sort((a, b) => (strength(b) as number) - (strength(a) as number));
   const btc = data.rows.find((c) => c.symbol === 'BTCUSDT');
-  const lines = [`<b>Top ${data.rows.length} coin theo volume</b> — nến 1D đến ${dayVi(data.day)}`, ''];
+  const lines = [`<b>Top ${data.rows.length} coin theo volume</b> — nến 1D đến ${dayVi(data.day)}`];
+  if (data.exchange === 'okx') lines.push('<i>Nguồn: OKX — Binance đang chặn IP máy chủ, nên hạng volume và dòng tiền là của OKX.</i>');
+  lines.push('');
   if (btc) lines.push(`BTC: 7N ${signed(btc.ret7d)} · 30N ${signed(btc.ret30d)} · ${FLOW_LABEL[btc.flow] ?? btc.flow}`, '');
 
   lines.push('💪 <b>Mạnh nhất so với BTC</b>');
@@ -78,7 +80,7 @@ export function formatCoinDetail(data: CoinsResponseDTO, symbol: string): string
   }
   const lines = [
     `<b>${coin(c.symbol)}</b> — ${FLOW_LABEL[c.flow] ?? c.flow}`,
-    `Hạng volume #${c.volumeRank} · nến 1D đến ${dayVi(c.day)}`,
+    `Hạng volume #${c.volumeRank}${data.exchange === 'okx' ? ' trên OKX' : ''} · nến 1D đến ${dayVi(c.day)}`,
     '',
     `Giá: 7N ${signed(c.ret7d)} · 30N ${signed(c.ret30d)}`,
   ];

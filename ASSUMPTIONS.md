@@ -766,6 +766,19 @@ three requests per coin plus two ticker calls. Decisions:
   sandbox this was built in gets 451 from `fapi.binance.com`, which is how
   this case was found. A refused spot host fails the run, and the hourly
   tick retries it.
+- **OKX when Binance refuses the server.** Production's shared Render IP is
+  banned by Binance spot for hours at a time (the setup scan had failed 68
+  runs in a row before this shipped), so a refused Binance scan is re-run
+  whole from OKX: tickers (`instCategory` "1" only, which drops tokenized
+  stocks and gold), `1Dutc` candles, the `rubik` taker split, OI in coins
+  and funding. A day is one exchange, never a mix, and is stored with its
+  `exchange` (migration 029). OKX's taker volume is per coin across all its
+  spot pairs and on Hong Kong days, assigned to the UTC day it overlaps by
+  16 hours; only its buy/sell ratio is read. Measured the same week, the
+  two venues' 7-day skew agreed in sign on SOL, LINK, ZEC, ETH and DOGE
+  and disagreed on BNB and TRX — a real difference between venues, which
+  is why the days are kept apart. Any other Binance failure is rethrown,
+  not covered by OKX.
 - **Stored per day** (`coin_scan_rows`, migration 028) with the close on
   every row, so the labels and the RS ranking can later be judged against
   the next 7–30 days the same way signals are. Not judged yet: there is no

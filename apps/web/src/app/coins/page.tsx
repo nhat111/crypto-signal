@@ -46,7 +46,7 @@ export default function CoinsPage() {
       <header>
         <h1 className="text-lg font-bold text-slate-100">Top coin</h1>
         <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-500">
-          Các coin có volume spot lớn nhất trên Binance, đọc một lần mỗi ngày sau khi nến 1D đóng. Hai câu hỏi: coin nào
+          Các coin có volume spot lớn nhất (Binance, hoặc OKX khi Binance chặn máy chủ), đọc một lần mỗi ngày sau khi nến 1D đóng. Hai câu hỏi: coin nào
           đang <b className="text-slate-300">mạnh hơn BTC</b> (phần lớn altcoin chỉ là BTC với biến động lớn hơn), và
           7 ngày qua giá được kéo bởi <b className="text-slate-300">spot mua thật hay đòn bẩy</b>. Bấm vào một dòng để
           xem số liệu đằng sau nhãn.
@@ -136,6 +136,12 @@ function Body({
           {rows.length} coin · nến 1D đến {data.day?.split('-').reverse().join('/')} · quét {formatRelativeTime(computedAt)}
         </p>
       </div>
+      {data.exchange === 'okx' && (
+        <p className="rounded-md border border-sky-500/30 bg-sky-500/5 px-3 py-2 text-xs text-sky-200">
+          Nguồn hôm nay: <b>OKX</b>. Binance đang chặn IP máy chủ, nên danh sách, hạng volume, mua/bán chủ động, OI và
+          funding đều lấy từ OKX — dòng tiền trên hai sàn có thể khác nhau.
+        </p>
+      )}
       {failingSince && (
         <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-200">
           Lần quét mới nhất bị lỗi ({data.fetch?.lastError}) — đang hiển thị lần quét thành công trước đó.

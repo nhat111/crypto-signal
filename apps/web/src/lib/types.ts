@@ -430,6 +430,8 @@ export interface CoinScanRow {
   flow: CoinFlow;
   reasons: string[];
   unknowns: string[];
+  /** Which exchange the day was read from. Absent from APIs older than the OKX fallback. */
+  exchange?: 'binance' | 'okx';
   computedAt: number;
 }
 
@@ -444,6 +446,8 @@ export interface CoinScanThresholds {
 export interface CoinsResponse {
   enabled: boolean;
   day: string | null;
+  /** Absent from APIs older than the OKX fallback, which only ever read Binance. */
+  exchange?: 'binance' | 'okx' | null;
   rows: CoinScanRow[];
   thresholds: CoinScanThresholds;
   fetch: { lastAttemptAt: number | null; lastSuccessAt: number | null; consecutiveFailures: number; lastError: string | null } | null;

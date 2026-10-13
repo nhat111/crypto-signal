@@ -277,7 +277,10 @@ Check items as they land; each phase's commit message references the phase.
       OI in contracts, funding scaled to 8h). No composite score.
 - [x] `/api/coins`, `/coins` web page, `/coins [COIN]` Telegram command.
 - [x] Futures refused (418 / 451 / 403) keeps the spot read and says so.
-- [ ] Judge it: once ~60 days are stored, compare the forward 7d/30d
+- [x] Whole-day OKX fallback when Binance refuses the server (the first
+      production scan hit a spot 418). Days are tagged with their exchange
+      so the later judgement can split them.
+- [ ] Judge it (per exchange — see ASSUMPTIONS §18): once ~60 days are stored, compare the forward 7d/30d
       return of the top RS quintile against the bottom one, and each flow
       label against the baseline — the same test signals get. Until then
       the page claims nothing predictive.
