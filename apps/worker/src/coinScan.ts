@@ -21,6 +21,7 @@ import { BinanceRestError, type BinanceFuturesAdapter, type BinanceSpotAdapter, 
 import type { CoinScanConfig } from '@crypto-signal/shared';
 import type { WorkerContext } from './context.js';
 import { readCoinFundamentals } from './coinFundamentals.js';
+import { readMemory } from './memory.js';
 
 const DAY_MS = 86_400_000;
 /** 61 closed days: 30-day returns, a 20-day ratio average and a 30-day down-day window, with room for a missing bar. */
@@ -225,6 +226,9 @@ export async function runCoinScanCycle(ctx: WorkerContext, now = Date.now(), sou
           return null;
         })
       : null;
+    // Sampled right after the biggest parse of the day, so the peak the
+    // heartbeat reports includes it rather than missing it between beats.
+    ctx.logger.info({ memory: readMemory() }, 'memory after coin fundamentals');
     const inputs = result.inputs.map((i) => ({ ...i, fundamentals: fundamentals?.get(i.read.symbol.replace(/USDT$/, '')) ?? null }));
 
     await saveCoinScan(ctx.pool, result.day, inputs, exchange);

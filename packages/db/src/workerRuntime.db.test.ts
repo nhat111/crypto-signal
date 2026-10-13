@@ -110,4 +110,12 @@ describe.skipIf(!hasTestDatabase)('worker heartbeat against real Postgres', () =
     await beat(['4h']);
     expect((await getWorkerRuntime(pool))?.alertTimeframes?.armed).toEqual(['4h']);
   });
+
+  it('stores the memory report with the heartbeat, and null from a worker that sends none', async () => {
+    const memory = { workerRssMb: 140, workerPeakRssMb: 230, containerUsedMb: 380, containerLimitMb: 512, containerPeakMb: 470 };
+    await recordWorkerHeartbeat(pool, RUNTIME_WORKER, { spot: 'open', futures: 'open', liquidation: 'open' }, {}, 1, null, memory);
+    expect((await getWorkerRuntime(pool))?.memory).toEqual(memory);
+    await recordWorkerHeartbeat(pool, RUNTIME_WORKER, { spot: 'open', futures: 'open', liquidation: 'open' });
+    expect((await getWorkerRuntime(pool))?.memory).toBeNull();
+  });
 });

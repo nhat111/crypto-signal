@@ -48,6 +48,17 @@ export interface WorkerRuntime {
    * "no frames are armed", and the page must not read it as that.
    */
   alertTimeframes: AlertTimeframeReport | null;
+  /** Null from a worker that predates the field, or one that could not read it. */
+  memory: WorkerMemory | null;
+}
+
+/** MB throughout. Container figures are null where the host exposes no cgroup. */
+export interface WorkerMemory {
+  workerRssMb: number;
+  workerPeakRssMb: number;
+  containerUsedMb: number | null;
+  containerLimitMb: number | null;
+  containerPeakMb: number | null;
 }
 
 export interface AlertTimeframeReport {
@@ -83,10 +94,11 @@ export async function recordWorkerHeartbeat(
   symbolIngest: Record<string, number> = {},
   alertChatCount = 0,
   alertTimeframes: AlertTimeframeReport | null = null,
+  memory: WorkerMemory | null = null,
 ): Promise<void> {
   await pool.query(
-    `INSERT INTO worker_runtime (service, last_heartbeat_at, spot_ws, futures_ws, liquidation_ws, symbol_ingest, alert_chat_count, alert_timeframes, updated_at)
-     VALUES ($1, now(), $2, $3, $4, $5::jsonb, $6, $7::jsonb, now())
+    `INSERT INTO worker_runtime (service, last_heartbeat_at, spot_ws, futures_ws, liquidation_ws, symbol_ingest, alert_chat_count, alert_timeframes, memory, updated_at)
+     VALUES ($1, now(), $2, $3, $4, $5::jsonb, $6, $7::jsonb, $8::jsonb, now())
      ON CONFLICT (service) DO UPDATE SET
        last_heartbeat_at = now(),
        spot_ws = EXCLUDED.spot_ws,
@@ -95,6 +107,7 @@ export async function recordWorkerHeartbeat(
        symbol_ingest = EXCLUDED.symbol_ingest,
        alert_chat_count = EXCLUDED.alert_chat_count,
        alert_timeframes = EXCLUDED.alert_timeframes,
+       memory = EXCLUDED.memory,
        updated_at = now()`,
     [
       service,
@@ -104,6 +117,7 @@ export async function recordWorkerHeartbeat(
       JSON.stringify(symbolIngest),
       alertChatCount,
       alertTimeframes === null ? null : JSON.stringify(alertTimeframes),
+      memory === null ? null : JSON.stringify(memory),
     ],
   );
 }
@@ -116,7 +130,7 @@ export async function getWorkerRuntime(
 ): Promise<WorkerRuntime | null> {
   const { rows } = await pool.query(
     `SELECT service, extract(epoch from last_heartbeat_at)*1000 AS beat_ms,
-            spot_ws, futures_ws, liquidation_ws, symbol_ingest, alert_chat_count, alert_timeframes
+            spot_ws, futures_ws, liquidation_ws, symbol_ingest, alert_chat_count, alert_timeframes, memory
      FROM worker_runtime WHERE service = $1`,
     [service],
   );
@@ -136,5 +150,6 @@ export async function getWorkerRuntime(
     symbolIngest: (row.symbol_ingest ?? {}) as Record<string, number>,
     alertChatCount: Number(row.alert_chat_count ?? 0),
     alertTimeframes: (row.alert_timeframes ?? null) as AlertTimeframeReport | null,
+    memory: (row.memory ?? null) as WorkerMemory | null,
   };
 }

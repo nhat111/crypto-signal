@@ -22,6 +22,7 @@ import { runAlertSelfTest } from './alertSelfTest.js';
 import { runStablecoinFlowCycle } from './stablecoinFlow.js';
 import { runTrendCycle } from './trendCycle.js';
 import { runCoinScanCycle } from './coinScan.js';
+import { readMemory } from './memory.js';
 import type { WorkerContext } from './context.js';
 
 const HORIZONS: OutcomeHorizon[] = ['15m', '1h', '4h', '24h'];
@@ -232,7 +233,7 @@ export function startSchedulers(ctx: WorkerContext): () => void {
       armed: ctx.config.alert.timeframes,
       collected: ctx.config.timeframes,
       ignored: ctx.config.alert.ignoredTimeframes,
-    }).catch((err) => ctx.logger.error({ err }, 'worker heartbeat failed'));
+    }, readMemory()).catch((err) => ctx.logger.error({ err }, 'worker heartbeat failed'));
   };
   timers.push(setInterval(beat, HEARTBEAT_INTERVAL_MS));
   beat();
