@@ -26,6 +26,7 @@ function perf(signalType: string, positiveMovePct: number | null, sampleCount: n
     netNegativeMovePct: 0,
     costPct: 0.1,
     sufficientData: sampleCount >= 30,
+    firingCount: sampleCount,
   };
 }
 

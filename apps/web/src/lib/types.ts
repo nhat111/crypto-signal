@@ -159,6 +159,12 @@ export interface PerformanceResult {
   costPct: number;
   sufficientData: boolean;
   /**
+   * Resolved firings before consecutive ones were folded into episodes.
+   * `sampleCount` counts episodes. Optional so an API that predates it
+   * still renders.
+   */
+  firingCount?: number;
+  /**
    * The comparison against the baseline, decided server-side.
    *
    * Not computed here: the confidence interval widens with how many types

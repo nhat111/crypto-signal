@@ -6,8 +6,10 @@ import {
   getBaselinePendingOutcome,
   getGemBaseline,
   getGemPerformance,
+  getGemsPendingOutcome,
   insertGemBaselineCandidates,
   recordGemBaselineOutcome,
+  recordGemOutcome,
 } from './gems.js';
 
 /**
@@ -52,8 +54,7 @@ describe.skipIf(!hasTestDatabase)('gem market baseline against real Postgres', (
         pool,
         rows[0].candidate_id,
         opts.horizon ?? '24h',
-        1 + opts.movePct / 100,
-        1,
+        { price: 1 + opts.movePct / 100, movePct: opts.movePct, basis: 'observed' },
         50_000,
       );
     }
@@ -153,11 +154,67 @@ describe.skipIf(!hasTestDatabase)('gem market baseline against real Postgres', (
       'SELECT candidate_id FROM gem_baseline_candidates WHERE token_address = $1',
       [token],
     );
-    await recordGemBaselineOutcome(pool, rows[0].candidate_id, '24h', 2, 1, 1000);
+    await recordGemBaselineOutcome(pool, rows[0].candidate_id, '24h', { price: 2, movePct: 100, basis: 'observed' }, 1000);
 
     expect(await getBaselinePendingOutcome(pool, '24h', Date.now())).toHaveLength(0);
     // Still pending at the longer horizon — the two are tracked separately.
     expect(await getBaselinePendingOutcome(pool, '7d', Date.now() + 8 * 24 * 60 * 60_000)).toHaveLength(1);
+  });
+
+  it('hands the tracker what it needs to tell a late quote from a dead pool', async () => {
+    const observedMsAgo = 25 * 60 * 60_000;
+    await candidate({ observedMsAgo });
+    const [row] = await getBaselinePendingOutcome(pool, '24h', Date.now());
+    expect(row?.liquidityAtObservationUsd).toBe(100_000);
+    // Due one horizon after it was observed, to within the test's own runtime.
+    expect(Math.abs((row?.dueAt ?? 0) - (Date.now() - observedMsAgo + 24 * 60 * 60_000))).toBeLessThan(5_000);
+  });
+
+  it('records a written-off pool as a loss, says so, and stops offering it', async () => {
+    const token = await candidate({ observedMsAgo: 3 * 24 * 60 * 60_000 });
+    const { rows } = await pool.query(
+      'SELECT candidate_id FROM gem_baseline_candidates WHERE token_address = $1',
+      [token],
+    );
+    await recordGemBaselineOutcome(pool, rows[0].candidate_id, '24h', { price: 0, movePct: -100, basis: 'pool_gone' }, null);
+
+    expect(await getBaselinePendingOutcome(pool, '24h', Date.now())).toHaveLength(0);
+    const { rows: stored } = await pool.query(
+      'SELECT move_after_24h_pct, outcome_basis_24h FROM gem_baseline_candidates WHERE token_address = $1',
+      [token],
+    );
+    expect(Number(stored[0].move_after_24h_pct)).toBe(-100);
+    expect(stored[0].outcome_basis_24h).toBe('pool_gone');
+    expect((await getGemBaseline(pool, '24h')).netPositiveMovePct).toBe(0);
+  });
+
+  it('records the scanner side the same way, liquidity included at 7d', async () => {
+    const { rows } = await pool.query(
+      `INSERT INTO gem_scans
+         (chain_id, token_address, scanned_at, gem_score, gem_components, risk_score, risk_components, reasons)
+       VALUES ('solana', 'drained', now() - interval '8 days', 80, '{}'::jsonb, 10, '{}'::jsonb, '[]'::jsonb)
+       RETURNING scan_id`,
+    );
+    const scanId = rows[0].scan_id as string;
+    await pool.query(
+      `INSERT INTO gem_outcomes (scan_id, price_at_scan, liquidity_at_scan_usd) VALUES ($1, 1, 100000)`,
+      [scanId],
+    );
+
+    const [pending] = await getGemsPendingOutcome(pool, '7d', Date.now());
+    expect(pending?.liquidityAtScanUsd).toBe(100_000);
+
+    await recordGemOutcome(pool, scanId, '7d', { price: 3, movePct: -100, basis: 'liquidity_collapsed' }, 1, 900);
+    const { rows: stored } = await pool.query(
+      `SELECT price_after_7d, move_after_7d_pct, outcome_basis_7d, liquidity_after_7d_usd
+       FROM gem_outcomes WHERE scan_id = $1`,
+      [scanId],
+    );
+    expect(Number(stored[0].price_after_7d)).toBe(3);
+    expect(Number(stored[0].move_after_7d_pct)).toBe(-100);
+    expect(stored[0].outcome_basis_7d).toBe('liquidity_collapsed');
+    expect(Number(stored[0].liquidity_after_7d_usd)).toBe(900);
+    expect(await getGemsPendingOutcome(pool, '7d', Date.now())).toHaveLength(0);
   });
 
   it('does not count the same token twice from a retried scan', async () => {

@@ -28,6 +28,7 @@ import {
   pruneOldGemScans,
   recordGemBaselineOutcome,
   recordGemOutcome,
+  resolveGemOutcome,
   upsertGemToken,
   type GemHorizon,
 } from '@crypto-signal/db';
@@ -285,29 +286,40 @@ export async function runGemOutcomeTracker(deps: GemScanDeps): Promise<void> {
         const pairs = await dexscreener.fetchPairsForTokens(chainId, addresses);
         const byToken = new Map(pairs.map((p) => [p.baseToken.address, p]));
 
+        // An empty answer for the whole chain is a feed problem, not a
+        // chain-wide rug: nothing is written off on a pass like that.
+        const feedAnswered = pairs.length > 0;
+
         for (const row of rows.scans) {
           const pair = byToken.get(row.tokenAddress);
-          // No current pair usually means the pool is gone — which is itself
-          // the outcome. Recording price 0 would assert a price we never
-          // observed, so it's left pending and reported as unresolved.
-          if (!pair || pair.priceUsd === null) continue;
-          await recordGemOutcome(pool, row.scanId, horizon, pair.priceUsd, row.priceAtScan, pair.liquidityUsd);
+          // A missing pair a day past the horizon, or a drained pool, is
+          // written off at -100% rather than left pending: pending forever
+          // kept the most common bad outcome out of the hit rate, and
+          // clogged the oldest-first queue for every row behind it.
+          const outcome = resolveGemOutcome({
+            priceAtScan: row.priceAtScan,
+            liquidityAtScanUsd: row.liquidityAtScanUsd,
+            quote: pair ?? null,
+            overdueMs: now - row.dueAt,
+            feedAnswered,
+          });
+          if (!outcome) continue;
+          await recordGemOutcome(pool, row.scanId, horizon, outcome, row.priceAtScan, pair?.liquidityUsd ?? null);
         }
 
         for (const row of rows.baseline) {
           const pair = byToken.get(row.tokenAddress);
-          // Same rule as above, and it matters more here: silently dropping
-          // dead controls while keeping dead picks would bias the
-          // comparison in the scanner's favour. Both sides stay pending.
-          if (!pair || pair.priceUsd === null) continue;
-          await recordGemBaselineOutcome(
-            pool,
-            row.candidateId,
-            horizon,
-            pair.priceUsd,
-            row.priceAtObservation,
-            pair.liquidityUsd,
-          );
+          // The same rule on both sides, or the comparison is biased toward
+          // whichever side rugs more.
+          const outcome = resolveGemOutcome({
+            priceAtScan: row.priceAtObservation,
+            liquidityAtScanUsd: row.liquidityAtObservationUsd,
+            quote: pair ?? null,
+            overdueMs: now - row.dueAt,
+            feedAnswered,
+          });
+          if (!outcome) continue;
+          await recordGemBaselineOutcome(pool, row.candidateId, horizon, outcome, pair?.liquidityUsd ?? null);
         }
       } catch (err) {
         logger.warn({ err, chainId, horizon }, 'gem outcome tracking failed for this chain');
