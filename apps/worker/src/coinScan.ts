@@ -20,6 +20,7 @@ import {
 import { BinanceRestError, type BinanceFuturesAdapter, type BinanceSpotAdapter, type OkxCoinScanData } from '@crypto-signal/market-data';
 import type { CoinScanConfig } from '@crypto-signal/shared';
 import type { WorkerContext } from './context.js';
+import { readCoinFundamentals } from './coinFundamentals.js';
 
 const DAY_MS = 86_400_000;
 /** 61 closed days: 30-day returns, a 20-day ratio average and a 30-day down-day window, with room for a missing bar. */
@@ -214,7 +215,19 @@ export async function runCoinScanCycle(ctx: WorkerContext, now = Date.now(), sou
       now,
     );
     if (result.inputs.length === 0) throw new Error(`no coin could be read: ${result.skipped.join('; ')}`);
-    await saveCoinScan(ctx.pool, result.day, result.inputs, exchange);
+
+    // Fundamentals are a second source with its own failures: DefiLlama
+    // being down must cost the day its fundamentals, never its scan.
+    const bases = result.inputs.map((i) => i.read.symbol.replace(/USDT$/, ''));
+    const fundamentals = ctx.defiLlama
+      ? await readCoinFundamentals(ctx.defiLlama, bases, ctx.logger).catch((err: unknown) => {
+          ctx.logger.warn({ err }, 'coin fundamentals unavailable — scan stored without them');
+          return null;
+        })
+      : null;
+    const inputs = result.inputs.map((i) => ({ ...i, fundamentals: fundamentals?.get(i.read.symbol.replace(/USDT$/, '')) ?? null }));
+
+    await saveCoinScan(ctx.pool, result.day, inputs, exchange);
     await recordJobSuccess(ctx.pool, JOB_COIN_SCAN);
     if (binanceError) ctx.logger.warn({ binanceError }, 'coin scan read from OKX — Binance refused the server');
     ctx.logger.info({ day: result.day, exchange, coins: result.inputs.length, skipped: result.skipped }, 'coin scan stored');

@@ -1,6 +1,13 @@
 import type { Pool } from 'pg';
 import type { AppConfig, Logger, SymbolId } from '@crypto-signal/shared';
-import type { BinanceFuturesAdapter, BinanceSpotAdapter, ConnectionStatus, OkxCoinScanData, OkxSpotCandles } from '@crypto-signal/market-data';
+import type {
+  BinanceFuturesAdapter,
+  BinanceSpotAdapter,
+  ConnectionStatus,
+  DefiLlamaFundamentalsSource,
+  OkxCoinScanData,
+  OkxSpotCandles,
+} from '@crypto-signal/market-data';
 import type { SignalType } from '@crypto-signal/signal-engine';
 import type { GemConfig } from '@crypto-signal/gem-scanner';
 import type { SignalVerdict } from '@crypto-signal/db';
@@ -20,6 +27,8 @@ export interface WorkerContext {
   okxSpot?: OkxSpotCandles;
   /** The wide coin scan's fallback when Binance refuses this server. A whole scan comes from one exchange or the other, never both. */
   okxCoinScan?: OkxCoinScanData;
+  /** Fees / TVL / stablecoins for the coin scan's fundamentals. Absent in tests; its failure never fails the scan. */
+  defiLlama?: DefiLlamaFundamentalsSource;
   states: Map<string, SymbolTimeframeState>;
   pairBuffer: CandlePairBuffer;
   /** Symbols with only a Binance Futures listing — routed straight to processFuturesOnlyCandle, never through pairBuffer (there's no spot side to wait for). */

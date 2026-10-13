@@ -31,6 +31,42 @@ function Signed({ value, digits = 1 }: { value: number | null; digits?: number }
   );
 }
 
+function FundamentalsCell({ f }: { f: CoinScanRow['fundamentals'] }) {
+  if (!f) return <span className="text-slate-600">—</span>;
+  if (f.bull.length === 0 && f.bear.length === 0) {
+    return <span className="text-slate-500">{f.chain || f.protocol ? 'Không đổi rõ' : 'Không khớp'}</span>;
+  }
+  return (
+    <span className="whitespace-nowrap tabular-nums">
+      {f.bull.length > 0 && <span className="text-emerald-300">▲{f.bull.length}</span>}
+      {f.bull.length > 0 && f.bear.length > 0 && ' '}
+      {f.bear.length > 0 && <span className="text-red-300">▼{f.bear.length}</span>}
+    </span>
+  );
+}
+
+/** The fundamentals behind the arrows: which chain/protocol matched, and each driver. */
+function FundamentalsDetail({ f }: { f: CoinScanRow['fundamentals'] }) {
+  if (!f) return null;
+  const matched = [f.chain && `chain ${f.chain.name}`, f.protocol && `protocol ${f.protocol.name}`].filter(Boolean).join(' · ');
+  return (
+    <div className="space-y-0.5">
+      <p className="text-slate-400">
+        <span className="font-medium text-slate-300">Cơ bản (DefiLlama)</span>
+        {matched ? `: ${matched}` : ''}
+      </p>
+      {f.bull.map((b) => (
+        <p key={b} className="text-emerald-300">▲ {b}</p>
+      ))}
+      {f.bear.map((b) => (
+        <p key={b} className="text-red-300">▼ {b}</p>
+      ))}
+      {matched && f.bull.length === 0 && f.bear.length === 0 && <p className="text-slate-500">Phí, TVL, stablecoin không đổi đủ lớn để tính.</p>}
+      {f.unknowns.length > 0 && <p className="text-slate-500">{f.unknowns.join(' ')}</p>}
+    </div>
+  );
+}
+
 /** Taker skew as "buy share minus sell share", in percentage points of volume. */
 const skewPct = (skew: number | null): number | null => (skew === null ? null : skew * 100);
 
@@ -44,13 +80,14 @@ export function CoinTable({ rows, trackedSymbols }: { rows: CoinScanRow[]; track
 
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-800">
-      <table className="w-full min-w-[760px] text-left text-xs">
+      <table className="w-full min-w-[840px] text-left text-xs">
         <thead className="bg-slate-900 text-[11px] uppercase tracking-wide text-slate-500">
           <tr>
             <th className="sticky left-0 z-10 bg-slate-900 px-3 py-2 font-medium">Coin</th>
             <th className="px-3 py-2 text-right font-medium" title="Lãi/lỗ hơn BTC trong cùng 30 ngày">vs BTC 30N</th>
             <th className="px-3 py-2 text-right font-medium" title="Lãi/lỗ hơn BTC trong cùng 7 ngày">vs BTC 7N</th>
             <th className="px-3 py-2 font-medium">Dòng tiền 7N</th>
+            <th className="px-3 py-2 font-medium" title="Phí, TVL, stablecoin từ DefiLlama: số yếu tố tăng ▲ / giảm ▼">Cơ bản</th>
             <th className="px-3 py-2 text-right font-medium">Giá 7N</th>
             <th className="px-3 py-2 text-right font-medium">Giá 30N</th>
             <th className="px-3 py-2 text-right font-medium" title="Mua chủ động trừ bán chủ động trên spot, % khối lượng 7 ngày">Spot lệch 7N</th>
@@ -82,6 +119,7 @@ export function CoinTable({ rows, trackedSymbols }: { rows: CoinScanRow[]; track
                   <td className="px-3 py-2 text-right"><Signed value={row.symbol === 'BTCUSDT' ? null : row.rs30d} /></td>
                   <td className="px-3 py-2 text-right"><Signed value={row.symbol === 'BTCUSDT' ? null : row.rs7d} /></td>
                   <td className="px-3 py-2"><FlowBadge flow={row.flow} /></td>
+                  <td className="px-3 py-2"><FundamentalsCell f={row.fundamentals} /></td>
                   <td className="px-3 py-2 text-right"><Signed value={row.ret7d} /></td>
                   <td className="px-3 py-2 text-right"><Signed value={row.ret30d} /></td>
                   <td className="px-3 py-2 text-right"><Signed value={skewPct(row.takerSkew7d)} /></td>
@@ -93,7 +131,7 @@ export function CoinTable({ rows, trackedSymbols }: { rows: CoinScanRow[]; track
                 </tr>
                 {isOpen && (
                   <tr className="border-t border-slate-800/40 bg-slate-900/40">
-                    <td colSpan={10} className="px-3 py-3">
+                    <td colSpan={11} className="px-3 py-3">
                       <div className="sticky left-3 max-w-[calc(100vw-4rem)] space-y-2 sm:max-w-3xl">
                         <p className="text-slate-400">{FLOW_META[row.flow]?.meaning}</p>
                         <ul className="list-disc space-y-0.5 pl-4 text-slate-300">
@@ -101,6 +139,7 @@ export function CoinTable({ rows, trackedSymbols }: { rows: CoinScanRow[]; track
                             <li key={r}>{r}</li>
                           ))}
                         </ul>
+                        <FundamentalsDetail f={row.fundamentals} />
                         {row.unknowns.length > 0 && (
                           <div className="text-slate-500">
                             <span className="font-medium">Không đọc được: </span>
