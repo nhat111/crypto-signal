@@ -290,8 +290,12 @@ Check items as they land; each phase's commit message references the phase.
 - [ ] Read it once verdicts appear (~mid-December 2026 for 7d at 30 coins
       a day). If neither RS nor any label beats its baseline, say so on the
       page and in the digest rather than keep ranking by it.
-- [ ] Thesis drivers beyond price and flow (DefiLlama TVL / fees, chain
-      stablecoin supply, token unlocks) — step 2 of the plan.
+- [x] Thesis drivers beyond price and flow: DefiLlama fees, TVL and chain
+      stablecoins per coin, stored daily (ASSUMPTIONS §20), shown on /coins
+      and in `/coins COIN`.
+- [ ] Token unlocks: needs a paid source (DefiLlama emissions / Tokenomist).
+- [ ] Judge the fundamentals drivers like the flow labels once enough
+      days are stored (same `evaluateCoinScan` machinery, grouped by driver).
 
 ## Phase 19 — Setups survive Binance bans
 - [x] 4H setups read OKX bars when Binance refuses the server, stamped with

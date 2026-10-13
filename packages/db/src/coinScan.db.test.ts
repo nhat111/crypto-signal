@@ -105,6 +105,17 @@ describe.skipIf(!hasTestDatabase)('coin scan rows against real Postgres', () => 
     expect(spot?.group.hitPct).toBe(100);
   });
 
+  it('stores fundamentals whole and reads them back, null when there were none', async () => {
+    const fundamentals = { chain: null, protocol: { name: 'uniswap', tvlUsd: 2.6e9, tvlChange7dPct: 3, fees30dUsd: 1.2e8, feesChangePct: -20 }, bull: [], bear: ['Phí giảm'], unknowns: [] };
+    await saveCoinScan(pool, '2099-03-01', [
+      { read: read('UNIUSDT'), volumeRank: 1, futuresSymbol: null, spotQuoteVolume24h: 1, fundamentals },
+      { read: read('XYZUSDT'), volumeRank: 2, futuresSymbol: null, spotQuoteVolume24h: 1 },
+    ]);
+    const rows = await getCoinScanForDay(pool, '2099-03-01');
+    expect(rows[0]?.fundamentals).toEqual(fundamentals);
+    expect(rows[1]?.fundamentals).toBeNull();
+  });
+
   it('records which exchange a day was read from', async () => {
     await saveCoinScan(pool, '2099-01-04', [{ read: read('BTCUSDT'), volumeRank: 1, futuresSymbol: 'BTCUSDT', spotQuoteVolume24h: 1 }], 'okx');
     const { rows } = await getLatestCoinScan(pool);

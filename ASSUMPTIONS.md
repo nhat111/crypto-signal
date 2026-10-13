@@ -802,3 +802,32 @@ so. Now:
 - The per-kind stats still pool both exchanges. For BTC/ETH/SOL the gap
   between venues is a few basis points against ATR-sized stops; the
   column exists so the stats can be split if that ever stops being true.
+
+## 20. Coin fundamentals (DefiLlama)
+"Why would this coin go up" is answered only with what can be measured
+for free: fees paid to the chain or protocol the token belongs to, TVL,
+and stablecoins on the chain — each as a change against its own recent
+past (fees: 30 days vs the 30 before; protocol TVL: 7 days; chain TVL and
+stablecoins: 30 days).
+
+- **Matching**: a chain by its gas token (`tokenSymbol`, the biggest chain
+  when several claim it); a protocol by ticker, summed across its family
+  (DefiLlama's `parentProtocol`: Uniswap V2/V3/V4 are one). When a ticker
+  is shared, the family with the most fees wins, and one under $100K fees
+  and $50M TVL is not a match. CEX rows are skipped (OKB is not "OKX's
+  reserves"). A chain's own fee row is never counted again as a protocol of
+  the same name (SOL). When the coin is a chain token, a protocol under the
+  same ticker counts only if it earns more than the chain — which keeps
+  Hyperliquid's exchange for HYPE and drops "Binance Alpha" for BNB.
+- **Thresholds** (first guesses, in `FUNDAMENTAL_THRESHOLDS`): fees ±20%,
+  TVL ±10%, stablecoins ±5%, and nothing on a base under $50M (TVL,
+  stablecoins) or $100K (30-day fees). DOGE's $1.8M of TVL doubling is not
+  a thesis.
+- **No unlocks.** Every unlock calendar checked (DefiLlama emissions,
+  Tokenomist) is paid. The page says so instead of guessing.
+- **Failure isolation**: DefiLlama down costs a day its fundamentals
+  (stored null), never its scan. The three big lists (~15 MB of JSON) are
+  fetched one after another to keep the peak small on a 512 MB host; a run
+  over 30 coins took 6 s and ~25 requests.
+- Stored per coin per day (`coin_scan_rows.fundamentals`, migration 031),
+  so the drivers can later be judged like the flow labels.

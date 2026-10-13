@@ -214,6 +214,8 @@ export interface CoinScanDTO {
   flow: CoinFlowDTO;
   reasons: string[];
   unknowns: string[];
+  /** DefiLlama drivers; absent from older APIs, null when none were read. */
+  fundamentals?: { chain: { name: string } | null; protocol: { name: string } | null; bull: string[]; bear: string[]; unknowns: string[] } | null;
 }
 
 export interface CoinsResponseDTO {

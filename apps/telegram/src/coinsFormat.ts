@@ -87,9 +87,18 @@ export function formatCoinDetail(data: CoinsResponseDTO, symbol: string): string
   if (c.symbol !== 'BTCUSDT') lines.push(`So với BTC: 7N ${signed(c.rs7d)} · 30N ${signed(c.rs30d)}`);
   lines.push('');
   for (const r of c.reasons) lines.push(`• ${escapeHtml(r)}`);
-  if (c.unknowns.length > 0) {
+  const f = c.fundamentals;
+  if (f && (f.chain || f.protocol)) {
+    const matched = [f.chain && `chain ${f.chain.name}`, f.protocol && `protocol ${f.protocol.name}`].filter(Boolean).join(' · ');
+    lines.push('', `<b>Cơ bản</b> (DefiLlama: ${escapeHtml(matched)})`);
+    for (const b of f.bull) lines.push(`▲ ${escapeHtml(b)}`);
+    for (const b of f.bear) lines.push(`▼ ${escapeHtml(b)}`);
+    if (f.bull.length === 0 && f.bear.length === 0) lines.push('Phí, TVL, stablecoin không đổi đủ lớn để tính.');
+  }
+  const unknowns = [...c.unknowns, ...(f?.unknowns ?? [])];
+  if (unknowns.length > 0) {
     lines.push('', 'Không đọc được:');
-    for (const u of c.unknowns) lines.push(`• ${escapeHtml(u)}`);
+    for (const u of unknowns) lines.push(`• ${escapeHtml(u)}`);
   }
   lines.push('', '<i>Mô tả, không phải dự báo.</i>');
   return lines.join('\n');

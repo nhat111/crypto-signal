@@ -498,6 +498,11 @@ the daily close; most-traded first.
     "reasons": ["Giá 7 ngày -12.4%.", "…"],
     "unknowns": [],
     "exchange": "binance",
+    "fundamentals": {
+      "chain": { "name": "Near", "tvlUsd": 245177632, "tvlChange30dPct": 84.1, "stablecoinsUsd": 128900000, "stablecoinsChange30dPct": 61.2, "fees30dUsd": 189371, "feesChangePct": 12.0 } | null,
+      "protocol": { "name": "near-protocol", "tvlUsd": 365920111, "tvlChange7dPct": 4.2, "fees30dUsd": 8000000, "feesChangePct": 63.0 } | null,
+      "bull": ["TVL trên chain Near 30N +84% ($245.2M).", "…"], "bear": [], "unknowns": []
+    } | null,
     "computedAt": 1791000000000
   }],
   "thresholds": { "priceMovePct": 3, "takerSkew": 0.03, "oiRisePct": 10, "oiFallPct": -10, "fundingElevatedPct": 0.03 },
@@ -514,7 +519,11 @@ whatever the perp's settlement interval. `flow` is the 7-day label (price
 direction first, then spot vs leverage); missing futures data never selects
 a leverage label and is listed in `unknowns`. `exchange` says where the
 whole day was read from: `okx` when Binance refused the server (volume
-ranks, taker flow, OI and funding are then OKX's). No composite score. Empty
+ranks, taker flow, OI and funding are then OKX's). `fundamentals` is
+DefiLlama's read for the coin (ASSUMPTIONS §20): the matched chain and/or
+protocol family, and the changes that cleared their thresholds as `bull` /
+`bear` sentences; null for days before it existed or when DefiLlama could
+not be read. No composite score. Empty
 `rows` with `enabled: true` means not run yet or failing — `fetch` says which.
 
 ## `GET /api/coins/edge?horizon=7|30`

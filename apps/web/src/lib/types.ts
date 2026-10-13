@@ -432,7 +432,31 @@ export interface CoinScanRow {
   unknowns: string[];
   /** Which exchange the day was read from. Absent from APIs older than the OKX fallback. */
   exchange?: 'binance' | 'okx';
+  /** DefiLlama fundamentals; null when none were read, absent from older APIs. */
+  fundamentals?: CoinFundamentals | null;
   computedAt: number;
+}
+
+export interface CoinFundamentals {
+  chain: {
+    name: string;
+    tvlUsd: number;
+    tvlChange30dPct: number | null;
+    stablecoinsUsd: number | null;
+    stablecoinsChange30dPct: number | null;
+    fees30dUsd: number | null;
+    feesChangePct: number | null;
+  } | null;
+  protocol: {
+    name: string;
+    tvlUsd: number | null;
+    tvlChange7dPct: number | null;
+    fees30dUsd: number | null;
+    feesChangePct: number | null;
+  } | null;
+  bull: string[];
+  bear: string[];
+  unknowns: string[];
 }
 
 export interface CoinScanThresholds {

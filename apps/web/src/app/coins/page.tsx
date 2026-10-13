@@ -50,7 +50,9 @@ export default function CoinsPage() {
           Các coin có volume spot lớn nhất (Binance, hoặc OKX khi Binance chặn máy chủ), đọc một lần mỗi ngày sau khi nến 1D đóng. Hai câu hỏi: coin nào
           đang <b className="text-slate-300">mạnh hơn BTC</b> (phần lớn altcoin chỉ là BTC với biến động lớn hơn), và
           7 ngày qua giá được kéo bởi <b className="text-slate-300">spot mua thật hay đòn bẩy</b>. Bấm vào một dòng để
-          xem số liệu đằng sau nhãn.
+          xem số liệu đằng sau nhãn. Cột <b className="text-slate-300">Cơ bản</b> lấy phí, TVL và stablecoin của chain hoặc
+          protocol từ DefiLlama (chỉ tính khi phí đổi ≥20%, TVL ≥10%, stablecoin ≥5%); lịch unlock token chưa có vì chưa có
+          nguồn miễn phí.
         </p>
       </header>
 
