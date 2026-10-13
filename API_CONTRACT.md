@@ -526,6 +526,33 @@ protocol family, and the changes that cleared their thresholds as `bull` /
 not be read. No composite score. Empty
 `rows` with `enabled: true` means not run yet or failing — `fetch` says which.
 
+## `GET /api/coins/edge?horizon=7|30`
+Whether the coin scan's groups went on to beat BTC over the next `horizon`
+days, per exchange.
+```json
+{
+  "horizonDays": 7, "minSamples": 20,
+  "reports": [{
+    "exchange": "binance" | "okx", "horizonDays": 7, "cohortDays": 12,
+    "relativeStrength": {
+      "group":    { "samples": 24, "hitPct": 62.5, "meanExcessPct": 3.1 },
+      "baseline": { "samples": 24, "hitPct": 41.7, "meanExcessPct": -2.0 },
+      "verdict": "beats" | "worse" | "indistinguishable" | null,
+      "deltaPp": 20.8, "marginPp": 25.0
+    },
+    "flows": [{ "flow": "spot_led", "group": { … }, "baseline": { … }, "verdict": null, "deltaPp": null, "marginPp": null }]
+  }]
+}
+```
+A win is beating BTC over the horizon (coin return − BTC return > 0).
+`relativeStrength` compares the top fifth by 30-day RS with the bottom fifth,
+picked within each cohort day; each flow label is compared with every coin
+on the same days. Cohort days sit on a fixed grid `horizon` days apart, so
+windows never overlap; a sample needs the same exchange at both ends.
+`verdict` is the same Agresti-Caffo / Šidák test as `/api/performance`,
+with the family being the RS comparison plus every label in the report, and
+is null while either side is under `minSamples`. 400 for any other horizon.
+
 ## `GET /api/setups?limit=`
 4H entry setups, most recent first (limit 1–100, default 30), with per-kind
 stats and the job's health.

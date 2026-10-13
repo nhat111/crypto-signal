@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { CoinScanRow } from '@crypto-signal/db';
-import { formatCoinDigest } from './coinDigest.js';
+import type { CoinScanEdgeReport, CoinScanRow } from '@crypto-signal/db';
+import { formatCoinDigest, formatEdgeLine } from './coinDigest.js';
 
 function row(symbol: string, rs30d: number | null, flow: CoinScanRow['flow'] = 'quiet', exchange: CoinScanRow['exchange'] = 'binance'): CoinScanRow {
   return { symbol, rs30d, flow, exchange } as CoinScanRow;
@@ -29,5 +29,36 @@ describe('formatCoinDigest', () => {
   it('says when the day was read from OKX, and adds nothing without a scan', () => {
     expect(formatCoinDigest([row('BTCUSDT', 0, 'quiet', 'okx')], [])[0]).toContain('(nguồn OKX)');
     expect(formatCoinDigest([], [])).toEqual([]);
+  });
+});
+
+describe('formatEdgeLine', () => {
+  const report = (verdict: CoinScanEdgeReport['relativeStrength']['verdict'], exchange: CoinScanEdgeReport['exchange'] = 'binance'): CoinScanEdgeReport => ({
+    exchange,
+    horizonDays: 7,
+    cohortDays: 12,
+    relativeStrength: {
+      group: { samples: 24, hitPct: 62.5, meanExcessPct: 3 },
+      baseline: { samples: 24, hitPct: 41.7, meanExcessPct: -2 },
+      verdict,
+      deltaPp: 20.8,
+      marginPp: 25,
+    },
+    flows: [],
+  });
+
+  it('stays silent until there is a verdict', () => {
+    expect(formatEdgeLine(report(null))).toBeNull();
+    expect(formatEdgeLine(undefined)).toBeNull();
+  });
+
+  it('states the rates and the verdict once there is one', () => {
+    expect(formatEdgeLine(report('indistinguishable'))).toBe('Kiểm chứng 7N: nhóm mạnh nhất thắng BTC 63% vs nhóm yếu nhất 42% (n=24) — chưa phân biệt được');
+  });
+
+  it('is added to the digest only for the exchange the day was read from', () => {
+    const today = [row('BTCUSDT', 0, 'quiet', 'okx')];
+    expect(formatCoinDigest(today, [], [report('beats', 'binance')]).join('\n')).not.toContain('Kiểm chứng');
+    expect(formatCoinDigest(today, [], [report('beats', 'okx')]).join('\n')).toContain('có lợi thế thật');
   });
 });

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { getJobHealth, getLatestCoinScan, JOB_COIN_SCAN } from '@crypto-signal/db';
+import { COIN_EDGE_HORIZONS, COIN_EDGE_MIN_SAMPLES, getCoinScanEdge, getJobHealth, getLatestCoinScan, JOB_COIN_SCAN } from '@crypto-signal/db';
 import type { ApiDeps } from '../deps.js';
 
 /**
@@ -28,5 +28,18 @@ export function registerCoinsRoute(app: FastifyInstance, deps: ApiDeps): void {
           }
         : null,
     };
+  });
+
+  /**
+   * Whether the scan's groups went on to beat BTC: the top fifth by RS
+   * against the bottom fifth, and each flow label against all coins, per
+   * exchange. `verdict` stays null below `minSamples`.
+   */
+  app.get<{ Querystring: { horizon?: string } }>('/api/coins/edge', async (req, reply) => {
+    const horizon = Number(req.query.horizon ?? 7);
+    if (!(COIN_EDGE_HORIZONS as readonly number[]).includes(horizon)) {
+      return reply.code(400).send({ error: `horizon must be one of ${COIN_EDGE_HORIZONS.join(', ')}` });
+    }
+    return { horizonDays: horizon, minSamples: COIN_EDGE_MIN_SAMPLES, reports: await getCoinScanEdge(deps.pool, horizon) };
   });
 }

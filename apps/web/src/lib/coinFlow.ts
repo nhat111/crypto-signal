@@ -1,4 +1,4 @@
-import type { CoinFlow, CoinScanRow } from './types';
+import type { CoinEdgeComparison, CoinFlow, CoinScanRow } from './types';
 
 export type FlowTone = 'good' | 'mixed' | 'warn' | 'bad' | 'neutral';
 
@@ -36,4 +36,15 @@ export function sortCoins(rows: CoinScanRow[], sort: CoinSort): CoinScanRow[] {
   if (sort === 'volume') return copy.sort((a, b) => a.volumeRank - b.volumeRank);
   const key = sort === 'rs30' ? 'rs30d' : 'rs7d';
   return copy.sort((a, b) => strength(b, key) - strength(a, key) || a.volumeRank - b.volumeRank);
+}
+
+/** One comparison's verdict, in words, with the reason when there is none yet. */
+export function edgeVerdictText(c: CoinEdgeComparison, minSamples: number): { text: string; tone: FlowTone } {
+  if (c.verdict === null) {
+    const have = Math.min(c.group.samples, c.baseline.samples);
+    return { text: `Chưa đủ dữ liệu (${have}/${minSamples} mẫu)`, tone: 'neutral' };
+  }
+  if (c.verdict === 'beats') return { text: 'Có lợi thế thật', tone: 'good' };
+  if (c.verdict === 'worse') return { text: 'Tệ hơn mức nền', tone: 'bad' };
+  return { text: 'Chưa phân biệt được với mức nền', tone: 'neutral' };
 }

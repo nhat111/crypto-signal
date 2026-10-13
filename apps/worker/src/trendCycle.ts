@@ -1,5 +1,6 @@
 import {
   claimDailyDigest,
+  getCoinScanEdge,
   getCoinScanForDay,
   getAllAlertSubscribers,
   getOverview,
@@ -161,7 +162,9 @@ async function maybeSendDigest(ctx: WorkerContext, results: TrendUpsertResult[],
       getRecentSignals(ctx.pool, { timeframes: ['4h'], limit: 100 }),
     ]);
     const previousCoins = coins.length > 0 ? await getCoinScanForDay(ctx.pool, new Date(latestOpen - DAY_MS).toISOString().slice(0, 10)) : [];
-    const text = formatDigest(results, overview, signals.filter((s) => s.timestamp >= now - DAY_MS), closedAt, formatCoinDigest(coins, previousCoins));
+    // The evidence line is a nice-to-have: a failed query must not cost the morning message.
+    const edge = coins.length > 0 ? await getCoinScanEdge(ctx.pool, 7).catch(() => []) : [];
+    const text = formatDigest(results, overview, signals.filter((s) => s.timestamp >= now - DAY_MS), closedAt, formatCoinDigest(coins, previousCoins, edge));
 
     let delivered = 0;
     for (const chatId of chatIds) {

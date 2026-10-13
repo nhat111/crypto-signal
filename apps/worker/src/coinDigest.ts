@@ -1,4 +1,4 @@
-import type { CoinScanRow } from '@crypto-signal/db';
+import type { CoinScanEdgeReport, CoinScanRow } from '@crypto-signal/db';
 import type { CoinFlow } from '@crypto-signal/indicators';
 
 /** Same wording as the bot's /coins and the web page. */
@@ -36,7 +36,7 @@ const signed = (n: number): string => `${n >= 0 ? '+' : ''}${n.toFixed(0)}%`;
  * count as a change: OKX and Binance flow differ, and a switch of venue is
  * not news about the coin.
  */
-export function formatCoinDigest(today: CoinScanRow[], previous: CoinScanRow[]): string[] {
+export function formatCoinDigest(today: CoinScanRow[], previous: CoinScanRow[], edge: CoinScanEdgeReport[] = []): string[] {
   if (today.length === 0) return [];
   const exchange = today[0]?.exchange;
   const strongest = today
@@ -59,6 +59,29 @@ export function formatCoinDigest(today: CoinScanRow[], previous: CoinScanRow[]):
     if (turned.length > 0) lines.push(`Vừa chuyển sang spot mua: ${turned.map((r) => coin(r.symbol)).join(', ')}`);
   }
 
+  const edgeLine = formatEdgeLine(edge.find((r) => r.exchange === exchange));
+  if (edgeLine) lines.push(edgeLine);
+
   lines.push('Chi tiết: /coins');
   return lines;
+}
+
+const VERDICT: Record<string, string> = {
+  beats: 'có lợi thế thật',
+  worse: 'tệ hơn nhóm yếu nhất',
+  indistinguishable: 'chưa phân biệt được',
+};
+
+/**
+ * The evidence for the ranking above it, once there is any. Silent until
+ * both ends of the RS comparison clear the sample floor: "not enough data"
+ * every morning for two months would teach the reader to skip the line.
+ */
+export function formatEdgeLine(report: CoinScanEdgeReport | undefined): string | null {
+  const rs = report?.relativeStrength;
+  if (!report || !rs || rs.verdict === null || rs.group.hitPct === null || rs.baseline.hitPct === null) return null;
+  return (
+    `Kiểm chứng ${report.horizonDays}N: nhóm mạnh nhất thắng BTC ${rs.group.hitPct.toFixed(0)}% ` +
+    `vs nhóm yếu nhất ${rs.baseline.hitPct.toFixed(0)}% (n=${rs.group.samples}) — ${VERDICT[rs.verdict] ?? rs.verdict}`
+  );
 }

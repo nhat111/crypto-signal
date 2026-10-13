@@ -283,10 +283,13 @@ Check items as they land; each phase's commit message references the phase.
 - [x] Morning digest carries a short coin section: the three strongest vs
       BTC with their flow, and coins that turned to spot buying since the
       day before (same exchange only). Waits up to 2h for the day's scan.
-- [ ] Judge it (per exchange — see ASSUMPTIONS §18): once ~60 days are stored, compare the forward 7d/30d
-      return of the top RS quintile against the bottom one, and each flow
-      label against the baseline — the same test signals get. Until then
-      the page claims nothing predictive.
+- [x] The judgement is built (`getCoinScanEdge`, `/api/coins/edge`, the
+      "Kiểm chứng" panel on /coins, a digest line once there is a verdict):
+      top-fifth RS vs bottom fifth and each label vs all coins, beating BTC
+      over 7/30 days, non-overlapping cohorts, per exchange.
+- [ ] Read it once verdicts appear (~mid-December 2026 for 7d at 30 coins
+      a day). If neither RS nor any label beats its baseline, say so on the
+      page and in the digest rather than keep ranking by it.
 - [x] Thesis drivers beyond price and flow: DefiLlama fees, TVL and chain
       stablecoins per coin, stored daily (ASSUMPTIONS §20), shown on /coins
       and in `/coins COIN`.

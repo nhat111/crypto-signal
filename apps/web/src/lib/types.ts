@@ -477,6 +477,37 @@ export interface CoinsResponse {
   fetch: { lastAttemptAt: number | null; lastSuccessAt: number | null; consecutiveFailures: number; lastError: string | null } | null;
 }
 
+export type CoinEdgeVerdict = 'beats' | 'worse' | 'indistinguishable';
+
+export interface CoinEdgeGroup {
+  samples: number;
+  hitPct: number | null;
+  meanExcessPct: number | null;
+}
+
+export interface CoinEdgeComparison {
+  group: CoinEdgeGroup;
+  baseline: CoinEdgeGroup;
+  /** Null below the sample floor. */
+  verdict: CoinEdgeVerdict | null;
+  deltaPp: number | null;
+  marginPp: number | null;
+}
+
+export interface CoinEdgeReport {
+  exchange: 'binance' | 'okx';
+  horizonDays: number;
+  cohortDays: number;
+  relativeStrength: CoinEdgeComparison;
+  flows: Array<{ flow: CoinFlow } & CoinEdgeComparison>;
+}
+
+export interface CoinEdgeResponse {
+  horizonDays: number;
+  minSamples: number;
+  reports: CoinEdgeReport[];
+}
+
 /* ---------- 4H entry setups ---------- */
 
 export type SetupKind = 'pullback' | 'breakout_retest';
