@@ -163,6 +163,8 @@ export interface SetupDTO {
   rr: number;
   status: 'open' | 'target' | 'stop' | 'expired';
   rMultiple: number | null;
+  /** Absent from APIs older than the OKX fallback. */
+  exchange?: 'binance' | 'okx';
 }
 
 export interface TrendDTO {

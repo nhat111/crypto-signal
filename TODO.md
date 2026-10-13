@@ -287,6 +287,13 @@ Check items as they land; each phase's commit message references the phase.
 - [ ] Thesis drivers beyond price and flow (DefiLlama TVL / fees, chain
       stablecoin supply, token unlocks) — step 2 of the plan.
 
+## Phase 19 — Setups survive Binance bans
+- [x] 4H setups read OKX bars when Binance refuses the server, stamped with
+      the exchange and resolved only on that exchange's bars
+      (ASSUMPTIONS §19). The scan had been silently off for three days.
+- [ ] Say it in Telegram when a scheduled job has failed for hours (setup
+      scan, coin scan): today only /status shows it.
+
 ## Known limitations (carried forward, not silently hidden)
 - [x] Components now render against older API payloads in the test suite
       (`apps/web/src/lib/legacyPayload.test.ts`). The optional fields are

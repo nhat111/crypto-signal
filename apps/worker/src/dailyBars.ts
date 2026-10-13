@@ -18,8 +18,8 @@ export interface DailyBarsResult {
  * trend, the setup scan and the morning digest together. The trend label
  * reads EMA200 and swing points off daily closes, where a few hundredths of
  * a percent between two exchanges cannot change the answer, so OKX is good
- * enough for it. Anything priced or scored (setups) must check `source` and
- * stay Binance-only.
+ * enough for it. Anything priced or scored (setups) records `source` with
+ * the row and is resolved only on bars from that same source.
  *
  * A Binance 400 means the symbol itself is wrong, which OKX cannot fix, so
  * it is rethrown. An empty OKX answer (pair not listed there) rethrows the
@@ -51,9 +51,6 @@ export async function fetchDailyBarsWithFallback(
 
 /** The line added to the trend's reasons, so the badge says where its bars came from. */
 export const OKX_TREND_REASON = 'Nến 1D lấy từ OKX vì Binance đang chặn IP máy chủ — giá có thể lệch rất ít so với Binance.';
-
-/** Why the setup scan skipped a symbol whose daily bars came from OKX. */
-export const OKX_SETUP_SKIP = 'Binance đang chặn IP máy chủ, nến 1D lấy từ OKX — setup chỉ quét bằng nến Binance nên bỏ qua lượt này';
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);

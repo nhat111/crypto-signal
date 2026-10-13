@@ -32,6 +32,12 @@ describe.skipIf(!hasTestDatabase)('trade setups against real Postgres', () => {
     expect(await getOpenTradeSetups(pool)).toHaveLength(2);
   });
 
+  it('stores which exchange found a setup, Binance unless told otherwise', async () => {
+    expect((await insertTradeSetup(pool, setup(5)))?.exchange).toBe('binance');
+    expect((await insertTradeSetup(pool, { ...setup(6), exchange: 'okx' }))?.exchange).toBe('okx');
+    expect((await getOpenTradeSetups(pool)).map((s) => s.exchange).sort()).toEqual(['binance', 'okx']);
+  });
+
   it('resolves only open setups and averages R over the resolved ones', async () => {
     const a = (await insertTradeSetup(pool, setup(1)))!;
     const b = (await insertTradeSetup(pool, setup(2)))!;
