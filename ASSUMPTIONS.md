@@ -851,3 +851,36 @@ stablecoins: 30 days).
   over 30 coins took 6 s and ~25 requests.
 - Stored per coin per day (`coin_scan_rows.fundamentals`, migration 031),
   so the drivers can later be judged like the flow labels.
+
+## 21. Setups on the scanned coins: watchlist and baseline
+
+- **Question.** Knowing which coins are strong says nothing about when to
+  buy one. The 4H setup detector (pullback, breakout-retest, ≥1:2 R:R,
+  §setups) already turns a chart into entry/stop/target for BTC/ETH/SOL;
+  it now also runs over the scanned coins, so "strong coin + setup" can be
+  told apart from "any coin + setup".
+- **Watchlist** (`pickWatchlist`, pure): RS vs BTC over 30 days > 0 and the
+  RS line above its 20-day average; no selling flow label (`spot_selling`,
+  `shorts_building`, `distribution`); not a coin whose DefiLlama drivers are
+  all bearish. Strongest by 30-day RS first, 6 by default. Gates and one
+  ordering, no score. The core symbols are excluded (the trend cycle reads
+  them).
+- **Baseline.** Every other scanned coin goes through the same detector on
+  the same hours and is stored as cohort `scan`, never alerted. Comparing
+  watchlist setups with *those* (not with BTC/ETH/SOL) holds the detector,
+  the period and the universe fixed, so only the watchlist rule differs.
+  Win = target reached; same Agresti-Caffo test as signals, both kinds
+  pooled, no verdict under 20 resolved setups per side.
+- **Alerts** carry ⭐ and the reason the coin was listed, and say plainly
+  that the setup is being tested and not to put real money on it until the
+  comparison has a verdict.
+- **Survivorship.** A coin that leaves the top 30 keeps being read until its
+  open setups resolve (no new ones are looked for), or the record would keep
+  only the coins that stayed popular.
+- **Cost on a rationed IP.** Daily bars are read once per UTC day per coin
+  (cached in memory), 4H bars hourly; one Binance refusal moves the rest of
+  the run to OKX instead of asking ~30 more times. 250 ms between coins.
+  A scan older than 3 days stops new detections (its watchlist is stale).
+- **Context** (scan day, 30-day RS, flow label) is stored with each setup,
+  because the next day's scan may list the coin differently.
+

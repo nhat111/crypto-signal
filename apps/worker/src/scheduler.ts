@@ -21,6 +21,7 @@ import { runHealthAlertCycle } from './healthAlerts.js';
 import { runAlertSelfTest } from './alertSelfTest.js';
 import { runStablecoinFlowCycle } from './stablecoinFlow.js';
 import { runTrendCycle } from './trendCycle.js';
+import { runCoinSetupCycle } from './coinSetups.js';
 import { runCoinScanCycle } from './coinScan.js';
 import { readMemory } from './memory.js';
 import type { WorkerContext } from './context.js';
@@ -209,6 +210,14 @@ export function startSchedulers(ctx: WorkerContext): () => void {
   if (ctx.config.coinScan.enabled) {
     timers.push(setInterval(() => void runCoinScanCycle(ctx).catch((err) => ctx.logger.error({ err }, 'coin scan failed')), 60 * 60_000));
     void runCoinScanCycle(ctx).catch((err) => ctx.logger.error({ err }, 'initial coin scan failed'));
+  }
+
+  // 4H setups on the scanned coins: the watchlist alerted, the rest kept as
+  // its baseline. Hourly like the core symbols' setups; the first run waits
+  // ten minutes so a fresh boot's trend read and coin scan go first.
+  if (ctx.config.coinScan.setups) {
+    timers.push(setInterval(() => void runCoinSetupCycle(ctx).catch((err) => ctx.logger.error({ err }, 'coin setup scan failed')), 60 * 60_000));
+    timers.push(setTimeout(() => void runCoinSetupCycle(ctx).catch((err) => ctx.logger.error({ err }, 'initial coin setup scan failed')), 10 * 60_000));
   }
 
   timers.push(setInterval(() => void runOutcomeTracker(ctx).catch((err) => ctx.logger.error({ err }, 'outcome tracker failed')), 5 * 60_000));

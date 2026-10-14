@@ -165,6 +165,8 @@ export interface SetupDTO {
   rMultiple: number | null;
   /** Absent from APIs older than the OKX fallback. */
   exchange?: 'binance' | 'okx';
+  /** Absent from APIs older than coin setups (all core then). */
+  cohort?: 'core' | 'watchlist' | 'scan';
 }
 
 export interface TrendDTO {

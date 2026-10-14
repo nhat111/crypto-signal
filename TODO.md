@@ -324,6 +324,19 @@ Check items as they land; each phase's commit message references the phase.
       succeeded — so the setup scan's 68 failures after a past success
       never alerted. Now: 3+ failures in a row and no success for 6 h.
 
+## Phase 20 — From strong coins to entries
+- [x] Daily watchlist from the coin scan (beats BTC over 30 days with the RS
+      line still rising, no selling flow, no usage figures that only fall;
+      strongest first, `COIN_WATCHLIST_SIZE`). ⭐ on /coins.
+- [x] The 4H setup detector runs hourly over every scanned coin. Watchlist
+      setups are alerted (marked "đang kiểm chứng"); the rest are recorded,
+      never alerted, as the baseline (ASSUMPTIONS §21).
+- [x] Setup 4H panel: ⭐ on watchlist setups and a "coin mạnh vs coin khác"
+      comparison with a verdict once each side has 20 resolved setups.
+- [ ] Position sizing from the user's own account and risk per trade.
+- [ ] Read the comparison once both sides clear the floor; drop or keep
+      the watchlist alerts on what it says.
+
 ## Known limitations (carried forward, not silently hidden)
 - [x] Components now render against older API payloads in the test suite
       (`apps/web/src/lib/legacyPayload.test.ts`). The optional fields are

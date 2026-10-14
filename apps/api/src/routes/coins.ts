@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { COIN_EDGE_HORIZONS, COIN_EDGE_MIN_SAMPLES, getCoinScanEdge, getJobHealth, getLatestCoinScan, JOB_COIN_SCAN } from '@crypto-signal/db';
+import { pickWatchlist } from '@crypto-signal/indicators';
 import type { ApiDeps } from '../deps.js';
 
 /**
@@ -18,6 +19,11 @@ export function registerCoinsRoute(app: FastifyInstance, deps: ApiDeps): void {
       // One day is read from one exchange; null before the first scan.
       exchange: scan.rows[0]?.exchange ?? null,
       rows: scan.rows,
+      // The coins whose 4H setups are alerted, by the same rule the worker
+      // applies to this same scan. Empty when coin setups are off.
+      watchlist: deps.config.coinScan.setups
+        ? pickWatchlist(scan.rows, deps.config.coinScan.watchlistSize, [...deps.config.symbols, ...deps.config.futuresOnlySymbols]).map((r) => r.symbol)
+        : [],
       thresholds: deps.config.coinScan.thresholds,
       fetch: health
         ? {

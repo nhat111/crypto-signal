@@ -75,7 +75,7 @@ const skewPct = (skew: number | null): number | null => (skew === null ? null : 
  * with the coin column pinned — the page itself never scrolls sideways.
  * A row opens to the reasons behind its label and what could not be read.
  */
-export function CoinTable({ rows, trackedSymbols }: { rows: CoinScanRow[]; trackedSymbols: string[] }) {
+export function CoinTable({ rows, trackedSymbols, watchlist = [] }: { rows: CoinScanRow[]; trackedSymbols: string[]; watchlist?: string[] }) {
   const [open, setOpen] = useState<string | null>(null);
 
   return (
@@ -113,6 +113,9 @@ export function CoinTable({ rows, trackedSymbols }: { rows: CoinScanRow[]; track
                       <span className="font-semibold text-slate-100">{base}</span>
                       {row.rsAboveSma20 === true && row.symbol !== 'BTCUSDT' && (
                         <span className="text-[10px] text-emerald-400" title="Tỉ giá với BTC trên trung bình 20 ngày">▲</span>
+                      )}
+                      {watchlist.includes(row.symbol) && (
+                        <span className="text-[10px]" title="Danh sách theo dõi: setup 4H của coin này được báo trên Telegram">⭐</span>
                       )}
                     </div>
                   </td>

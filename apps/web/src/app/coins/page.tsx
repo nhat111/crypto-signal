@@ -151,7 +151,14 @@ function Body({
           Lần quét mới nhất bị lỗi ({data.fetch?.lastError}) — đang hiển thị lần quét thành công trước đó.
         </p>
       )}
-      <CoinTable rows={rows} trackedSymbols={tracked} />
+      {data.watchlist && data.watchlist.length > 0 && (
+        <p className="text-xs text-slate-400">
+          ⭐ Danh sách theo dõi: <b className="text-slate-200">{data.watchlist.map((s) => s.replace(/USDT$/, '')).join(', ')}</b>. Mạnh hơn BTC
+          trong 30 ngày và vẫn đang mạnh lên, không có dòng bán, không có số liệu sử dụng chỉ giảm. Setup 4H trên các coin này được báo
+          Telegram và so với setup trên các coin còn lại ở mục Setup 4H trang chủ.
+        </p>
+      )}
+      <CoinTable rows={rows} trackedSymbols={tracked} watchlist={data.watchlist} />
     </div>
   );
 }

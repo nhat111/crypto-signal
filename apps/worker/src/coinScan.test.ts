@@ -10,6 +10,8 @@ const CONFIG: CoinScanConfig = {
   enabled: true,
   topN: 10,
   thresholds: { priceMovePct: 3, takerSkew: 0.02, oiRisePct: 10, oiFallPct: -10, fundingElevatedPct: 0.03 },
+  setups: true,
+  watchlistSize: 6,
 };
 
 function bars(n: number, daily: number, lastOpen = Date.UTC(2026, 9, 12)): CoinDailyBar[] {

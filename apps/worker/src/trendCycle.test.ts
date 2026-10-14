@@ -75,7 +75,7 @@ describe('formatDigest coin section', () => {
 
 describe('formatSetupAlert', () => {
   it('gives the three numbers, R:R and the guide’s example size, and keeps the plan line out of the bullets', async () => {
-    const { formatSetupAlert } = await import('./trendCycle.js');
+    const { formatSetupAlert } = await import('./setupScan.js');
     const text = formatSetupAlert({
       id: '1',
       symbol: 'SOLUSDT',
@@ -93,6 +93,8 @@ describe('formatSetupAlert', () => {
       resolvedAt: null,
       rMultiple: null,
       exchange: 'binance',
+      cohort: 'core',
+      context: null,
     });
     expect(text).toContain('SOLUSDT 4H — Hồi về hỗ trợ');
     expect(text).toContain('Vào ~114 · Cắt lỗ 110.8 · Chốt lời 124.95');
@@ -103,12 +105,25 @@ describe('formatSetupAlert', () => {
   });
 
   it('says when the bars came from OKX', async () => {
-    const { formatSetupAlert } = await import('./trendCycle.js');
+    const { formatSetupAlert } = await import('./setupScan.js');
     const text = formatSetupAlert({
       id: '2', symbol: 'ETHUSDT', kind: 'breakout_retest', barOpenTime: 0, detectedAt: 0, level: 2600, entry: 2610,
       stop: 2550, target: 2800, rr: 3.2, atr: 40, reasons: ['Kế hoạch: …'], status: 'open', resolvedAt: null, rMultiple: null,
-      exchange: 'okx',
+      exchange: 'okx', cohort: 'core', context: null,
     });
     expect(text).toContain('lấy từ OKX');
+    expect(text).not.toContain('coin mạnh');
+  });
+
+  it('marks a watchlist setup and says why the coin was on the list and that it is still being tested', async () => {
+    const { formatSetupAlert } = await import('./setupScan.js');
+    const text = formatSetupAlert({
+      id: '3', symbol: 'OPUSDT', kind: 'pullback', barOpenTime: 0, detectedAt: 0, level: 0.5, entry: 0.52,
+      stop: 0.5, target: 0.6, rr: 4, atr: 0.01, reasons: ['Kế hoạch: …'], status: 'open', resolvedAt: null, rMultiple: null,
+      exchange: 'okx', cohort: 'watchlist', context: { scanDay: '2026-10-13', rs30d: 54.5, flow: 'leverage_led' },
+    });
+    expect(text).toContain('OPUSDT 4H — Hồi về hỗ trợ</b> · ⭐ coin mạnh');
+    expect(text).toContain('Trong danh sách theo dõi (quét 2026-10-13): +55% so với BTC trong 30 ngày, dòng tiền 7N: Đòn bẩy kéo');
+    expect(text).toContain('chưa nên vào tiền thật');
   });
 });

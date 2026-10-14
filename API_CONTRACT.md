@@ -526,6 +526,7 @@ the daily close; most-traded first.
     } | null,
     "computedAt": 1791000000000
   }],
+  "watchlist": ["STRKUSDT", "OPUSDT"],
   "thresholds": { "priceMovePct": 3, "takerSkew": 0.03, "oiRisePct": 10, "oiFallPct": -10, "fundingElevatedPct": 0.03 },
   "fetch": { "lastAttemptAt": 0, "lastSuccessAt": 0, "consecutiveFailures": 0, "lastError": null }
 }
@@ -574,9 +575,12 @@ windows never overlap; a sample needs the same exchange at both ends.
 with the family being the RS comparison plus every label in the report, and
 is null while either side is under `minSamples`. 400 for any other horizon.
 
-## `GET /api/setups?limit=`
-4H entry setups, most recent first (limit 1–100, default 30), with per-kind
-stats and the job's health.
+## `GET /api/setups?limit=&cohort=`
+4H entry setups, most recent first (limit 1–100, default 30), with stats
+per cohort and kind, the watchlist-vs-baseline comparison, and both setup
+jobs' health. `cohort` is `all` or a comma list of `core`, `watchlist`,
+`scan`; the default is `core,watchlist` (the setups anyone is alerted to).
+Anything else is a 400.
 ```json
 {
   "setups": [{
@@ -586,13 +590,28 @@ stats and the job's health.
     "reasons": ["…", "Kế hoạch: …"],
     "status": "open" | "target" | "stop" | "expired",
     "resolvedAt": null, "rMultiple": null,
-    "exchange": "binance" | "okx"
+    "exchange": "binance" | "okx",
+    "cohort": "core" | "watchlist" | "scan",
+    "context": { "scanDay": "2026-10-13", "rs30d": 54.5, "flow": "leverage_led" } | null
   }],
-  "stats": [{ "kind": "pullback", "total": 3, "open": 1, "resolved": 2, "targets": 1, "stops": 1, "expired": 0, "avgR": 1.05 }],
+  "stats": [{ "cohort": "core", "kind": "pullback", "total": 3, "open": 1, "resolved": 2, "targets": 1, "stops": 1, "expired": 0, "avgR": 1.05 }],
+  "cohortComparison": {
+    "watchlist": { "resolved": 4, "targets": 2, "hitPct": 50, "avgR": 0.8 },
+    "scan": { "resolved": 30, "targets": 9, "hitPct": 30, "avgR": -0.1 },
+    "verdict": null, "deltaPp": null, "marginPp": null
+  },
   "minResolved": 20,
-  "fetch": { "lastAttemptAt": 0, "lastSuccessAt": 0, "consecutiveFailures": 0, "lastError": null }
+  "fetch": { "lastAttemptAt": 0, "lastSuccessAt": 0, "consecutiveFailures": 0, "lastError": null },
+  "coinFetch": { "lastAttemptAt": 0, "lastSuccessAt": 0, "consecutiveFailures": 0, "lastError": null } | null
 }
 ```
+`cohort`: `core` for the tracked symbols, `watchlist` for a scanned coin on
+that day's watchlist (alerted), `scan` for every other scanned coin (never
+alerted; the baseline). `context` is what put a scanned coin in its cohort
+at detection. `cohortComparison` pools both kinds and judges watchlist hit
+rate (target reached) against the baseline with the same test as signals;
+`verdict` is null until each side has `minResolved` resolved setups.
+`fetch` is the core setup job, `coinFetch` the scanned coins' one.
 `exchange`: whose bars found the setup (`okx` when Binance refused the
 server); a setup is resolved only on that exchange's bars.
 `rMultiple` is in units of the planned risk (entry − stop): `+rr` at the
