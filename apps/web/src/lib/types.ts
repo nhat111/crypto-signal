@@ -402,6 +402,7 @@ export type CoinFlow =
   | 'spot_led'
   | 'spot_and_leverage'
   | 'leverage_led'
+  | 'short_squeeze'
   | 'short_covering'
   | 'up_unconfirmed'
   | 'spot_selling'
@@ -471,6 +472,7 @@ export interface CoinScanThresholds {
   oiRisePct: number;
   oiFallPct: number;
   fundingElevatedPct: number;
+  fundingShortsPayPct: number;
 }
 
 export interface CoinsResponse {

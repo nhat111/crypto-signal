@@ -187,6 +187,8 @@ export interface CoinScanThresholds {
   oiFallPct: number;
   /** Average funding per 8h over 7d, in percent, that counts as longs paying up. */
   fundingElevatedPct: number;
+  /** Same average at or below this (negative) counts as shorts paying: new open interest into a rise is then mostly shorts. */
+  fundingShortsPayPct: number;
 }
 
 export interface CoinScanConfig {
@@ -205,6 +207,7 @@ const COIN_SCAN_THRESHOLDS: CoinScanThresholds = {
   oiRisePct: 10,
   oiFallPct: -10,
   fundingElevatedPct: 0.03,
+  fundingShortsPayPct: -0.005,
 };
 
 export interface AppConfig {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CoinScanThresholds } from '@crypto-signal/shared';
 import { classifyFlow, fundingPer8h, isStableLike, pickCoinUniverse, readCoin, type CoinDailyBar, type Ticker24h } from './coinScan.js';
 
-const T: CoinScanThresholds = { priceMovePct: 3, takerSkew: 0.02, oiRisePct: 10, oiFallPct: -10, fundingElevatedPct: 0.03 };
+const T: CoinScanThresholds = { priceMovePct: 3, takerSkew: 0.02, oiRisePct: 10, oiFallPct: -10, fundingElevatedPct: 0.03, fundingShortsPayPct: -0.005 };
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 9, 13);
 
@@ -73,6 +73,18 @@ describe('classifyFlow', () => {
     expect(read(8, 0, 2, 0.05)).toBe('leverage_led');
     expect(read(8, 0.05, -15, 0.01)).toBe('short_covering');
     expect(read(8, 0, 2, 0.01)).toBe('up_unconfirmed');
+  });
+
+  it('calls a rise with OI up and shorts paying a squeeze, whatever spot did', () => {
+    expect(read(8, 0, 15, -0.01)).toBe('short_squeeze');
+    expect(read(8, 0.05, 250, -0.037)).toBe('short_squeeze');
+    // Funding barely below zero is not shorts paying.
+    expect(read(8, 0, 15, -0.001)).toBe('leverage_led');
+    expect(read(8, 0.05, 15, -0.001)).toBe('spot_and_leverage');
+    // OI falling stays short covering.
+    expect(read(8, 0, -15, -0.01)).toBe('short_covering');
+    // Without the price rise it is not a squeeze.
+    expect(read(-8, 0, 15, -0.01)).toBe('shorts_building');
   });
 
   it('labels a fall', () => {
@@ -159,6 +171,19 @@ describe('readCoin', () => {
     expect(r?.spotPerpVolumeRatio).toBeCloseTo(0.25, 9);
     expect(r?.flow).toBe('leverage_led');
     expect(r?.unknowns).toEqual([]);
+  });
+
+  it('warns when spot volume is a thin slice of perp volume', () => {
+    const r = readCoin({
+      ...base,
+      symbol: 'BATUSDT',
+      bars: bars(trend(40, 0.01)),
+      futuresQuoteVolume24h: 2500,
+      oiContracts: [100, 101, 102, 103, 104, 105, 110, 120],
+      fundingRates: Array.from({ length: 21 }, () => 0.0001),
+    });
+    expect(r?.spotPerpVolumeRatio).toBeCloseTo(0.04, 9);
+    expect(r?.unknowns).toEqual([expect.stringContaining('Volume spot chỉ bằng 4% volume perp')]);
   });
 
   it('says when there is no taker split to read, instead of calling the week balanced', () => {

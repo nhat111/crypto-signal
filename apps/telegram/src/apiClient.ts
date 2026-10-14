@@ -185,6 +185,7 @@ export type CoinFlowDTO =
   | 'spot_led'
   | 'spot_and_leverage'
   | 'leverage_led'
+  | 'short_squeeze'
   | 'short_covering'
   | 'up_unconfirmed'
   | 'spot_selling'

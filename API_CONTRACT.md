@@ -513,7 +513,7 @@ the daily close; most-traded first.
     "downDayExcess": -0.4, "downDays": 14,
     "takerSkew7d": -0.023, "takerSkew30d": 0.006,
     "oiChange7dPct": 4.2, "fundingAvg7dPct": 0.0071, "spotPerpVolumeRatio": 0.31,
-    "flow": "spot_led" | "spot_and_leverage" | "leverage_led" | "short_covering" | "up_unconfirmed"
+    "flow": "spot_led" | "spot_and_leverage" | "leverage_led" | "short_squeeze" | "short_covering" | "up_unconfirmed"
           | "spot_selling" | "shorts_building" | "long_unwind" | "down_unconfirmed"
           | "accumulation" | "distribution" | "leverage_building" | "quiet",
     "reasons": ["Giá 7 ngày -12.4%.", "…"],
@@ -527,7 +527,7 @@ the daily close; most-traded first.
     "computedAt": 1791000000000
   }],
   "watchlist": ["STRKUSDT", "OPUSDT"],
-  "thresholds": { "priceMovePct": 3, "takerSkew": 0.03, "oiRisePct": 10, "oiFallPct": -10, "fundingElevatedPct": 0.03 },
+  "thresholds": { "priceMovePct": 3, "takerSkew": 0.03, "oiRisePct": 10, "oiFallPct": -10, "fundingElevatedPct": 0.03, "fundingShortsPayPct": -0.005 },
   "fetch": { "lastAttemptAt": 0, "lastSuccessAt": 0, "consecutiveFailures": 0, "lastError": null }
 }
 ```
