@@ -9,7 +9,7 @@ const NOW = Date.UTC(2026, 9, 13, 3); // 13/10 03:00 UTC — the 12/10 bar is th
 const CONFIG: CoinScanConfig = {
   enabled: true,
   topN: 10,
-  thresholds: { priceMovePct: 3, takerSkew: 0.02, oiRisePct: 10, oiFallPct: -10, fundingElevatedPct: 0.03 },
+  thresholds: { priceMovePct: 3, takerSkew: 0.02, oiRisePct: 10, oiFallPct: -10, fundingElevatedPct: 0.03, fundingShortsPayPct: -0.005 },
   setups: true,
   watchlistSize: 6,
 };

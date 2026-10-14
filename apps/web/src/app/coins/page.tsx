@@ -25,6 +25,7 @@ const LEGEND_ORDER: CoinFlow[] = [
   'accumulation',
   'spot_and_leverage',
   'leverage_led',
+  'short_squeeze',
   'short_covering',
   'leverage_building',
   'long_unwind',

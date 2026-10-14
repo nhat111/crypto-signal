@@ -6,6 +6,7 @@ export const COIN_FLOW_LABEL: Record<CoinFlow, string> = {
   spot_led: 'Spot mua dẫn',
   spot_and_leverage: 'Spot + đòn bẩy',
   leverage_led: 'Đòn bẩy kéo',
+  short_squeeze: 'Short bị ép',
   short_covering: 'Short đóng lệnh',
   up_unconfirmed: 'Tăng, chưa xác nhận',
   spot_selling: 'Spot bán ròng',

@@ -20,7 +20,7 @@ describe('sortCoins', () => {
 
 describe('FLOW_META', () => {
   it('labels every flow the API can send', () => {
-    expect(Object.keys(FLOW_META)).toHaveLength(13);
+    expect(Object.keys(FLOW_META)).toHaveLength(14);
     for (const meta of Object.values(FLOW_META)) expect(meta.label.length).toBeGreaterThan(0);
   });
 });

@@ -107,6 +107,7 @@ export type CoinFlow =
   | 'spot_led'
   | 'spot_and_leverage'
   | 'leverage_led'
+  | 'short_squeeze'
   | 'short_covering'
   | 'up_unconfirmed'
   | 'spot_selling'
@@ -122,6 +123,7 @@ export const ALL_COIN_FLOWS: CoinFlow[] = [
   'spot_led',
   'spot_and_leverage',
   'leverage_led',
+  'short_squeeze',
   'short_covering',
   'up_unconfirmed',
   'spot_selling',
@@ -185,6 +187,12 @@ const DOWN_DAY_WINDOW = 30;
 const MIN_DOWN_DAYS = 5;
 /** Funding settles every 8h on most perps, so a week is 21 prints; fewer than this means the history is incomplete. */
 const MIN_FUNDING_PRINTS = 6;
+/**
+ * Spot volume under this share of perp volume: the taker skew is read from
+ * a small slice of the coin's trading, so "spot bought" or "spot sold" says
+ * little about the market as a whole.
+ */
+const THIN_SPOT_RATIO = 0.1;
 
 const pct = (n: number, digits = 1): string => `${n >= 0 ? '+' : ''}${n.toFixed(digits)}%`;
 
@@ -286,6 +294,9 @@ export function readCoin(input: CoinReadInput): CoinRead | null {
 
   const spotPerp =
     input.futuresQuoteVolume24h !== null && input.futuresQuoteVolume24h > 0 ? input.spotQuoteVolume24h / input.futuresQuoteVolume24h : null;
+  if (spotPerp !== null && spotPerp < THIN_SPOT_RATIO) {
+    unknowns.push(`Volume spot chỉ bằng ${(spotPerp * 100).toFixed(0)}% volume perp — mua/bán chủ động trên spot là phần nhỏ của thị trường, đọc nhãn spot thận trọng.`);
+  }
 
   const { flow, reasons } = classifyFlow({ ret7d: r7 === null ? null : r7 * 100, skew7, oiChange, funding }, t);
 
@@ -368,6 +379,7 @@ export function classifyFlow(input: FlowInput, t: CoinScanThresholds): { flow: C
   const oiUp = oiChange !== null && oiChange >= t.oiRisePct;
   const oiDown = oiChange !== null && oiChange <= t.oiFallPct;
   const fundingHot = funding !== null && funding >= t.fundingElevatedPct;
+  const shortsPay = funding !== null && funding <= t.fundingShortsPayPct;
 
   if (ret7d !== null) reasons.push(`Giá 7 ngày ${pct(ret7d)}.`);
   if (skew7 !== null) {
@@ -388,6 +400,9 @@ export function classifyFlow(input: FlowInput, t: CoinScanThresholds): { flow: C
   let flow: CoinFlow;
   if (up) {
     if (oiDown) flow = 'short_covering';
+    // OI rising while shorts pay: the new positions are mostly shorts
+    // leaning against the rise, whatever the spot skew says.
+    else if (oiUp && shortsPay) flow = 'short_squeeze';
     else if (spotBuy && (oiUp || fundingHot)) flow = 'spot_and_leverage';
     else if (spotBuy) flow = 'spot_led';
     else if (oiUp || fundingHot) flow = 'leverage_led';
