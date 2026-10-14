@@ -2,7 +2,7 @@ import type { CoinScanEdgeReport, CoinScanRow } from '@crypto-signal/db';
 import type { CoinFlow } from '@crypto-signal/indicators';
 
 /** Same wording as the bot's /coins and the web page. */
-const FLOW: Record<CoinFlow, string> = {
+export const COIN_FLOW_LABEL: Record<CoinFlow, string> = {
   spot_led: 'Spot mua dẫn',
   spot_and_leverage: 'Spot + đòn bẩy',
   leverage_led: 'Đòn bẩy kéo',
@@ -46,7 +46,7 @@ export function formatCoinDigest(today: CoinScanRow[], previous: CoinScanRow[], 
 
   const lines = [`🪙 <b>Top ${today.length} coin</b>${exchange === 'okx' ? ' <i>(nguồn OKX)</i>' : ''}`];
   if (strongest.length > 0) {
-    lines.push(`Mạnh nhất vs BTC 30N: ${strongest.map((r) => `${coin(r.symbol)} ${signed(r.rs30d as number)} (${FLOW[r.flow] ?? r.flow})`).join(' · ')}`);
+    lines.push(`Mạnh nhất vs BTC 30N: ${strongest.map((r) => `${coin(r.symbol)} ${signed(r.rs30d as number)} (${COIN_FLOW_LABEL[r.flow] ?? r.flow})`).join(' · ')}`);
   }
 
   const sameVenue = previous.length > 0 && previous[0]?.exchange === exchange;

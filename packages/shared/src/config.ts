@@ -52,6 +52,10 @@ const envSchema = z.object({
   COIN_SCAN: z.string().default('on'),
   // How many coins it reads, by 24h spot volume. Each costs three REST requests a day.
   COIN_SCAN_TOP_N: numeric(30),
+  // 4H setups on the scanned coins (watchlist alerted, the rest kept as the baseline). On unless off/0/false; needs COIN_SCAN.
+  COIN_SETUPS: z.string().default('on'),
+  // How many scanned coins make the daily watchlist whose setups are alerted.
+  COIN_WATCHLIST_SIZE: numeric(6),
 
   SYMBOLS: z.string().default('BTCUSDT,ETHUSDT,SOLUSDT'),
   /** Futures-only symbols (no Binance Spot listing) — see ASSUMPTIONS.md §15. Tracked with a reduced indicator/signal set. */
@@ -189,6 +193,10 @@ export interface CoinScanConfig {
   enabled: boolean;
   topN: number;
   thresholds: CoinScanThresholds;
+  /** Run the 4H setup detector over the scanned coins. Off when the scan is. */
+  setups: boolean;
+  /** Coins on the daily watchlist; their setups are the ones alerted. */
+  watchlistSize: number;
 }
 
 const COIN_SCAN_THRESHOLDS: CoinScanThresholds = {
@@ -364,6 +372,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       // is a few hundred REST calls into an IP that shares its ban with others.
       topN: Math.min(100, Math.max(5, Math.round(parsed.COIN_SCAN_TOP_N) || 30)),
       thresholds: COIN_SCAN_THRESHOLDS,
+      setups: isEnabledFlag(parsed.COIN_SCAN) && isEnabledFlag(parsed.COIN_SETUPS),
+      watchlistSize: Math.min(20, Math.max(0, Math.round(parsed.COIN_WATCHLIST_SIZE))),
     },
     symbols: parsed.SYMBOLS.split(',').map((s) => s.trim()).filter(Boolean),
     futuresOnlySymbols: parsed.FUTURES_ONLY_SYMBOLS.split(',').map((s) => s.trim()).filter(Boolean),

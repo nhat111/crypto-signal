@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import type { SetupsResponse, TradeSetup } from '@/lib/types';
+import type { SetupCohortComparison, SetupCohortGroup, SetupsResponse, TradeSetup } from '@/lib/types';
 import { cx, formatRelativeTime, formatUsd } from '@/lib/format';
 import { setupPrefillHref } from '@/lib/journalPrefill';
 
@@ -22,9 +22,13 @@ const STATUS: Record<TradeSetup['status'], { label: string; tone: string }> = {
 export function SetupsPanel({ data }: { data: SetupsResponse }) {
   const open = data.setups.filter((s) => s.status === 'open');
   const resolved = data.setups.filter((s) => s.status !== 'open').slice(0, 8);
-  const totalResolved = data.stats.reduce((n, s) => n + s.resolved, 0);
-  const targets = data.stats.reduce((n, s) => n + s.targets, 0);
-  const rSum = data.stats.reduce((n, s) => n + (s.avgR ?? 0) * s.resolved, 0);
+  // The headline counts the setups this panel lists; the baseline cohort
+  // has its own line in the comparison below.
+  const shown = data.stats.filter((s) => (s.cohort ?? 'core') !== 'scan');
+  const totalResolved = shown.reduce((n, s) => n + s.resolved, 0);
+  const targets = shown.reduce((n, s) => n + s.targets, 0);
+  const rSum = shown.reduce((n, s) => n + (s.avgR ?? 0) * s.resolved, 0);
+  const coinSetups = data.stats.some((s) => s.cohort === 'watchlist' || s.cohort === 'scan');
 
   return (
     <section className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
@@ -54,6 +58,7 @@ export function SetupsPanel({ data }: { data: SetupsResponse }) {
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h3 className="font-bold text-slate-100">
                   {s.symbol} <span className="text-xs font-semibold text-sky-300">· {KIND[s.kind]}</span>
+                  {s.cohort === 'watchlist' && <WatchlistBadge setup={s} />}
                   {s.exchange === 'okx' && (
                     <span className="ml-1.5 rounded border border-slate-700 px-1 py-px text-[10px] font-medium text-slate-400" title="Nến lấy từ OKX vì Binance đang chặn IP máy chủ">
                       OKX
@@ -81,6 +86,8 @@ export function SetupsPanel({ data }: { data: SetupsResponse }) {
         </div>
       )}
 
+      {coinSetups && data.cohortComparison && <CohortComparison c={data.cohortComparison} minResolved={data.minResolved} />}
+
       {resolved.length > 0 && (
         <div className="mt-4">
           <h3 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Đã kết thúc</h3>
@@ -88,7 +95,8 @@ export function SetupsPanel({ data }: { data: SetupsResponse }) {
             {resolved.map((s) => (
               <li key={s.id} className="flex flex-wrap items-baseline justify-between gap-2 py-1.5">
                 <span className="text-slate-300">
-                  {s.symbol} · {KIND[s.kind]} · vào {formatUsd(s.entry, false)}
+                  {s.symbol}
+                  {s.cohort === 'watchlist' && ' ⭐'} · {KIND[s.kind]} · vào {formatUsd(s.entry, false)}
                 </span>
                 <span className={cx('tabular-nums', STATUS[s.status].tone)}>
                   {STATUS[s.status].label}
@@ -108,6 +116,61 @@ function Cell({ label, value, tone }: { label: string; value: string; tone?: str
     <div>
       <dt className="text-[10px] uppercase tracking-wide text-slate-500">{label}</dt>
       <dd className={cx('tabular-nums font-semibold', tone ?? 'text-slate-200')}>{value}</dd>
+    </div>
+  );
+}
+
+function WatchlistBadge({ setup }: { setup: TradeSetup }) {
+  const c = setup.context;
+  const title = c
+    ? `Trong danh sách theo dõi ngày ${c.scanDay}${c.rs30d === null ? '' : `: ${c.rs30d >= 0 ? '+' : ''}${c.rs30d.toFixed(0)}% so với BTC trong 30 ngày`}`
+    : 'Trong danh sách theo dõi';
+  return (
+    <span className="ml-1.5 rounded border border-amber-500/40 px-1 py-px text-[10px] font-medium text-amber-200" title={title}>
+      ⭐ coin mạnh
+    </span>
+  );
+}
+
+function groupText(g: SetupCohortGroup): string {
+  if (g.resolved === 0) return 'chưa có setup nào kết thúc';
+  return `${g.targets}/${g.resolved} chạm chốt lời${g.avgR === null ? '' : ` · ${g.avgR >= 0 ? '+' : ''}${g.avgR.toFixed(2)}R`}`;
+}
+
+const VERDICT: Record<NonNullable<SetupCohortComparison['verdict']>, { text: string; tone: string }> = {
+  beats: { text: 'Coin mạnh cho setup tốt hơn thật', tone: 'text-emerald-300' },
+  worse: { text: 'Coin mạnh cho setup tệ hơn', tone: 'text-rose-300' },
+  indistinguishable: { text: 'Chưa phân biệt được với coin khác', tone: 'text-slate-400' },
+};
+
+/**
+ * The question the watchlist exists to answer: are setups on strong coins
+ * better than the same setups on the other scanned coins? Shown with its
+ * sample counts until both sides clear the floor, then with a verdict.
+ */
+function CohortComparison({ c, minResolved }: { c: SetupCohortComparison; minResolved: number }) {
+  const verdict = c.verdict ? VERDICT[c.verdict] : null;
+  return (
+    <div className="mt-4 rounded-lg border border-slate-800 p-3 text-xs">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="font-semibold text-slate-300">Kiểm chứng: setup trên coin mạnh có tốt hơn không?</h3>
+        <span className={cx('font-medium', verdict?.tone ?? 'text-slate-400')}>
+          {verdict?.text ?? `Chưa đủ mẫu (cần ${minResolved} setup kết thúc mỗi bên)`}
+        </span>
+      </div>
+      <dl className="mt-2 grid grid-cols-1 gap-1 text-slate-400 sm:grid-cols-2">
+        <div>
+          <dt className="inline text-slate-300">⭐ Coin mạnh (danh sách theo dõi): </dt>
+          <dd className="inline tabular-nums">{groupText(c.watchlist)}</dd>
+        </div>
+        <div>
+          <dt className="inline text-slate-300">Các coin khác trong top: </dt>
+          <dd className="inline tabular-nums">{groupText(c.scan)}</dd>
+        </div>
+      </dl>
+      <p className="mt-2 text-[11px] text-slate-500">
+        Cùng bộ tìm setup, cùng khoảng thời gian; chỉ coin mạnh được báo Telegram. Đến khi có kết luận, setup ⭐ chỉ để theo dõi.
+      </p>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
 import { createTestPool, hasTestDatabase, lockTestTables } from './testPool.js';
-import { getOpenTradeSetups, getTradeSetupStats, insertTradeSetup, resolveTradeSetup, type NewTradeSetup } from './tradeSetups.js';
+import { getOpenTradeSetups, getRecentTradeSetups, getTradeSetupStats, insertTradeSetup, resolveTradeSetup, type NewTradeSetup } from './tradeSetups.js';
 
 const LOCK = 991_027;
 
@@ -48,5 +48,15 @@ describe.skipIf(!hasTestDatabase)('trade setups against real Postgres', () => {
     const [stats] = await getTradeSetupStats(pool);
     expect(stats).toMatchObject({ kind: 'pullback', total: 3, open: 1, resolved: 2, targets: 1, stops: 1 });
     expect(stats?.avgR).toBeCloseTo(0.5);
+  });
+
+  it('stores the cohort and its context, core unless told otherwise, and filters recent setups by cohort', async () => {
+    const context = { scanDay: '2026-10-13', rs30d: 54.5, flow: 'leverage_led' };
+    expect(await insertTradeSetup(pool, setup(1))).toMatchObject({ cohort: 'core', context: null });
+    expect(await insertTradeSetup(pool, { ...setup(2), symbol: 'OPUSDT', cohort: 'watchlist', context })).toMatchObject({ cohort: 'watchlist', context });
+    await insertTradeSetup(pool, { ...setup(3), symbol: 'LTCUSDT', cohort: 'scan', context });
+    expect((await getRecentTradeSetups(pool, 10)).map((s) => s.cohort).sort()).toEqual(['core', 'scan', 'watchlist']);
+    expect((await getRecentTradeSetups(pool, 10, ['core', 'watchlist'])).map((s) => s.symbol).sort()).toEqual(['OPUSDT', 'SOLUSDT']);
+    expect((await getTradeSetupStats(pool)).map((s) => `${s.cohort}/${s.kind}/${s.total}`)).toEqual(['core/pullback/1', 'scan/pullback/1', 'watchlist/pullback/1']);
   });
 });

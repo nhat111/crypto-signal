@@ -479,6 +479,8 @@ export interface CoinsResponse {
   /** Absent from APIs older than the OKX fallback, which only ever read Binance. */
   exchange?: 'binance' | 'okx' | null;
   rows: CoinScanRow[];
+  /** Coins whose 4H setups are alerted. Absent from APIs older than coin setups. */
+  watchlist?: string[];
   thresholds: CoinScanThresholds;
   fetch: { lastAttemptAt: number | null; lastSuccessAt: number | null; consecutiveFailures: number; lastError: string | null } | null;
 }
@@ -536,9 +538,32 @@ export interface TradeSetup {
   rMultiple: number | null;
   /** Whose bars found it (and resolve it). Absent from APIs older than the OKX fallback, which only used Binance. */
   exchange?: 'binance' | 'okx';
+  /** Absent from APIs older than coin setups, when every setup was core. */
+  cohort?: SetupCohort;
+  context?: { scanDay: string; rs30d: number | null; flow: string } | null;
+}
+
+/** core: BTC/ETH/SOL · watchlist: a strong scanned coin (alerted) · scan: any other scanned coin (the baseline). */
+export type SetupCohort = 'core' | 'watchlist' | 'scan';
+
+export interface SetupCohortGroup {
+  resolved: number;
+  targets: number;
+  hitPct: number | null;
+  avgR: number | null;
+}
+
+export interface SetupCohortComparison {
+  watchlist: SetupCohortGroup;
+  scan: SetupCohortGroup;
+  verdict: 'beats' | 'worse' | 'indistinguishable' | null;
+  deltaPp: number | null;
+  marginPp: number | null;
 }
 
 export interface TradeSetupStats {
+  /** Absent from APIs older than coin setups. */
+  cohort?: SetupCohort;
   kind: SetupKind;
   total: number;
   open: number;
@@ -552,6 +577,8 @@ export interface TradeSetupStats {
 export interface SetupsResponse {
   setups: TradeSetup[];
   stats: TradeSetupStats[];
+  /** Absent from APIs older than coin setups. */
+  cohortComparison?: SetupCohortComparison;
   minResolved: number;
   fetch: { lastAttemptAt: number | null; lastSuccessAt: number | null; consecutiveFailures: number; lastError: string | null } | null;
 }

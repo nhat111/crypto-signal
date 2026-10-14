@@ -412,16 +412,17 @@ export function formatSetups(setups: SetupDTO[]): string {
   const lines = ['<b>Setup 4H</b>', ''];
   if (open.length === 0) lines.push('Không có setup nào đang mở — phần lớn thời gian là vậy.');
   for (const s of open) {
-    lines.push(`🎯 <b>${escapeHtml(s.symbol)}</b> — ${SETUP_KIND[s.kind]}${s.exchange === 'okx' ? ' <i>(nến OKX)</i>' : ''}`);
+    lines.push(`🎯 <b>${escapeHtml(s.symbol)}</b> — ${SETUP_KIND[s.kind]}${s.cohort === 'watchlist' ? ' ⭐' : ''}${s.exchange === 'okx' ? ' <i>(nến OKX)</i>' : ''}`);
     lines.push(`  Vào ~${formatPrice(s.entry)} · SL ${formatPrice(s.stop)} · TP ${formatPrice(s.target)} · R:R 1:${s.rr.toFixed(1)}`);
   }
   if (done.length > 0) {
     lines.push('', 'Gần đây:');
     for (const s of done) {
       const r = s.rMultiple === null ? '' : ` (${s.rMultiple >= 0 ? '+' : ''}${s.rMultiple.toFixed(1)}R)`;
-      lines.push(`  ${escapeHtml(s.symbol)} ${SETUP_KIND[s.kind].toLowerCase()} — ${SETUP_END[s.status]}${r}`);
+      lines.push(`  ${escapeHtml(s.symbol)}${s.cohort === 'watchlist' ? ' ⭐' : ''} ${SETUP_KIND[s.kind].toLowerCase()} — ${SETUP_END[s.status]}${r}`);
     }
   }
+  if (setups.some((s) => s.cohort === 'watchlist')) lines.push('', '⭐ = coin trong danh sách theo dõi từ /coins — đang kiểm chứng, chưa nên vào tiền thật.');
   lines.push('', '<i>Ứng viên, không phải lệnh. Tự xem chart và BTC trước khi vào.</i>');
   return lines.join('\n');
 }

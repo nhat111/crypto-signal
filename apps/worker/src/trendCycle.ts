@@ -4,27 +4,24 @@ import {
   getCoinScanForDay,
   getAllAlertSubscribers,
   getOverview,
-  getOpenTradeSetups,
   getRecentSignals,
-  insertTradeSetup,
   JOB_DAILY_DIGEST,
   JOB_SETUP_SCAN,
   JOB_TREND_1D,
   recordDigestRecipients,
   recordJobFailure,
   recordJobSuccess,
-  resolveTradeSetup,
   upsertTrendState,
   type OverviewRow,
   type RecentSignalRow,
-  type TradeSetupRow,
   type TrendUpsertResult,
 } from '@crypto-signal/db';
-import { detectSetups, readMarketStructure, resolveSetupOutcome, type MarketStructure, type OhlcvBar } from '@crypto-signal/indicators';
+import { readMarketStructure } from '@crypto-signal/indicators';
 import { SEVERITY_ORDER } from '@crypto-signal/signal-engine';
 import type { WorkerContext } from './context.js';
 import { formatCoinDigest } from './coinDigest.js';
-import { OKX_TREND_REASON, fetchDailyBarsWithFallback, type DailyBarSource } from './dailyBars.js';
+import { scanSetups } from './setupScan.js';
+import { OKX_TREND_REASON, fetchDailyBarsWithFallback } from './dailyBars.js';
 
 /** 400 closed days covers EMA200 with room for the seed window. */
 const DAILY_BARS = 400;
@@ -105,7 +102,7 @@ export async function runTrendCycle(ctx: WorkerContext, now = Date.now()): Promi
             source === 'binance' || !okx
               ? (s: string, limit: number, at: number) => ctx.spotAdapter.fetchClosedBars(s, '4h', limit, at)
               : (s: string, limit: number, at: number) => okx.fetchClosedBars(s, '4h', limit, at);
-          await scanSetups(ctx, symbol, bars, structure, now, source, fetch4h);
+          await scanSetups(ctx, symbol, bars, structure, now, source, fetch4h, { cohort: 'core', context: null, alert: ctx.config.setupAlerts });
           setupScans += 1;
         } catch (err) {
           setupFailures.push(`${symbol}: ${err instanceof Error ? err.message : String(err)}`);
@@ -239,78 +236,5 @@ export function formatDigest(
   }
   if (coinLines.length > 0) lines.push('', ...coinLines);
   lines.push('', '<i>Xu hướng đọc theo đỉnh/đáy trên nến ngày đã đóng. Mô tả, không phải dự báo.</i>');
-  return lines.join('\n');
-}
-
-/** 4H bars read per scan: 20 days, enough for ATR, the volume baseline, and resolving any setup still open. */
-const SETUP_BARS_4H = 120;
-/** A setup that has hit neither level in two weeks is closed at the last price — it has stopped being the trade it was. */
-const SETUP_EXPIRY_MS = 14 * DAY_MS;
-
-async function scanSetups(
-  ctx: WorkerContext,
-  symbol: string,
-  dailyBars: OhlcvBar[],
-  structure: MarketStructure,
-  now: number,
-  exchange: DailyBarSource,
-  fetch4h: (symbol: string, limit: number, now: number) => Promise<OhlcvBar[]>,
-): Promise<void> {
-  const bars4h = await fetch4h(symbol, SETUP_BARS_4H, now);
-  if (bars4h.length === 0) return;
-
-  // Resolve first, so a setup that already played out is never reported
-  // alongside a fresh one as if both were live. Only setups found on this
-  // same exchange: a stop is judged on the wicks of the venue it was priced
-  // on, so a Binance setup waits for Binance bars (120 bars reach back 20
-  // days, past the 14-day expiry, so the first touch is still found then).
-  const open = (await getOpenTradeSetups(ctx.pool)).filter((s) => s.symbol === symbol && s.exchange === exchange);
-  for (const setup of open) {
-    const { outcome, at } = resolveSetupOutcome(setup, bars4h);
-    if (outcome === 'target') await resolveTradeSetup(ctx.pool, setup.id, 'target', at ?? now, setup.rr);
-    else if (outcome === 'stop') await resolveTradeSetup(ctx.pool, setup.id, 'stop', at ?? now, -1);
-    else if (now - setup.barOpenTime > SETUP_EXPIRY_MS) {
-      const lastClose = (bars4h[bars4h.length - 1] as OhlcvBar).close;
-      await resolveTradeSetup(ctx.pool, setup.id, 'expired', now, (lastClose - setup.entry) / (setup.entry - setup.stop));
-    }
-  }
-
-  for (const candidate of detectSetups({ structure, dailyBars, bars4h })) {
-    const row = await insertTradeSetup(ctx.pool, { symbol, ...candidate, exchange });
-    if (!row) continue; // already found on an earlier hourly run of this bar
-    ctx.logger.info({ symbol, kind: row.kind, entry: row.entry, stop: row.stop, target: row.target, rr: row.rr }, 'setup found');
-    if (ctx.config.setupAlerts) await alertSetup(ctx, row);
-  }
-}
-
-async function alertSetup(ctx: WorkerContext, setup: TradeSetupRow): Promise<void> {
-  const subscribers = await getAllAlertSubscribers(ctx.pool);
-  const chatIds = Array.from(new Set([...ctx.config.telegramAlertChatIds, ...subscribers.map((s) => s.chatId)]));
-  const text = formatSetupAlert(setup);
-  for (const chatId of chatIds) await ctx.notifier.send(chatId, text);
-}
-
-const SETUP_TITLE: Record<TradeSetupRow['kind'], string> = {
-  pullback: 'Hồi về hỗ trợ',
-  breakout_retest: 'Phá vùng rồi test lại',
-};
-
-/** One setup as a plan someone could act on — or decide not to. Pure for testing. */
-export function formatSetupAlert(setup: TradeSetupRow): string {
-  const risk = setup.entry - setup.stop;
-  // The guide's sizing rule on a round example account: risk 1% of 1,000$.
-  const units = 10 / risk;
-  const lines = [
-    `🎯 <b>${escapeHtml(setup.symbol)} 4H — ${SETUP_TITLE[setup.kind]}</b>`,
-    '',
-    `Vào ~${price(setup.entry)} · Cắt lỗ ${price(setup.stop)} · Chốt lời ${price(setup.target)}`,
-    `R:R 1:${setup.rr.toFixed(1)} · Rủi ro ${((risk / setup.entry) * 100).toFixed(1)}%/coin`,
-    `Cỡ lệnh ví dụ (TK 1.000$, rủi ro 1%): ${units < 1 ? units.toPrecision(3) : units.toFixed(2)} ${escapeHtml(setup.symbol.replace(/USDT$/, ''))} ≈ ${price(units * setup.entry)}$`,
-    '',
-    ...setup.reasons.slice(0, -1).map((r) => `• ${escapeHtml(r)}`),
-    '',
-    ...(setup.exchange === 'okx' ? ['<i>Nến 4H/1D lấy từ OKX vì Binance đang chặn IP máy chủ — giá trên Binance có thể lệch rất ít.</i>'] : []),
-    '<i>Ứng viên, không phải lệnh: tự xem chart và xu hướng BTC trước khi vào. Đặt cắt lỗ lên sàn ngay khi vào.</i>',
-  ];
   return lines.join('\n');
 }
