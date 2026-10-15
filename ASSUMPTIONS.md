@@ -781,6 +781,17 @@ three requests per coin plus two ticker calls. Decisions:
   `CoinScanThresholds` (shared config) and are first guesses; the taker
   skew threshold (3%) is set just outside the −3.1%…+1.0% that ten majors'
   30-day skew drifted within when measured (2026-10).
+- **`short_squeeze` ("Short bị ép")**: a rise with OI up ≥ `oiRisePct` and
+  average funding ≤ `fundingShortsPayPct` (−0.005%/8h). With shorts paying,
+  the new positions are mostly shorts leaning against the move, the
+  opposite risk to longs crowding in, so it is no longer folded into
+  `leverage_led` or `spot_and_leverage`. Checked after `short_covering`
+  (OI falling) and before the spot branches. Added after BAT on 13/10
+  (OI +251%, funding −0.037%) read as "Spot + đòn bẩy" on a 3.5% skew.
+- **Thin spot is relative** (`flagThinSpot`): a coin whose spot/perp
+  volume ratio is under half of the day's median gets an `unknowns` note.
+  A fixed 10% flagged BTC and ETH on OKX, where perps out-trade spot on
+  almost every coin; the note is for coins thin *next to their peers*.
 - **Futures refused ≠ scan failed.** A 418 ban or a 451/403 region block on
   the futures host leaves the spot read intact and says so per coin; the
   sandbox this was built in gets 451 from `fapi.binance.com`, which is how
@@ -884,3 +895,25 @@ stablecoins: 30 days).
 - **Context** (scan day, 30-day RS, flow label) is stored with each setup,
   because the next day's scan may list the coin differently.
 
+## 22. Exit-side alert for held and ⭐ coins (`coinWatch.ts`)
+
+- **Question.** The watchlist and 4H setups say when a coin is worth
+  entering; nothing said when the reason to hold it had gone.
+- **Who is watched.** Open long/spot trades in the journal (any chat,
+  symbols normalized `bat` → `BATUSDT`) and the previous day's ⭐ coins.
+  Shorts are left out: a coin weakening is good news for them.
+- **What counts as a change**, between the newly stored day and the one
+  before, both from the same exchange: a turn into `short_covering`,
+  `long_unwind`, `spot_selling`, `shorts_building` or `distribution`;
+  funding from ≤ `fundingShortsPayPct` to positive (a squeeze ending); the
+  RS line falling under its 20-day average; losing the ⭐; or dropping out
+  of the scanned universe entirely (found in a dry run: BAT, S and TIA
+  left the top 30 on 14/10 and would otherwise have been silent).
+- **When.** Once, right after `runCoinScanCycle` stores a new day (the
+  hourly ticks return early once a day is in). One message to the alert
+  chats, held coins first; nothing is sent without a change. A failed
+  send is logged and never marks the scan job failed. Daily only, so it
+  can lag a fast squeeze by up to a day (intraday refresh is a TODO).
+- **Framing.** The message says it describes the last 7–30 days and is
+  not a sell order; the decision stays with the thesis written in the
+  journal.
