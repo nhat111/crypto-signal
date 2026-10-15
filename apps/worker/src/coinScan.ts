@@ -1,5 +1,8 @@
 import {
+  getAllAlertSubscribers,
+  getCoinScanForDay,
   getLatestCoinScanDay,
+  getTrades,
   JOB_COIN_SCAN,
   recordJobFailure,
   recordJobSuccess,
@@ -9,9 +12,11 @@ import {
 } from '@crypto-signal/db';
 import {
   BENCHMARK_SYMBOL,
+  flagThinSpot,
   fundingPer8h,
   isStableLike,
   pickCoinUniverse,
+  pickWatchlist,
   readCoin,
   type CoinDailyBar,
   type CoinUniverseEntry,
@@ -21,6 +26,7 @@ import { BinanceRestError, type BinanceFuturesAdapter, type BinanceSpotAdapter, 
 import type { CoinScanConfig } from '@crypto-signal/shared';
 import type { WorkerContext } from './context.js';
 import { readCoinFundamentals } from './coinFundamentals.js';
+import { coinWatchChanges, formatCoinWatch, type WatchedCoin } from './coinWatch.js';
 import { readMemory } from './memory.js';
 
 const DAY_MS = 86_400_000;
@@ -160,7 +166,10 @@ export async function scanCoins(source: CoinScanSource, config: CoinScanConfig, 
     }
   }
 
-  return { day, inputs, skipped };
+  // Thin spot is judged against the day's other coins, not a fixed ratio:
+  // on OKX perps out-trade spot almost everywhere, BTC included.
+  const reads = flagThinSpot(inputs.map((i) => i.read));
+  return { day, inputs: inputs.map((i, n) => ({ ...i, read: reads[n] ?? i.read })), skipped };
 }
 
 async function readLeverage(source: CoinScanSource, entry: CoinUniverseEntry, now: number): Promise<{ oi: number[] | null; funding: number[] | null }> {
@@ -208,6 +217,7 @@ export async function runCoinScanCycle(ctx: WorkerContext, now = Date.now(), sou
   if (!ctx.config.coinScan.enabled) return;
   if ((await getLatestCoinScanDay(ctx.pool)) === lastClosedDay(now)) return;
 
+  let storedDay: string;
   try {
     const { result, exchange, binanceError } = await scanWithFallback(
       source ?? binanceCoinScanSource(ctx.spotAdapter, ctx.futuresAdapter),
@@ -232,6 +242,7 @@ export async function runCoinScanCycle(ctx: WorkerContext, now = Date.now(), sou
     const inputs = result.inputs.map((i) => ({ ...i, fundamentals: fundamentals?.get(i.read.symbol.replace(/USDT$/, '')) ?? null }));
 
     await saveCoinScan(ctx.pool, result.day, inputs, exchange);
+    storedDay = result.day;
     await recordJobSuccess(ctx.pool, JOB_COIN_SCAN);
     if (binanceError) ctx.logger.warn({ binanceError }, 'coin scan read from OKX — Binance refused the server');
     ctx.logger.info({ day: result.day, exchange, coins: result.inputs.length, skipped: result.skipped }, 'coin scan stored');
@@ -239,4 +250,49 @@ export async function runCoinScanCycle(ctx: WorkerContext, now = Date.now(), sou
     await recordJobFailure(ctx.pool, JOB_COIN_SCAN, err).catch(() => undefined);
     throw err;
   }
+  // After the job is recorded: a failed send must not mark the scan failed.
+  await sendCoinWatch(ctx, storedDay).catch((err: unknown) => ctx.logger.warn({ err }, 'coin watch alert failed'));
+}
+
+/** Journal symbols are typed by hand ("bat", "BAT", "BATUSDT"); the scan speaks BATUSDT. Contract addresses pass through and simply never match. */
+export function scanSymbol(raw: string): string {
+  const s = raw.trim().toUpperCase();
+  return /^[A-Z0-9]{1,12}$/.test(s) && !s.endsWith('USDT') ? `${s}USDT` : /^[A-Z0-9]{1,16}$/.test(s) ? s : raw;
+}
+
+/**
+ * Tells the alert chats when a coin they hold or watch has turned against
+ * holding it (see coinWatch.ts). Runs once per stored day, right after the
+ * scan, since the hourly ticks return before reaching here once a day is in.
+ */
+async function sendCoinWatch(ctx: WorkerContext, day: string): Promise<void> {
+  const previousDay = new Date(Date.parse(`${day}T00:00:00Z`) - DAY_MS).toISOString().slice(0, 10);
+  const [today, previous, open, subscribers] = await Promise.all([
+    getCoinScanForDay(ctx.pool, day),
+    getCoinScanForDay(ctx.pool, previousDay),
+    getTrades(ctx.pool, { status: 'open', limit: 500 }),
+    getAllAlertSubscribers(ctx.pool),
+  ]);
+  const chatIds = Array.from(new Set([...ctx.config.telegramAlertChatIds, ...subscribers.map((s) => s.chatId)]));
+  if (chatIds.length === 0 || today.length === 0 || previous.length === 0) return;
+
+  // The same ⭐ the /coins page shows: core symbols have their own alerts.
+  const exclude = [...ctx.config.symbols, ...ctx.config.futuresOnlySymbols];
+  const size = ctx.config.coinScan.watchlistSize;
+  const starredBefore = new Set(pickWatchlist(previous, size, exclude).map((r) => r.symbol));
+  const starredNow = new Set(pickWatchlist(today, size, exclude).map((r) => r.symbol));
+
+  const watched = new Map<string, WatchedCoin>();
+  for (const s of starredBefore) watched.set(s, { held: false, starred: true });
+  // Shorts are left out: a coin weakening is good news for them.
+  for (const t of open.filter((t) => t.side !== 'short')) {
+    const symbol = scanSymbol(t.symbol);
+    watched.set(symbol, { held: true, starred: starredBefore.has(symbol) });
+  }
+
+  const text = formatCoinWatch(coinWatchChanges(today, previous, watched, starredNow, ctx.config.coinScan.thresholds), day);
+  if (!text) return;
+  let delivered = 0;
+  for (const chatId of chatIds) if ((await ctx.notifier.send(chatId, text)).ok) delivered += 1;
+  ctx.logger.info({ day, delivered, chats: chatIds.length }, 'coin watch alert sent');
 }

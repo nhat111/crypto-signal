@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CoinScanThresholds } from '@crypto-signal/shared';
-import { classifyFlow, fundingPer8h, isStableLike, pickCoinUniverse, readCoin, type CoinDailyBar, type Ticker24h } from './coinScan.js';
+import { classifyFlow, flagThinSpot, fundingPer8h, isStableLike, pickCoinUniverse, readCoin, type CoinDailyBar, type CoinRead, type Ticker24h } from './coinScan.js';
 
 const T: CoinScanThresholds = { priceMovePct: 3, takerSkew: 0.02, oiRisePct: 10, oiFallPct: -10, fundingElevatedPct: 0.03, fundingShortsPayPct: -0.005 };
 const DAY = 86_400_000;
@@ -173,19 +173,6 @@ describe('readCoin', () => {
     expect(r?.unknowns).toEqual([]);
   });
 
-  it('warns when spot volume is a thin slice of perp volume', () => {
-    const r = readCoin({
-      ...base,
-      symbol: 'BATUSDT',
-      bars: bars(trend(40, 0.01)),
-      futuresQuoteVolume24h: 2500,
-      oiContracts: [100, 101, 102, 103, 104, 105, 110, 120],
-      fundingRates: Array.from({ length: 21 }, () => 0.0001),
-    });
-    expect(r?.spotPerpVolumeRatio).toBeCloseTo(0.04, 9);
-    expect(r?.unknowns).toEqual([expect.stringContaining('Volume spot chỉ bằng 4% volume perp')]);
-  });
-
   it('says when there is no taker split to read, instead of calling the week balanced', () => {
     const noTaker = bars(trend(40, 0.01)).map((b) => ({ ...b, quoteVolume: 0, takerBuyQuoteVolume: 0 }));
     const r = readCoin({ ...base, symbol: 'XYZUSDT', bars: noTaker });
@@ -221,5 +208,27 @@ describe('fundingPer8h', () => {
 
   it('returns nothing it cannot scale', () => {
     expect(fundingPer8h([{ fundingTime: 0, fundingRate: 0.0001 }])).toEqual([]);
+  });
+});
+
+describe('flagThinSpot', () => {
+  const r = (symbol: string, ratio: number | null) => ({ symbol, spotPerpVolumeRatio: ratio, unknowns: [] as string[] }) as unknown as CoinRead;
+
+  it('flags only coins far below the day\'s median ratio', () => {
+    const out = flagThinSpot([r('A', 0.04), r('B', 0.1), r('C', 0.13), r('D', 0.15), r('E', 0.2), r('F', null)]);
+    expect(out.map((x) => x.unknowns.length)).toEqual([1, 0, 0, 0, 0, 0]);
+    expect(out[0]?.unknowns[0]).toContain('Volume spot chỉ bằng 4.0% volume perp');
+    expect(out[0]?.unknowns[0]).toContain('(13.0%)');
+  });
+
+  it('does not judge without enough coins to know what typical is', () => {
+    const reads = [r('A', 0.01), r('B', 0.2), r('C', 0.3)];
+    expect(flagThinSpot(reads)).toBe(reads);
+  });
+
+  it('leaves the input untouched', () => {
+    const reads = [r('A', 0.01), r('B', 0.1), r('C', 0.1), r('D', 0.1), r('E', 0.1)];
+    flagThinSpot(reads);
+    expect(reads[0]?.unknowns).toEqual([]);
   });
 });

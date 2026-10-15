@@ -333,6 +333,15 @@ Check items as they land; each phase's commit message references the phase.
       never alerted, as the baseline (ASSUMPTIONS §21).
 - [x] Setup 4H panel: ⭐ on watchlist setups and a "coin mạnh vs coin khác"
       comparison with a verdict once each side has 20 resolved setups.
+- [x] Exit-side alert after each scan day: coins held (open long/spot
+      trades) or ⭐ the day before that turned into a selling or unwinding
+      flow, saw funding flip from shorts paying to positive, dropped under
+      the RS 20-day average, lost the ⭐ or fell out of the volume ranking.
+      Same exchange both days only (`apps/worker/src/coinWatch.ts`).
+- [x] "Spot mỏng" note judged against the day's median spot/perp ratio
+      (under half of it), not a fixed 10%, which flagged BTC on OKX.
+- [ ] Intraday funding/OI refresh for ⭐ and held coins, so the exit alert
+      does not wait for the next daily close.
 - [ ] Position sizing from the user's own account and risk per trade.
 - [ ] Read the comparison once both sides clear the floor; drop or keep
       the watchlist alerts on what it says.

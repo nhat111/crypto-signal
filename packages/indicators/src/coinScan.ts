@@ -187,12 +187,6 @@ const DOWN_DAY_WINDOW = 30;
 const MIN_DOWN_DAYS = 5;
 /** Funding settles every 8h on most perps, so a week is 21 prints; fewer than this means the history is incomplete. */
 const MIN_FUNDING_PRINTS = 6;
-/**
- * Spot volume under this share of perp volume: the taker skew is read from
- * a small slice of the coin's trading, so "spot bought" or "spot sold" says
- * little about the market as a whole.
- */
-const THIN_SPOT_RATIO = 0.1;
 
 const pct = (n: number, digits = 1): string => `${n >= 0 ? '+' : ''}${n.toFixed(digits)}%`;
 
@@ -294,9 +288,6 @@ export function readCoin(input: CoinReadInput): CoinRead | null {
 
   const spotPerp =
     input.futuresQuoteVolume24h !== null && input.futuresQuoteVolume24h > 0 ? input.spotQuoteVolume24h / input.futuresQuoteVolume24h : null;
-  if (spotPerp !== null && spotPerp < THIN_SPOT_RATIO) {
-    unknowns.push(`Volume spot chỉ bằng ${(spotPerp * 100).toFixed(0)}% volume perp — mua/bán chủ động trên spot là phần nhỏ của thị trường, đọc nhãn spot thận trọng.`);
-  }
 
   const { flow, reasons } = classifyFlow({ ret7d: r7 === null ? null : r7 * 100, skew7, oiChange, funding }, t);
 
@@ -329,6 +320,36 @@ export function readCoin(input: CoinReadInput): CoinRead | null {
     reasons,
     unknowns,
   };
+}
+
+/** A coin is flagged when its spot/perp volume ratio is under this share of the day's median. */
+const THIN_SPOT_OF_MEDIAN = 0.5;
+/** Fewer ratios than this and there is no "typical" to compare against. */
+const MIN_RATIOS_FOR_MEDIAN = 5;
+
+/**
+ * Notes the coins whose spot trades unusually little next to their perp,
+ * compared with the other coins read the same day. A fixed ratio flagged
+ * nearly everything on OKX, where perps out-trade spot for BTC too; what
+ * matters is a coin whose taker skew rests on a much thinner slice than
+ * its neighbours'. Pure: returns new reads, the input is not changed.
+ */
+export function flagThinSpot(reads: CoinRead[]): CoinRead[] {
+  const ratios = reads.map((r) => r.spotPerpVolumeRatio).filter((x): x is number => x !== null && x > 0).sort((a, b) => a - b);
+  if (ratios.length < MIN_RATIOS_FOR_MEDIAN) return reads;
+  const mid = Math.floor(ratios.length / 2);
+  const median = ratios.length % 2 ? (ratios[mid] as number) : ((ratios[mid - 1] as number) + (ratios[mid] as number)) / 2;
+  return reads.map((r) =>
+    r.spotPerpVolumeRatio !== null && r.spotPerpVolumeRatio < median * THIN_SPOT_OF_MEDIAN
+      ? {
+          ...r,
+          unknowns: [
+            ...r.unknowns,
+            `Volume spot chỉ bằng ${(r.spotPerpVolumeRatio * 100).toFixed(1)}% volume perp, mỏng hơn hẳn mức chung hôm nay (${(median * 100).toFixed(1)}%) — nhãn spot dựa trên phần nhỏ của thị trường, đọc thận trọng.`,
+          ],
+        }
+      : r,
+  );
 }
 
 const EIGHT_HOURS_MS = 8 * 60 * 60_000;
