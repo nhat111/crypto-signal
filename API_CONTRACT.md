@@ -671,6 +671,25 @@ Source is DefiLlama, refreshed a few times a day by the worker. It says
 nothing about *which* asset the money buys, so it is context only — never
 render it as trend confirmation or as a signal.
 
+## Bot settings — `POST /api/bot/register`, `GET /api/bot/settings/:chatId`, `POST /api/bot/settings/:chatId`
+
+Telegram only. `settings`:
+
+```json
+{ "chatId": "123", "alertsEnabled": true, "minSeverity": "MEDIUM", "symbols": [],
+  "accountUsd": 1500, "riskPct": 1 }
+```
+
+`accountUsd` is `null` until the chat sets it with `/risk`; `riskPct`
+defaults to 1. Both are absent from APIs older than migration 035, so
+clients treat a missing `accountUsd` as unset.
+
+`POST /api/bot/settings/:chatId` body, every field optional but at least
+one required: `{ alertsEnabled?: boolean, accountUsd?: number | null,
+riskPct?: number }`. `accountUsd` must be ≥ 10 or `null` (clears it);
+`riskPct` must be 0.1–5. A refused body is `400 { error }`, an unknown
+chat `404`. Returns the stored `settings`.
+
 ## Notes for the web app
 - This API is the **only** thing apps/web talks to — never Binance, never
   Postgres directly (rule: "Không để Telegram/web gọi trực tiếp Binance",

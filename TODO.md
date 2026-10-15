@@ -344,7 +344,11 @@ Check items as they land; each phase's commit message references the phase.
       (under half of it), not a fixed 10%, which flagged BTC on OKX.
 - [ ] Intraday funding/OI refresh for ⭐ and held coins, so the exit alert
       does not wait for the next daily close.
-- [ ] Position sizing from the user's own account and risk per trade.
+- [x] Position sizing from the user's own account and risk per trade:
+      `/risk VỐN [%RỦI_RO]` per chat (migration 035), sized in the setup
+      alert and /setups, capped at what spot can buy (ASSUMPTIONS §23).
+- [ ] Optional stop on journal trades, so results read in R and the size
+      a trade was opened with can be checked against the rule.
 - [ ] Read the comparison once both sides clear the floor; drop or keep
       the watchlist alerts on what it says.
 

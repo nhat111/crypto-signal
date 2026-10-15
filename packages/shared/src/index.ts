@@ -5,3 +5,4 @@ export * from './time.js';
 export * from './logger.js';
 export * from './httpJson.js';
 export * from './baselineReport.js';
+export * from './sizing.js';
