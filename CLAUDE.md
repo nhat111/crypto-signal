@@ -83,5 +83,8 @@ Run them before pushing.
   line `coin watch alert sent` if it seems silent (no change = no message).
 - Open questions, from `TODO.md`: the coin-scan edge report has 0 samples
   until enough days are stored (verdicts expected ~mid-December 2026);
-  intraday funding/OI refresh for ⭐/held coins; position sizing; token
-  unlock data (needs a paid source).
+  intraday funding/OI refresh for ⭐/held coins; a stop on journal trades
+  (R results); token unlock data (needs a paid source).
+- Position sizing: `/risk` stores account + risk% per chat (migration 035);
+  the setup alert and /setups size from it (`packages/shared/src/sizing.ts`,
+  ASSUMPTIONS §23).

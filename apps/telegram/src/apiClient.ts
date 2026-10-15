@@ -66,6 +66,9 @@ export interface BotSettings {
   alertsEnabled: boolean;
   minSeverity: string;
   symbols: string[];
+  /** Null until set with /risk. Absent from APIs older than the risk profile. */
+  accountUsd?: number | null;
+  riskPct?: number;
 }
 
 export interface GemRow {
@@ -465,5 +468,10 @@ export class ApiClient {
 
   setAlertsEnabled(chatId: string, enabled: boolean): Promise<{ settings: BotSettings }> {
     return this.post(`/api/bot/settings/${chatId}`, { alertsEnabled: enabled });
+  }
+
+  /** `accountUsd: null` forgets the account; an omitted `riskPct` keeps the stored one. */
+  setRiskProfile(chatId: string, accountUsd: number | null, riskPct?: number): Promise<{ settings: BotSettings }> {
+    return this.post(`/api/bot/settings/${chatId}`, riskPct === undefined ? { accountUsd } : { accountUsd, riskPct });
   }
 }

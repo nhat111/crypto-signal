@@ -16,8 +16,10 @@ import {
   formatTradeOpened,
   formatWatchConfirmation,
   formatWatchList,
+  formatRiskProfile,
   formatSetups,
   formatTrends,
+  riskProfileOf,
 } from './formatting.js';
 import { coinArg, formatCoinDetail, formatCoins } from './coinsFormat.js';
 import { botBuildLine } from './botBuildLine.js';
@@ -25,6 +27,7 @@ import { launchWithHandover } from './launchWithHandover.js';
 import { retryOn429 } from './retryAfter.js';
 import { parseSignalsArg, resolveSignalsScope } from './signalsScope.js';
 import { parseTimeframeArg, type TimeframeChoice } from './timeframeArg.js';
+import { parseRiskArgs } from './riskArgs.js';
 import { parseTradeArgs } from './tradeArgs.js';
 
 async function main(): Promise<void> {
@@ -315,8 +318,12 @@ async function main(): Promise<void> {
 
   bot.command('setups', async (ctx) => {
     try {
-      const { setups } = await api.getSetups(10);
-      await ctx.reply(formatSetups(setups), { parse_mode: 'HTML' });
+      // The size is extra: a failed settings read still answers with the setups.
+      const [{ setups }, settings] = await Promise.all([
+        api.getSetups(10),
+        api.getSettings(String(ctx.chat.id)).then((r) => r.settings, () => undefined),
+      ]);
+      await ctx.reply(formatSetups(setups, riskProfileOf(settings)), { parse_mode: 'HTML' });
     } catch (err) {
       logger.error({ err }, '/setups failed');
       await ctx.reply('Không đọc được setup lúc này — thử lại sau ít phút.');
@@ -382,6 +389,27 @@ async function main(): Promise<void> {
     }
   });
 
+  bot.command('risk', async (ctx) => {
+    const chatId = String(ctx.chat.id);
+    const args = parseRiskArgs(ctx.message.text);
+    if (args.kind === 'error') {
+      await ctx.reply(args.message);
+      return;
+    }
+    try {
+      const { settings } =
+        args.kind === 'show'
+          ? await api.getSettings(chatId)
+          : args.kind === 'clear'
+            ? await api.setRiskProfile(chatId, null)
+            : await api.setRiskProfile(chatId, args.accountUsd, args.riskPct ?? undefined);
+      await ctx.reply(formatRiskProfile(riskProfileOf(settings)), { parse_mode: 'HTML' });
+    } catch (err) {
+      logger.error({ err }, '/risk failed');
+      await ctx.reply('Không lưu được cài đặt cỡ lệnh lúc này — thử lại sau ít phút.');
+    }
+  });
+
   bot.command('flow', async (ctx) => {
     try {
       const { stablecoin } = await api.getFlow();
@@ -438,6 +466,7 @@ async function main(): Promise<void> {
         { command: 'trade', description: 'Log a trade you took' },
         { command: 'close', description: 'Close a logged trade' },
         { command: 'journal', description: 'Your trade log + P&L summary' },
+        { command: 'risk', description: 'Vốn + % rủi ro: tính cỡ lệnh cho setup' },
         { command: 'flow', description: 'Stablecoin supply / macro flow' },
         { command: 'alerts', description: 'Toggle alerts for this chat' },
         { command: 'id', description: 'Chat ID của chat này (để bật cảnh báo)' },

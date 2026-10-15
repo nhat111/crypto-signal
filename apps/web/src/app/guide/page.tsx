@@ -122,7 +122,7 @@ export default function GuidePage() {
             EMA200 và R:R từ 1:2. Mỗi setup có sẵn giá vào, cắt lỗ dưới vùng và chốt lời ở đỉnh 1D, và được theo dõi
             tới khi chạm chốt lời hoặc cắt lỗ — để sau vài chục setup bro biết nó có đáng tin không. Setup hiếm, có
             tuần không có cái nào. Đây là <Term>ứng viên, không phải lệnh</Term>: vẫn tự xem chart và BTC, vẫn tính cỡ
-            lệnh theo quy tắc 1%, và bấm <Term>Log in journal →</Term> nếu vào để bảng By source chấm luôn nguồn{' '}
+            lệnh theo quy tắc 1% (gõ <Term>/risk</Term> trên bot để cảnh báo tự tính theo vốn của bro), và bấm <Term>Log in journal →</Term> nếu vào để bảng By source chấm luôn nguồn{' '}
             <Term>Setup scanner</Term>. Bot: <Term>/setups</Term>.
           </p>
 

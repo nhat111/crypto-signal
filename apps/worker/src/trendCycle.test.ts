@@ -104,6 +104,22 @@ describe('formatSetupAlert', () => {
     expect(text).not.toContain('OKX');
   });
 
+  it('sizes for the chat\'s own account when it has set one, and drops the /risk hint', async () => {
+    const { formatSetupAlert } = await import('./setupScan.js');
+    const setup = {
+      id: '4', symbol: 'SOLUSDT', kind: 'pullback' as const, barOpenTime: 0, detectedAt: 0, level: 112.5, entry: 114,
+      stop: 110.8, target: 124.95, rr: 3.4, atr: 2, reasons: ['Kế hoạch: …'], status: 'open' as const, resolvedAt: null,
+      rMultiple: null, exchange: 'binance' as const, cohort: 'core' as const, context: null,
+    };
+    const own = formatSetupAlert(setup, { accountUsd: 5000, riskPct: 0.5 });
+    expect(own).toContain('Cỡ lệnh (TK 5,000$, rủi ro 0.5%)');
+    expect(own).toContain('mất 25$ nếu dính cắt lỗ');
+    expect(own).not.toContain('/risk');
+    const example = formatSetupAlert(setup);
+    expect(example).toContain('Cỡ lệnh ví dụ (TK 1,000$, rủi ro 1%)');
+    expect(example).toContain('/risk VỐN %RỦI_RO');
+  });
+
   it('says when the bars came from OKX', async () => {
     const { formatSetupAlert } = await import('./setupScan.js');
     const text = formatSetupAlert({

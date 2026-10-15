@@ -1,4 +1,5 @@
-import type { GemRow, GemWatchDTO, LookupDTO, LatestSymbolState, OverviewRow, PriceLevels, SignalRow, StablecoinFlowDTO, StablecoinFlowWindowDTO, TradeDTO, TradeSummaryDTO, TrendDTO, SetupDTO } from './apiClient.js';
+import { formatPositionSize, positionSize, type RiskProfile } from '@crypto-signal/shared';
+import type { BotSettings, GemRow, GemWatchDTO, LookupDTO, LatestSymbolState, OverviewRow, PriceLevels, SignalRow, StablecoinFlowDTO, StablecoinFlowWindowDTO, TradeDTO, TradeSummaryDTO, TrendDTO, SetupDTO } from './apiClient.js';
 
 function healthLine(row: OverviewRow): string {
   const score = row.healthScore === null ? 'N/A' : String(row.healthScore);
@@ -307,6 +308,7 @@ export function buildHelpText(symbols: string[]): string {
     '/coins [COIN] — top coin theo volume: mạnh/yếu so với BTC, spot hay đòn bẩy kéo giá (vd: /coins SOL)',
     '/close SYMBOL EXIT_PRICE — close your most recent open trade on that symbol',
     '/journal — your trade log + win rate / P&L summary',
+    '/risk [VỐN %RỦI_RO] — vốn và % rủi ro mỗi lệnh, để setup tính cỡ lệnh cho bro (vd /risk 1500 1)',
     '/flow — stablecoin supply: money entering or leaving crypto',
     '/alerts on|off — toggle alert push to this chat',
     '/id — chat id của chat này (cần để bật cảnh báo sự cố hệ thống)',
@@ -406,7 +408,36 @@ const SETUP_KIND: Record<SetupDTO['kind'], string> = { pullback: 'Hồi về h�
 const SETUP_END: Record<SetupDTO['status'], string> = { open: 'đang mở', target: '✅ chạm chốt lời', stop: '❌ dính cắt lỗ', expired: '⌛ hết hạn' };
 
 /** /setups — open plans first, then how the recent ones ended. */
-export function formatSetups(setups: SetupDTO[]): string {
+/** The chat's sizing profile, or null when it has not set an account (or the API predates it). */
+export function riskProfileOf(settings: BotSettings | undefined): RiskProfile | null {
+  if (!settings || settings.accountUsd === null || settings.accountUsd === undefined) return null;
+  return { accountUsd: settings.accountUsd, riskPct: settings.riskPct ?? 1 };
+}
+
+/** Reply to /risk: the stored profile and what it means per trade. */
+export function formatRiskProfile(profile: RiskProfile | null): string {
+  if (!profile) {
+    return [
+      '<b>Cỡ lệnh</b>',
+      '',
+      'Chưa đặt vốn. Cảnh báo setup đang tính cỡ lệnh ví dụ trên tài khoản 1.000$, rủi ro 1%.',
+      '',
+      'Đặt: <code>/risk VỐN [%RỦI_RO]</code>, vd <code>/risk 1500 1</code> (vốn 1500$, mất tối đa 1% = 15$ mỗi lệnh dính cắt lỗ).',
+    ].join('\n');
+  }
+  const riskUsd = (profile.accountUsd * profile.riskPct) / 100;
+  return [
+    '<b>Cỡ lệnh</b>',
+    '',
+    `Vốn: ${profile.accountUsd.toLocaleString('en-US')}$ · Rủi ro mỗi lệnh: ${profile.riskPct}% = ${riskUsd.toLocaleString('en-US', { maximumFractionDigits: 2 })}$`,
+    'Cảnh báo setup và /setups sẽ tính cỡ lệnh sao cho dính cắt lỗ thì mất đúng số này.',
+    '',
+    'Đổi: <code>/risk VỐN [%RỦI_RO]</code> · Xoá: <code>/risk off</code>',
+    '<i>Cập nhật vốn khi tài khoản thay đổi nhiều — cỡ lệnh chỉ đúng khi vốn đúng.</i>',
+  ].join('\n');
+}
+
+export function formatSetups(setups: SetupDTO[], profile: RiskProfile | null = null): string {
   const open = setups.filter((s) => s.status === 'open');
   const done = setups.filter((s) => s.status !== 'open').slice(0, 5);
   const lines = ['<b>Setup 4H</b>', ''];
@@ -414,6 +445,10 @@ export function formatSetups(setups: SetupDTO[]): string {
   for (const s of open) {
     lines.push(`🎯 <b>${escapeHtml(s.symbol)}</b> — ${SETUP_KIND[s.kind]}${s.cohort === 'watchlist' ? ' ⭐' : ''}${s.exchange === 'okx' ? ' <i>(nến OKX)</i>' : ''}`);
     lines.push(`  Vào ~${formatPrice(s.entry)} · SL ${formatPrice(s.stop)} · TP ${formatPrice(s.target)} · R:R 1:${s.rr.toFixed(1)}`);
+    if (profile) {
+      const asset = escapeHtml(s.symbol.replace(/USDT$/, ''));
+      for (const line of formatPositionSize(positionSize(profile, 'long', s.entry, s.stop), profile, asset)) lines.push(`  ${line}`);
+    }
   }
   if (done.length > 0) {
     lines.push('', 'Gần đây:');
@@ -423,6 +458,7 @@ export function formatSetups(setups: SetupDTO[]): string {
     }
   }
   if (setups.some((s) => s.cohort === 'watchlist')) lines.push('', '⭐ = coin trong danh sách theo dõi từ /coins — đang kiểm chứng, chưa nên vào tiền thật.');
+  if (!profile && open.length > 0) lines.push('', '<i>/risk VỐN %RỦI_RO để thấy cỡ lệnh cho tài khoản của bro.</i>');
   lines.push('', '<i>Ứng viên, không phải lệnh. Tự xem chart và BTC trước khi vào.</i>');
   return lines.join('\n');
 }

@@ -917,3 +917,30 @@ stablecoins: 30 days).
 - **Framing.** The message says it describes the last 7–30 days and is
   not a sell order; the decision stays with the thesis written in the
   journal.
+
+## 23. Position size from the reader's account (`/risk`)
+
+- **Question.** Neither the setups nor the coin scan has a verdict yet, so
+  the one decision that protects the account whether or not they work is
+  how much goes into each trade. The setup alert printed a size for a
+  round 1,000$ / 1% example; anyone with a different account had to redo
+  the arithmetic, or skip it.
+- **Rule.** `units = account × risk% ÷ |entry − stop|`, so hitting the stop
+  loses exactly the chosen share of the account
+  (`packages/shared/src/sizing.ts`, pure, shared by the worker alert and
+  the bot so they cannot disagree).
+- **Stored per chat** on `bot_settings` (migration 035): `account_usd`
+  (null until set, so an unset chat keeps the labelled example rather than
+  a guess) and `risk_pct` (default 1). Set with `/risk VỐN [%RỦI_RO]`,
+  cleared with `/risk off`.
+- **Bounds.** Account ≥ 10$ (it also catches "1.000" typed with a thousands
+  dot, which parses as 1). Risk 0.1–5%: above 5%, five stops in a row —
+  routine for a setup with a sub-50% hit rate — cost over a quarter of the
+  account. Enforced by the bot, the API and a database check.
+- **When the size exceeds the account** (a stop very close to entry), the
+  message gives the spot maximum and the smaller loss it implies, and
+  says not to add leverage to reach the size. It never prints a leverage
+  figure on its own, which would read as advice to borrow.
+- **Not done.** The web dashboard has no login, so it has no account to
+  size for and keeps the guide's 1% rule as text. The journal does not
+  store a stop yet, so a trade's result is not expressed in R.
