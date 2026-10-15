@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CoinDailyBar, Ticker24h } from '@crypto-signal/indicators';
 import { BinanceRestError } from '@crypto-signal/market-data';
 import type { CoinScanConfig } from '@crypto-signal/shared';
-import { lastClosedDay, scanCoins, scanWithFallback, type CoinScanSource } from './coinScan.js';
+import { lastClosedDay, scanCoins, scanSymbol, scanWithFallback, type CoinScanSource } from './coinScan.js';
 
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 9, 13, 3); // 13/10 03:00 UTC — the 12/10 bar is the last closed one
@@ -154,5 +154,14 @@ describe('scanWithFallback', () => {
       NOW,
     );
     await expect(out).rejects.toThrow(/banned — OKX fallback failed too: OKX 50011/);
+  });
+});
+
+describe('scanSymbol', () => {
+  it('turns journal tickers into scan symbols, leaving addresses alone', () => {
+    expect(scanSymbol('bat')).toBe('BATUSDT');
+    expect(scanSymbol(' BATUSDT ')).toBe('BATUSDT');
+    expect(scanSymbol('1000PEPE')).toBe('1000PEPEUSDT');
+    expect(scanSymbol('0xAbC123def4567890abc')).toBe('0xAbC123def4567890abc');
   });
 });
