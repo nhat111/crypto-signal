@@ -90,7 +90,8 @@ const formatUsd = (n: number): string =>
  * on a stand-in account rather than the reader's own.
  */
 export function formatPositionSize(size: PositionSize, profile: RiskProfile, asset: string, opts: { example?: boolean } = {}): string[] {
-  if (!size.ok) {
+  // `=== false` narrows without strictNullChecks too (Vercel builds the API that way).
+  if (size.ok === false) {
     return [size.reason === 'stop_wrong_side' ? 'Cỡ lệnh: không tính được (cắt lỗ nằm sai phía giá vào).' : 'Cỡ lệnh: không tính được.'];
   }
   const head = `Cỡ lệnh${opts.example ? ' ví dụ' : ''} (TK ${formatUsd(profile.accountUsd)}, rủi ro ${profile.riskPct}%): ${formatUnits(size.units)} ${asset} ≈ ${formatUsd(size.notionalUsd)} · mất ${formatUsd(size.riskUsd)} nếu dính cắt lỗ`;

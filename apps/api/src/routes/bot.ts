@@ -60,7 +60,9 @@ export function registerBotRoutes(app: FastifyInstance, deps: ApiDeps): void {
 
   app.post<{ Params: { chatId: string } }>('/api/bot/settings/:chatId', async (req, reply) => {
     const parsed = parseSettingsBody(req.body);
-    if (!parsed.ok) return reply.code(400).send({ error: parsed.error });
+    // `=== false`, not `!parsed.ok`: Vercel builds this without strictNullChecks,
+    // where truthiness does not narrow the union and the build fails.
+    if (parsed.ok === false) return reply.code(400).send({ error: parsed.error });
     const settings = await updateBotSettings(deps.pool, req.params.chatId, parsed.patch);
     if (!settings) return reply.code(404).send({ error: 'unknown chat, call /api/bot/register first' });
     return { settings };
