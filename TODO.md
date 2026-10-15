@@ -298,6 +298,8 @@ Check items as they land; each phase's commit message references the phase.
 - [x] Whole-day OKX fallback when Binance refuses the server (the first
       production scan hit a spot 418). Days are tagged with their exchange
       so the later judgement can split them.
+- [x] `short_squeeze` flow ("Short bị ép"): price up, OI up, shorts paying
+      funding (ASSUMPTIONS §18). Stored days keep their old labels.
 - [x] Morning digest carries a short coin section: the three strongest vs
       BTC with their flow, and coins that turned to spot buying since the
       day before (same exchange only). Waits up to 2h for the day's scan.
@@ -337,7 +339,7 @@ Check items as they land; each phase's commit message references the phase.
       trades) or ⭐ the day before that turned into a selling or unwinding
       flow, saw funding flip from shorts paying to positive, dropped under
       the RS 20-day average, lost the ⭐ or fell out of the volume ranking.
-      Same exchange both days only (`apps/worker/src/coinWatch.ts`).
+      Same exchange both days only (`apps/worker/src/coinWatch.ts`, ASSUMPTIONS §22).
 - [x] "Spot mỏng" note judged against the day's median spot/perp ratio
       (under half of it), not a fixed 10%, which flagged BTC on OKX.
 - [ ] Intraday funding/OI refresh for ⭐ and held coins, so the exit alert
