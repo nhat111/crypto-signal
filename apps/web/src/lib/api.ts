@@ -18,6 +18,7 @@ import type {
   Trade,
   TradeSourcesResponse,
   TrendResponse,
+  CoinsLiveResponse,
   CoinsResponse,
   CoinEdgeResponse,
   SetupsResponse,
@@ -164,6 +165,10 @@ export function getSetups(limit = 30): Promise<SetupsResponse> {
 
 export function getCoins(): Promise<CoinsResponse> {
   return fetchJson<CoinsResponse>('/api/coins');
+}
+
+export function getCoinsLive(): Promise<CoinsLiveResponse> {
+  return fetchJson<CoinsLiveResponse>('/api/coins/live');
 }
 
 export function getCoinEdge(horizon: 7 | 30): Promise<CoinEdgeResponse> {

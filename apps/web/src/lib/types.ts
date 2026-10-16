@@ -487,6 +487,13 @@ export interface CoinsResponse {
   fetch: { lastAttemptAt: number | null; lastSuccessAt: number | null; consecutiveFailures: number; lastError: string | null } | null;
 }
 
+/** `GET /api/coins/live`: the scanned coins' price now, from OKX. A coin OKX does not list is absent. */
+export interface CoinsLiveResponse {
+  source: 'okx';
+  at: number;
+  prices: Record<string, number>;
+}
+
 export type CoinEdgeVerdict = 'beats' | 'worse' | 'indistinguishable';
 
 export interface CoinEdgeGroup {

@@ -1,18 +1,20 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { getCoins } from '@/lib/api';
+import { getCoins, getCoinsLive } from '@/lib/api';
 import { usePolling } from '@/lib/usePolling';
 import { useTrackedSymbols } from '@/lib/useTrackedSymbols';
 import { cx, formatRelativeTime } from '@/lib/format';
 import { FLOW_META, sortCoins, type CoinSort } from '@/lib/coinFlow';
-import type { CoinFlow, CoinsResponse } from '@/lib/types';
+import type { CoinFlow, CoinsLiveResponse, CoinsResponse } from '@/lib/types';
 import { CoinTable, FlowBadge } from '@/components/coins/CoinTable';
 import { CoinEdgePanel } from '@/components/coins/CoinEdgePanel';
 import { LoadingPanel, StatePanel } from '@/components/StatePanel';
 
 /** The scan changes once a day; a ten-minute poll only catches the morning's run. */
 const POLL_MS = 10 * 60_000;
+/** The live column only; the API reuses one OKX read for 30 s, so a minute is plenty. */
+const LIVE_POLL_MS = 60_000;
 
 const SORTS: Array<{ key: CoinSort; label: string }> = [
   { key: 'rs30', label: 'Mạnh vs BTC 30N' },
@@ -39,6 +41,7 @@ const LEGEND_ORDER: CoinFlow[] = [
 
 export default function CoinsPage() {
   const coins = usePolling(getCoins, POLL_MS, []);
+  const live = usePolling(getCoinsLive, LIVE_POLL_MS, []);
   const tracked = useTrackedSymbols();
   const [sort, setSort] = useState<CoinSort>('rs30');
   const rows = useMemo(() => sortCoins(coins.data?.rows ?? [], sort), [coins.data, sort]);
@@ -57,7 +60,7 @@ export default function CoinsPage() {
         </p>
       </header>
 
-      <Body state={coins} rows={rows} tracked={tracked} sort={sort} onSort={setSort} />
+      <Body state={coins} rows={rows} tracked={tracked} sort={sort} onSort={setSort} live={live.data} />
 
       <CoinEdgePanel />
 
@@ -88,8 +91,10 @@ function Body({
   tracked,
   sort,
   onSort,
+  live,
 }: {
   state: { data: CoinsResponse | null; error: string | null; loading: boolean };
+  live: CoinsLiveResponse | null;
   rows: CoinsResponse['rows'];
   tracked: string[];
   sort: CoinSort;
@@ -159,7 +164,7 @@ function Body({
           Telegram và so với setup trên các coin còn lại ở mục Setup 4H trang chủ.
         </p>
       )}
-      <CoinTable rows={rows} trackedSymbols={tracked} watchlist={data.watchlist} />
+      <CoinTable rows={rows} trackedSymbols={tracked} watchlist={data.watchlist} closeDay={data.day} live={live} />
     </div>
   );
 }
