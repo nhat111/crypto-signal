@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FLOW_META, edgeVerdictText, sortCoins } from './coinFlow';
+import { FLOW_META, changeSinceClose, edgeVerdictText, shortDay, sortCoins } from './coinFlow';
 import type { CoinScanRow } from './types';
 
 const row = (symbol: string, volumeRank: number, rs30d: number | null, rs7d: number | null): CoinScanRow =>
@@ -35,5 +35,20 @@ describe('edgeVerdictText', () => {
     expect(edgeVerdictText({ ...base, verdict: 'beats' }, 20)).toEqual({ text: 'Có lợi thế thật', tone: 'good' });
     expect(edgeVerdictText({ ...base, verdict: 'worse' }, 20).tone).toBe('bad');
     expect(edgeVerdictText({ ...base, verdict: 'indistinguishable' }, 20).text).toContain('Chưa phân biệt');
+  });
+});
+
+describe('shortDay / changeSinceClose', () => {
+  it('prints the scan day as dd/mm, and nothing for a missing or odd day', () => {
+    expect(shortDay('2026-10-14')).toBe('14/10');
+    expect(shortDay(null)).toBeNull();
+    expect(shortDay('14/10')).toBeNull();
+  });
+
+  it('measures the move from the close to the live price', () => {
+    // NEAR on 15/10: closed 4.888 on the 14th, traded at 5.265.
+    expect(changeSinceClose(4.888, 5.265)).toBeCloseTo(7.71, 2);
+    expect(changeSinceClose(4.888, undefined)).toBeNull();
+    expect(changeSinceClose(0, 5)).toBeNull();
   });
 });

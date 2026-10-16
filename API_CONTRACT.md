@@ -548,6 +548,21 @@ protocol family, and the changes that cleared their thresholds as `bull` /
 not be read. No composite score. Empty
 `rows` with `enabled: true` means not run yet or failing — `fetch` says which.
 
+## `GET /api/coins/live`
+
+The latest scan's coins at their price now, read from OKX on request
+(whichever exchange the scan day used; Binance refuses the server).
+Cached 30 s server-side; nothing is stored.
+
+```json
+{ "source": "okx", "at": 1792041468000, "prices": { "NEARUSDT": 5.287, "BTCUSDT": 82243.7 } }
+```
+
+A coin OKX does not list is absent from `prices`. OKX unreachable →
+`502 { error }`; clients then show the scan's close alone. The scan's
+own `close` is the daily close of `day`, and every other figure in
+`/api/coins` is computed up to it; this price changes none of them.
+
 ## `GET /api/coins/edge?horizon=7|30`
 Whether the coin scan's groups went on to beat BTC over the next `horizon`
 days, per exchange.

@@ -3,8 +3,8 @@
 import { Fragment, useState } from 'react';
 import Link from 'next/link';
 import { cx, formatPct, formatTokenPrice } from '@/lib/format';
-import { FLOW_META, type FlowTone } from '@/lib/coinFlow';
-import type { CoinFlow, CoinScanRow } from '@/lib/types';
+import { changeSinceClose, FLOW_META, shortDay, type FlowTone } from '@/lib/coinFlow';
+import type { CoinFlow, CoinScanRow, CoinsLiveResponse } from '@/lib/types';
 
 const TONE_CLASS: Record<FlowTone, string> = {
   good: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
@@ -67,6 +67,17 @@ function FundamentalsDetail({ f }: { f: CoinScanRow['fundamentals'] }) {
   );
 }
 
+/** The price now and its move since the scan's close, kept visually lighter than the scan's own columns. */
+function LiveCell({ close, price }: { close: number; price: number | undefined }) {
+  if (price === undefined) return <td className="px-3 py-2 text-right text-slate-600">—</td>;
+  return (
+    <td className="px-3 py-2 text-right">
+      <div className="tabular-nums text-slate-400">{formatTokenPrice(price)}</div>
+      <div className="text-[10px]"><Signed value={changeSinceClose(close, price)} /></div>
+    </td>
+  );
+}
+
 /** Taker skew as "buy share minus sell share", in percentage points of volume. */
 const skewPct = (skew: number | null): number | null => (skew === null ? null : skew * 100);
 
@@ -75,8 +86,24 @@ const skewPct = (skew: number | null): number | null => (skew === null ? null : 
  * with the coin column pinned — the page itself never scrolls sideways.
  * A row opens to the reasons behind its label and what could not be read.
  */
-export function CoinTable({ rows, trackedSymbols, watchlist = [] }: { rows: CoinScanRow[]; trackedSymbols: string[]; watchlist?: string[] }) {
+export function CoinTable({
+  rows,
+  trackedSymbols,
+  watchlist = [],
+  closeDay = null,
+  live = null,
+}: {
+  rows: CoinScanRow[];
+  trackedSymbols: string[];
+  watchlist?: string[];
+  /** The scan day (`YYYY-MM-DD`): every column but the live one is computed up to that day's close. */
+  closeDay?: string | null;
+  /** Prices now, or null while loading / when OKX could not be read. */
+  live?: CoinsLiveResponse | null;
+}) {
   const [open, setOpen] = useState<string | null>(null);
+  const day = shortDay(closeDay);
+  const liveAt = live ? new Date(live.at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : null;
 
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-800">
@@ -93,7 +120,19 @@ export function CoinTable({ rows, trackedSymbols, watchlist = [] }: { rows: Coin
             <th className="px-3 py-2 text-right font-medium" title="Mua chủ động trừ bán chủ động trên spot, % khối lượng 7 ngày">Spot lệch 7N</th>
             <th className="px-3 py-2 text-right font-medium" title="Thay đổi open interest 7 ngày, tính theo hợp đồng">OI 7N</th>
             <th className="px-3 py-2 text-right font-medium" title="Funding trung bình 7 ngày, quy về mỗi 8 giờ">Funding/8h</th>
-            <th className="px-3 py-2 text-right font-medium">Giá</th>
+            {/* Labelled with its day: an unlabelled "Giá" read as the price now, and on the day after a scan it is a full day old. */}
+            <th
+              className="px-3 py-2 text-right font-medium"
+              title={`Giá đóng nến ngày${day ? ` ${day}` : ''} (UTC, tức 7h sáng hôm sau giờ VN). Mọi cột bên trái đều tính tới nến này.`}
+            >
+              {day ? `Đóng ${day}` : 'Giá đóng'}
+            </th>
+            <th
+              className="px-3 py-2 text-right font-medium"
+              title={`Giá OKX${liveAt ? ` lúc ${liveAt}` : ''}, làm mới mỗi phút, và % so với giá đóng. Chỉ để biết giá đang ở đâu: các cột 7N/30N và nhãn dòng tiền không đổi theo giá này.`}
+            >
+              Hiện tại
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -131,10 +170,11 @@ export function CoinTable({ rows, trackedSymbols, watchlist = [] }: { rows: Coin
                     {row.fundingAvg7dPct === null ? <span className="text-slate-600">—</span> : `${row.fundingAvg7dPct.toFixed(4)}%`}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums text-slate-300">{formatTokenPrice(row.close)}</td>
+                  <LiveCell close={row.close} price={live?.prices[row.symbol]} />
                 </tr>
                 {isOpen && (
                   <tr className="border-t border-slate-800/40 bg-slate-900/40">
-                    <td colSpan={11} className="px-3 py-3">
+                    <td colSpan={12} className="px-3 py-3">
                       <div className="sticky left-3 max-w-[calc(100vw-4rem)] space-y-2 sm:max-w-3xl">
                         <p className="text-slate-400">{FLOW_META[row.flow]?.meaning}</p>
                         <ul className="list-disc space-y-0.5 pl-4 text-slate-300">

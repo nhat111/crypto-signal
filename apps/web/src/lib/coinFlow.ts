@@ -49,3 +49,15 @@ export function edgeVerdictText(c: CoinEdgeComparison, minSamples: number): { te
   if (c.verdict === 'worse') return { text: 'Tệ hơn mức nền', tone: 'bad' };
   return { text: 'Chưa phân biệt được với mức nền', tone: 'neutral' };
 }
+
+/** "2026-10-14" → "14/10": the scan day as the column header says it. */
+export function shortDay(day: string | null | undefined): string | null {
+  const m = day ? /^\d{4}-(\d{2})-(\d{2})$/.exec(day) : null;
+  return m ? `${m[2]}/${m[1]}` : null;
+}
+
+/** Percent move from the scan's daily close to the live price; null when either is missing. */
+export function changeSinceClose(close: number | null | undefined, live: number | null | undefined): number | null {
+  if (close === null || close === undefined || live === null || live === undefined || !(close > 0) || !Number.isFinite(live)) return null;
+  return ((live - close) / close) * 100;
+}
