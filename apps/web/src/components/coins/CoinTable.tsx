@@ -118,7 +118,7 @@ export function CoinTable({
             <th className="px-3 py-2 text-right font-medium">Giá 7N</th>
             <th className="px-3 py-2 text-right font-medium">Giá 30N</th>
             <th className="px-3 py-2 text-right font-medium" title="Mua chủ động trừ bán chủ động trên spot, % khối lượng 7 ngày">Spot lệch 7N</th>
-            <th className="px-3 py-2 text-right font-medium" title="Thay đổi open interest 7 ngày, tính theo hợp đồng">OI 7N</th>
+            <th className="px-3 py-2 text-right font-medium" title="Thay đổi open interest 7 ngày, tính theo số coin, cộng nhiều sàn (sàn quét + Bybit + Gate)">OI 7N</th>
             <th className="px-3 py-2 text-right font-medium" title="Funding trung bình 7 ngày, quy về mỗi 8 giờ">Funding/8h</th>
             {/* Labelled with its day: an unlabelled "Giá" read as the price now, and on the day after a scan it is a full day old. */}
             <th

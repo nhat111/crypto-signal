@@ -52,6 +52,8 @@ const envSchema = z.object({
   COIN_SCAN: z.string().default('on'),
   // How many coins it reads, by 24h spot volume. Each costs three REST requests a day.
   COIN_SCAN_TOP_N: numeric(30),
+  // Exchanges whose daily OI is added to the scan's own (Binance or OKX), comma-separated: bybit, gate. Empty = own exchange only.
+  COIN_SCAN_OI_VENUES: z.string().default('bybit,gate'),
   // 4H setups on the scanned coins (watchlist alerted, the rest kept as the baseline). On unless off/0/false; needs COIN_SCAN.
   COIN_SETUPS: z.string().default('on'),
   // How many scanned coins make the daily watchlist whose setups are alerted.
@@ -199,6 +201,17 @@ export interface CoinScanConfig {
   setups: boolean;
   /** Coins on the daily watchlist; their setups are the ones alerted. */
   watchlistSize: number;
+  /** Extra venues summed into the 7-day OI change (`bybit`, `gate`); the scan's own exchange is always in. */
+  oiVenues: CoinScanOiVenue[];
+}
+
+export const COIN_SCAN_OI_VENUES = ['bybit', 'gate'] as const;
+export type CoinScanOiVenue = (typeof COIN_SCAN_OI_VENUES)[number];
+
+/** Unknown names are dropped rather than failing startup: a typo costs one venue, not the worker. */
+export function parseOiVenues(raw: string): CoinScanOiVenue[] {
+  const wanted = new Set(raw.split(',').map((s) => s.trim().toLowerCase()));
+  return COIN_SCAN_OI_VENUES.filter((v) => wanted.has(v));
 }
 
 const COIN_SCAN_THRESHOLDS: CoinScanThresholds = {
@@ -377,6 +390,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       thresholds: COIN_SCAN_THRESHOLDS,
       setups: isEnabledFlag(parsed.COIN_SCAN) && isEnabledFlag(parsed.COIN_SETUPS),
       watchlistSize: Math.min(20, Math.max(0, Math.round(parsed.COIN_WATCHLIST_SIZE))),
+      oiVenues: parseOiVenues(parsed.COIN_SCAN_OI_VENUES),
     },
     symbols: parsed.SYMBOLS.split(',').map((s) => s.trim()).filter(Boolean),
     futuresOnlySymbols: parsed.FUTURES_ONLY_SYMBOLS.split(',').map((s) => s.trim()).filter(Boolean),

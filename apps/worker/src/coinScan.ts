@@ -18,8 +18,10 @@ import {
   pickCoinUniverse,
   pickWatchlist,
   readCoin,
+  sumDailyOpenInterest,
   type CoinDailyBar,
   type CoinUniverseEntry,
+  type OiDay,
   type Ticker24h,
 } from '@crypto-signal/indicators';
 import { BinanceRestError, type BinanceFuturesAdapter, type BinanceSpotAdapter, type OkxCoinScanData } from '@crypto-signal/market-data';
@@ -44,17 +46,73 @@ export interface CoinScanSource {
   spotTickers(): Promise<Ticker24h[]>;
   futuresTickers(): Promise<Ticker24h[]>;
   dailyBars(symbol: string, now: number): Promise<CoinDailyBar[]>;
-  dailyOpenInterest(futuresSymbol: string): Promise<number[]>;
+  /**
+   * Daily OI in coins, oldest first, summed over the scan's exchange and
+   * every other venue that covers the window (`sumDailyOpenInterest`).
+   * `base` is the spot coin (PEPE for 1000PEPEUSDT). A failure of the
+   * scan's own exchange throws; another venue failing only leaves it out.
+   */
+  dailyOpenInterest(futuresSymbol: string, base: string): Promise<{ coins: number[]; venues: string[] }>;
   /** Funding over the last seven days, scaled to 8h. */
   funding7d(futuresSymbol: string, now: number): Promise<number[]>;
 }
 
-export function binanceCoinScanSource(spot: BinanceSpotAdapter, futures: BinanceFuturesAdapter): CoinScanSource {
+/**
+ * Another exchange's daily OI, added to the scan's own. Free public
+ * endpoints only. Binance is not one: it refuses the production server,
+ * and on the days it does answer it is already the scan's own venue.
+ */
+export interface OiVenue {
+  readonly name: string;
+  dailyOpenInterest(base: string, points: number): Promise<OiDay[]>;
+}
+
+/** OKX as an extra venue, on the days Binance answers and is the scan's own. */
+export function okxOiVenue(okx: OkxCoinScanData): OiVenue {
+  return { name: 'okx', dailyOpenInterest: (base, points) => okx.dailyOpenInterest(`${base}USDT`, points) };
+}
+
+/** Binance lists some perps per 1000 or 1,000,000 coins; its OI is in those units. */
+function binanceOiScale(futuresSymbol: string, base: string): number {
+  if (futuresSymbol === `1000000${base}USDT`) return 1_000_000;
+  if (futuresSymbol === `1000${base}USDT`) return 1000;
+  return 1;
+}
+
+/**
+ * The scan's own venue first (its errors decide whether futures are
+ * refused), then the others, each allowed to fail on its own.
+ */
+async function aggregatedOi(
+  primary: { venue: string; read: () => Promise<OiDay[]> },
+  extras: OiVenue[],
+  base: string,
+): Promise<{ coins: number[]; venues: string[] }> {
+  const days = await primary.read();
+  // A coin with no OI on its own venue has nothing for the others to line up with.
+  if (days.length === 0) return { coins: [], venues: [] };
+  const others = [];
+  for (const venue of extras) {
+    const read = await venue.dailyOpenInterest(base, OI_POINTS + 1).catch(() => [] as OiDay[]);
+    others.push({ venue: venue.name, days: read });
+  }
+  return sumDailyOpenInterest({ venue: primary.venue, days }, others, OI_POINTS);
+}
+
+export function binanceCoinScanSource(spot: BinanceSpotAdapter, futures: BinanceFuturesAdapter, extraOi: OiVenue[] = []): CoinScanSource {
   return {
     spotTickers: () => spot.fetch24hTickers(),
     futuresTickers: () => futures.fetch24hTickers(),
     dailyBars: (symbol, now) => spot.fetchClosedFlowBars(symbol, '1d', DAILY_BARS, now),
-    dailyOpenInterest: async (symbol) => (await futures.fetchDailyOpenInterest(symbol, OI_POINTS)).map((p) => p.contracts),
+    dailyOpenInterest: (symbol, base) =>
+      aggregatedOi(
+        {
+          venue: 'binance',
+          read: async () => (await futures.fetchDailyOpenInterest(symbol, OI_POINTS + 1)).map((p) => ({ time: p.timestamp, coins: p.contracts * binanceOiScale(symbol, base) })),
+        },
+        extraOi,
+        base,
+      ),
     funding7d: async (symbol, now) => fundingPer8h(await futures.fetchFundingRateHistory(symbol, { startTime: now - 7 * DAY_MS, limit: 200 })),
   };
 }
@@ -65,12 +123,12 @@ export function binanceCoinScanSource(spot: BinanceSpotAdapter, futures: Binance
  * exchanges' order flow — their taker skews disagree in sign on some coins
  * (BNB, TRX), which is a real difference between venues, not noise.
  */
-export function okxCoinScanSource(okx: OkxCoinScanData): CoinScanSource {
+export function okxCoinScanSource(okx: OkxCoinScanData, extraOi: OiVenue[] = []): CoinScanSource {
   return {
     spotTickers: () => okx.spotTickers(),
     futuresTickers: () => okx.swapTickers(),
     dailyBars: (symbol, now) => okx.dailyFlowBars(symbol, DAILY_BARS, now),
-    dailyOpenInterest: (symbol) => okx.dailyOpenInterest(symbol, OI_POINTS),
+    dailyOpenInterest: (symbol, base) => aggregatedOi({ venue: 'okx', read: () => okx.dailyOpenInterest(symbol, OI_POINTS + 1) }, extraOi, base),
     funding7d: async (symbol, now) => fundingPer8h(await okx.fundingHistory(symbol, now - 7 * DAY_MS)),
   };
 }
@@ -81,6 +139,8 @@ export interface CoinScanResult {
   inputs: CoinScanInput[];
   /** Per-coin problems that did not stop the scan. */
   skipped: string[];
+  /** How many coins each venue's OI was summed into: whether the extra venues actually answer. */
+  oiVenues: Record<string, number>;
 }
 
 /**
@@ -120,6 +180,7 @@ export async function scanCoins(source: CoinScanSource, config: CoinScanConfig, 
 
   const inputs: CoinScanInput[] = [];
   const skipped: string[] = [];
+  const oiVenues: Record<string, number> = {};
   let futuresBanned = futuresUnreadable;
 
   for (const entry of universe) {
@@ -139,11 +200,12 @@ export async function scanCoins(source: CoinScanSource, config: CoinScanConfig, 
         continue;
       }
 
-      const { oi, funding } = futuresBanned ? { oi: null, funding: null } : await readLeverage(source, entry, now).catch((err: unknown) => {
+      const { oi, funding, venues } = futuresBanned ? { oi: null, funding: null, venues: [] } : await readLeverage(source, entry, now).catch((err: unknown) => {
         if (isRefused(err)) futuresBanned = true;
         skipped.push(`${entry.symbol}: futures read failed — ${message(err)}`);
-        return { oi: null, funding: null };
+        return { oi: null, funding: null, venues: [] };
       });
+      for (const v of venues) oiVenues[v] = (oiVenues[v] ?? 0) + 1;
 
       const read = readCoin({
         symbol: entry.symbol,
@@ -169,14 +231,18 @@ export async function scanCoins(source: CoinScanSource, config: CoinScanConfig, 
   // Thin spot is judged against the day's other coins, not a fixed ratio:
   // on OKX perps out-trade spot almost everywhere, BTC included.
   const reads = flagThinSpot(inputs.map((i) => i.read));
-  return { day, inputs: inputs.map((i, n) => ({ ...i, read: reads[n] ?? i.read })), skipped };
+  return { day, inputs: inputs.map((i, n) => ({ ...i, read: reads[n] ?? i.read })), skipped, oiVenues };
 }
 
-async function readLeverage(source: CoinScanSource, entry: CoinUniverseEntry, now: number): Promise<{ oi: number[] | null; funding: number[] | null }> {
-  if (!entry.futuresSymbol) return { oi: null, funding: null };
-  const oi = await source.dailyOpenInterest(entry.futuresSymbol);
+async function readLeverage(
+  source: CoinScanSource,
+  entry: CoinUniverseEntry,
+  now: number,
+): Promise<{ oi: number[] | null; funding: number[] | null; venues: string[] }> {
+  if (!entry.futuresSymbol) return { oi: null, funding: null, venues: [] };
+  const oi = await source.dailyOpenInterest(entry.futuresSymbol, entry.base);
   const funding = await source.funding7d(entry.futuresSymbol, now);
-  return { oi, funding };
+  return { oi: oi.coins, funding, venues: oi.venues };
 }
 
 /**
@@ -220,8 +286,8 @@ export async function runCoinScanCycle(ctx: WorkerContext, now = Date.now(), sou
   let storedDay: string;
   try {
     const { result, exchange, binanceError } = await scanWithFallback(
-      source ?? binanceCoinScanSource(ctx.spotAdapter, ctx.futuresAdapter),
-      source ? null : ctx.okxCoinScan ? okxCoinScanSource(ctx.okxCoinScan) : null,
+      source ?? binanceCoinScanSource(ctx.spotAdapter, ctx.futuresAdapter, [...(ctx.okxCoinScan ? [okxOiVenue(ctx.okxCoinScan)] : []), ...(ctx.oiVenues ?? [])]),
+      source ? null : ctx.okxCoinScan ? okxCoinScanSource(ctx.okxCoinScan, ctx.oiVenues ?? []) : null,
       ctx.config.coinScan,
       now,
     );
@@ -245,7 +311,7 @@ export async function runCoinScanCycle(ctx: WorkerContext, now = Date.now(), sou
     storedDay = result.day;
     await recordJobSuccess(ctx.pool, JOB_COIN_SCAN);
     if (binanceError) ctx.logger.warn({ binanceError }, 'coin scan read from OKX — Binance refused the server');
-    ctx.logger.info({ day: result.day, exchange, coins: result.inputs.length, skipped: result.skipped }, 'coin scan stored');
+    ctx.logger.info({ day: result.day, exchange, coins: result.inputs.length, skipped: result.skipped, oiVenues: result.oiVenues }, 'coin scan stored');
   } catch (err) {
     await recordJobFailure(ctx.pool, JOB_COIN_SCAN, err).catch(() => undefined);
     throw err;

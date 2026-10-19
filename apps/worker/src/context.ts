@@ -11,6 +11,7 @@ import type {
 import type { SignalType } from '@crypto-signal/signal-engine';
 import type { GemConfig } from '@crypto-signal/gem-scanner';
 import type { SignalVerdict } from '@crypto-signal/db';
+import type { OiVenue } from './coinScan.js';
 import { TelegramNotifier } from './telegramNotifier.js';
 import { CandlePairBuffer, SymbolTimeframeState, stateKey } from './state.js';
 
@@ -27,6 +28,8 @@ export interface WorkerContext {
   okxSpot?: OkxSpotCandles;
   /** The wide coin scan's fallback when Binance refuses this server. A whole scan comes from one exchange or the other, never both. */
   okxCoinScan?: OkxCoinScanData;
+  /** Venues whose daily OI the coin scan adds to its own exchange's (Bybit, Gate). Absent in tests. */
+  oiVenues?: OiVenue[];
   /** Fees / TVL / stablecoins for the coin scan's fundamentals. Absent in tests; its failure never fails the scan. */
   defiLlama?: DefiLlamaFundamentalsSource;
   states: Map<string, SymbolTimeframeState>;

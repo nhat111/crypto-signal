@@ -11,3 +11,5 @@ export * from './stablecoin/defillama.js';
 export * from './okx/spotCandles.js';
 export * from './okx/coinScanData.js';
 export * from './defillama/fundamentals.js';
+export * from './bybit/openInterest.js';
+export * from './gate/openInterest.js';

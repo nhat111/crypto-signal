@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { CoinDailyBar, Ticker24h } from '@crypto-signal/indicators';
 import { BinanceRestError } from '@crypto-signal/market-data';
 import type { CoinScanConfig } from '@crypto-signal/shared';
-import { lastClosedDay, scanCoins, scanSymbol, scanWithFallback, type CoinScanSource } from './coinScan.js';
+import type { OkxCoinScanData } from '@crypto-signal/market-data';
+import { lastClosedDay, okxCoinScanSource, scanCoins, scanSymbol, scanWithFallback, type CoinScanSource, type OiVenue } from './coinScan.js';
 
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 9, 13, 3); // 13/10 03:00 UTC — the 12/10 bar is the last closed one
@@ -12,6 +13,7 @@ const CONFIG: CoinScanConfig = {
   thresholds: { priceMovePct: 3, takerSkew: 0.02, oiRisePct: 10, oiFallPct: -10, fundingElevatedPct: 0.03, fundingShortsPayPct: -0.005 },
   setups: true,
   watchlistSize: 6,
+  oiVenues: [],
 };
 
 function bars(n: number, daily: number, lastOpen = Date.UTC(2026, 9, 12)): CoinDailyBar[] {
@@ -45,7 +47,7 @@ function source(overrides: Partial<CoinScanSource> = {}): CoinScanSource & { cal
     },
     dailyOpenInterest: async (symbol) => {
       calls.push(`oi:${symbol}`);
-      return [100, 100, 100, 100, 100, 100, 100, 120];
+      return { coins: [100, 100, 100, 100, 100, 100, 100, 120], venues: ['binance', 'gate'] };
     },
     funding7d: async (symbol) => {
       calls.push(`funding:${symbol}`);
@@ -83,6 +85,8 @@ describe('scanCoins', () => {
     expect(eth?.oiChange7dPct).toBeCloseTo(20, 9);
     expect(eth?.flow).toBe('spot_and_leverage');
     expect(result.inputs[1]?.futuresSymbol).toBe('ETHUSDT');
+    // BTC and ETH both had a perp, so both venues were summed into both.
+    expect(result.oiVenues).toEqual({ binance: 2, gate: 2 });
   });
 
   it('keeps the spot read when the futures market refuses the server, and says so per coin', async () => {
@@ -163,5 +167,43 @@ describe('scanSymbol', () => {
     expect(scanSymbol(' BATUSDT ')).toBe('BATUSDT');
     expect(scanSymbol('1000PEPE')).toBe('1000PEPEUSDT');
     expect(scanSymbol('0xAbC123def4567890abc')).toBe('0xAbC123def4567890abc');
+  });
+});
+
+describe('summed open interest', () => {
+  const day = (i: number): number => Date.UTC(2026, 9, 4) + i * DAY;
+  const series = (values: number[]) => values.map((coins, i) => ({ time: day(i), coins }));
+  const okx = (read: () => Promise<Array<{ time: number; coins: number }>>) => ({ dailyOpenInterest: read }) as unknown as OkxCoinScanData;
+  const venue = (name: string, read: OiVenue['dailyOpenInterest']): OiVenue => ({ name, dailyOpenInterest: read });
+
+  it('adds the other venues to the scan exchange and leaves out one that fails', async () => {
+    const src = okxCoinScanSource(okx(async () => series([10, 10, 10, 10, 10, 10, 10, 10, 10])), [
+      venue('bybit', async (base) => (base === 'ETH' ? series([5, 5, 5, 5, 5, 5, 5, 5, 15]) : [])),
+      venue('gate', async () => Promise.reject(new Error('HTTP 400'))),
+    ]);
+    const oi = await src.dailyOpenInterest('ETHUSDT', 'ETH');
+    expect(oi.venues).toEqual(['okx', 'bybit']);
+    expect(oi.coins).toHaveLength(8);
+    // 15 → 25: the change Bybit's longs added, which OKX alone would read as flat.
+    expect(oi.coins[0]).toBe(15);
+    expect(oi.coins[7]).toBe(25);
+  });
+
+  it('still throws when the scan exchange itself fails, so a ban stops futures reads', async () => {
+    const ban = new BinanceRestError('banned', 418, undefined);
+    const src = okxCoinScanSource(okx(async () => Promise.reject(ban)), [venue('bybit', async () => series([1]))]);
+    await expect(src.dailyOpenInterest('ETHUSDT', 'ETH')).rejects.toBe(ban);
+  });
+
+  it('asks no other venue for a coin the scan exchange has no OI for', async () => {
+    let asked = 0;
+    const src = okxCoinScanSource(okx(async () => []), [
+      venue('bybit', async () => {
+        asked += 1;
+        return series([1]);
+      }),
+    ]);
+    expect(await src.dailyOpenInterest('ETHUSDT', 'ETH')).toEqual({ coins: [], venues: [] });
+    expect(asked).toBe(0);
   });
 });

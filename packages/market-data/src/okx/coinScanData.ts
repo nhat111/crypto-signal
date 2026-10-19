@@ -19,7 +19,8 @@ import type { FlowBar, Ticker24hRow } from '../types.js';
  *   against Binance's taker skew on nine majors: the coins without an
  *   exchange-specific story (SOL, LINK, ZEC, ETH, DOGE) agree in sign.
  * - /rubik/stat/contracts/open-interest-history: `[ts, oi, oiCcy, oiUsd]`,
- *   `oiCcy` in coins — the unit that price alone cannot move.
+ *   `oiCcy` in coins — the unit that price alone cannot move. `period=1Dutc`
+ *   puts `ts` at UTC midnight (plain `1D` is Hong Kong days), newest first.
  * - /public/funding-rate-history: objects with `fundingRate`, `fundingTime`.
  *
  * An instrument OKX does not list answers HTTP 200 with a non-zero code
@@ -95,15 +96,15 @@ export class OkxCoinScanData {
     return mergeTakerVolume(parseClosedCandles(candles, now), taker ?? []).slice(-limit);
   }
 
-  /** Daily open interest in coins, oldest first. Empty when OKX has no perpetual for it. */
-  async dailyOpenInterest(symbol: string, points: number): Promise<number[]> {
+  /**
+   * Daily open interest in coins, oldest first, on UTC days (`1Dutc`, the
+   * forming day included) so it lines up with the other venues it is
+   * summed with. Empty when OKX has no perpetual for it.
+   */
+  async dailyOpenInterest(symbol: string, points: number): Promise<Array<{ time: number; coins: number }>> {
     const instId = `${baseOf(symbol)}-USDT-SWAP`;
-    const rows = await this.get(`/api/v5/rubik/stat/contracts/open-interest-history?instId=${encodeURIComponent(instId)}&period=1D&limit=${points}`, rowsSchema);
-    return (rows ?? [])
-      .map((r) => ({ ts: Number(r[0]), coins: Number(r[2]) }))
-      .filter((r) => Number.isFinite(r.ts) && Number.isFinite(r.coins))
-      .sort((a, b) => a.ts - b.ts)
-      .map((r) => r.coins);
+    const rows = await this.get(`/api/v5/rubik/stat/contracts/open-interest-history?instId=${encodeURIComponent(instId)}&period=1Dutc&limit=${points}`, rowsSchema);
+    return parseOpenInterest(rows ?? []);
   }
 
   /** Funding prints since `startTime`, oldest first, as OKX printed them (per settlement period). */
@@ -189,4 +190,12 @@ export function mergeTakerVolume(bars: FlowBar[], takerRows: string[][]): FlowBa
     const t = byUtcDay.get(b.openTime);
     return t ? { ...b, quoteVolume: t.buy + t.sell, takerBuyQuoteVolume: t.buy } : b;
   });
+}
+
+/** OKX's `[ts, oi, oiCcy, oiUsd]` rows as coins per day, oldest first. */
+export function parseOpenInterest(rows: string[][]): Array<{ time: number; coins: number }> {
+  return rows
+    .map((r) => ({ time: Number(r[0]), coins: Number(r[2]) }))
+    .filter((r) => Number.isFinite(r.time) && Number.isFinite(r.coins))
+    .sort((a, b) => a.time - b.time);
 }
