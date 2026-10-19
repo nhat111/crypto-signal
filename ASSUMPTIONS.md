@@ -771,8 +771,9 @@ three requests per coin plus two ticker calls. Decisions:
   fiat and wrapped tokens are excluded by name; anything whose last 30
   closes stayed within 2% is skipped as pegged (this caught `UUSDT`, which
   no list had). BTC is always included — it is the yardstick.
-- **Perp matching** tries `X`, `1000X`, `1000000X`. OI change is a ratio,
-  so the multiplier cancels.
+- **Perp matching** tries `X`, `1000X`, `1000000X`. Binance's OI on a
+  1000x perp is in those units; it is scaled back to coins before it is
+  summed with other venues (below).
 - **Relative strength, not a score.** RS vs BTC (7d/30d), the ratio against
   its 20-day mean, and the average excess return on BTC's red days are
   separate columns. Ranking defaults to 30-day RS.
@@ -810,6 +811,26 @@ three requests per coin plus two ticker calls. Decisions:
   and disagreed on BNB and TRX — a real difference between venues, which
   is why the days are kept apart. Any other Binance failure is rethrown,
   not covered by OKX.
+- **OI summed across venues, the one exception to "one exchange a day".**
+  The 7-day OI change is the scan's own exchange (Binance, or OKX on a
+  fallback day) plus every venue in `COIN_SCAN_OI_VENUES` (default Bybit
+  and Gate; OKX too on a Binance day), all free public endpoints, summed
+  in coins per UTC day (`sumDailyOpenInterest`). One venue's OI is one
+  venue's crowd: leverage moving from OKX to Bybit read as "OI falling".
+  OI in coins adds up across venues in a way taker skew does not, which
+  is why only OI is mixed. A venue is in a coin's sum only if it covers
+  every day of the window; otherwise it is dropped for that coin (one
+  missing only the forming day shifts the window back a day instead), so
+  a listing that starts mid-week never reads as new positions. Another
+  venue failing never fails the coin: it is just left out; the scan's
+  own exchange failing still stops futures reads as before. OKX's OI
+  moved from Hong Kong days (`1D`) to UTC days (`1Dutc`) to line up.
+  Gate's figures are large next to OKX's (BTC ~1.7x, PEPE ~3x in coins
+  on 2026-10-19), so its moves weigh heavily; drop it from the env var if
+  that reads wrong. Bybit's shape is from its docs only: the build
+  environment's region is blocked by Bybit's CDN. The worker log line
+  `coin scan stored` has `oiVenues`, the number of coins each venue was
+  summed into, which says whether a venue actually answers from Render.
 - **Stored per day** (`coin_scan_rows`, migration 028) with the close on
   every row, so the labels and the RS ranking can later be judged against
   the next 7–30 days the same way signals are. Not judged yet: there is no

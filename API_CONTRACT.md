@@ -536,7 +536,9 @@ same days, 0 for BTC itself. `rsAboveSma20`: the coin/BTC ratio closed above
 its 20-day mean. `downDayExcess`: mean daily return over BTC on the days BTC
 closed red in the last 30 (null under 5 such days). `takerSkew*` is
 (taker buy − taker sell) / spot quote volume, −1…1. `oiChange7dPct` is in
-contracts, so price alone cannot move it; `fundingAvg7dPct` is scaled to 8h
+coins, so price alone cannot move it, and summed over the scan's exchange
+plus Bybit and Gate (OKX too on a Binance day) where each covers the whole
+week (ASSUMPTIONS §18); `fundingAvg7dPct` is scaled to 8h
 whatever the perp's settlement interval. `flow` is the 7-day label (price
 direction first, then spot vs leverage); missing futures data never selects
 a leverage label and is listed in `unknowns`. `exchange` says where the

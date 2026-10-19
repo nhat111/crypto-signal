@@ -342,6 +342,8 @@ Check items as they land; each phase's commit message references the phase.
       Same exchange both days only (`apps/worker/src/coinWatch.ts`, ASSUMPTIONS §22).
 - [x] "Spot mỏng" note judged against the day's median spot/perp ratio
       (under half of it), not a fixed 10%, which flagged BTC on OKX.
+- [x] 7-day OI summed across free venues (scan exchange + Bybit + Gate,
+      `COIN_SCAN_OI_VENUES`), in coins per UTC day (ASSUMPTIONS §18).
 - [ ] Intraday funding/OI refresh for ⭐ and held coins, so the exit alert
       does not wait for the next daily close.
 - [x] Position sizing from the user's own account and risk per trade:
