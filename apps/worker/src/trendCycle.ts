@@ -2,25 +2,32 @@ import {
   claimDailyDigest,
   getCoinScanEdge,
   getCoinScanForDay,
-  getAllAlertSubscribers,
+  getOpenTradeSetups,
   getOverview,
   getRecentSignals,
+  getTrades,
   JOB_DAILY_DIGEST,
   JOB_SETUP_SCAN,
   JOB_TREND_1D,
+  recordDigestBody,
+  recordDigestForChat,
   recordDigestRecipients,
   recordJobFailure,
   recordJobSuccess,
   upsertTrendState,
+  type CoinScanRow,
   type OverviewRow,
   type RecentSignalRow,
   type TrendUpsertResult,
 } from '@crypto-signal/db';
 import { readMarketStructure } from '@crypto-signal/indicators';
+import type { RiskProfile } from '@crypto-signal/shared';
 import { SEVERITY_ORDER } from '@crypto-signal/signal-engine';
 import type { WorkerContext } from './context.js';
 import { formatCoinDigest } from './coinDigest.js';
-import { scanSetups } from './setupScan.js';
+import { scanSymbol } from './coinScan.js';
+import { formatPersonalDigest } from './personalDigest.js';
+import { alertChatsWithProfiles, scanSetups } from './setupScan.js';
 import { OKX_TREND_REASON, fetchDailyBarsWithFallback } from './dailyBars.js';
 
 /** 400 closed days covers EMA200 with room for the seed window. */
@@ -139,8 +146,7 @@ async function maybeSendDigest(ctx: WorkerContext, results: TrendUpsertResult[],
   const closedAt = latestOpen + DAY_MS;
   if (now - closedAt > DIGEST_WINDOW_MS) return;
 
-  const subscribers = await getAllAlertSubscribers(ctx.pool);
-  const chatIds = Array.from(new Set([...ctx.config.telegramAlertChatIds, ...subscribers.map((s) => s.chatId)]));
+  const { chatIds, profileOf } = await alertChatsWithProfiles(ctx);
   if (chatIds.length === 0) return;
 
   const barDay = new Date(latestOpen).toISOString().slice(0, 10);
@@ -161,12 +167,27 @@ async function maybeSendDigest(ctx: WorkerContext, results: TrendUpsertResult[],
     const previousCoins = coins.length > 0 ? await getCoinScanForDay(ctx.pool, new Date(latestOpen - DAY_MS).toISOString().slice(0, 10)) : [];
     // The evidence line is a nice-to-have: a failed query must not cost the morning message.
     const edge = coins.length > 0 ? await getCoinScanEdge(ctx.pool, 7).catch(() => []) : [];
-    const text = formatDigest(results, overview, signals.filter((s) => s.timestamp >= now - DAY_MS), closedAt, formatCoinDigest(coins, previousCoins, edge));
+    const recentSignals = signals.filter((s) => s.timestamp >= now - DAY_MS);
+    const coinLines = formatCoinDigest(coins, previousCoins, edge);
+    const shared = formatDigest(results, overview, recentSignals, closedAt, coinLines);
+    // Stored before sending, so /digest has it even if every send fails. A
+    // failed write only costs /digest, never the morning message.
+    const keep = (write: Promise<void>): Promise<void> => write.catch((err: unknown) => ctx.logger.warn({ err, day }, 'could not store digest text'));
+    await keep(recordDigestBody(ctx.pool, day, shared));
+
+    // The personal section is extra: a failed read sends everyone the shared text.
+    const personal = await readPersonalDigest(ctx, results, coins, previousCoins).catch((err: unknown) => {
+      ctx.logger.warn({ err }, 'digest personal section unavailable — sending the shared text');
+      return null;
+    });
 
     let delivered = 0;
     for (const chatId of chatIds) {
+      const text = personal ? formatDigest(results, overview, recentSignals, closedAt, coinLines, personal(chatId, profileOf(chatId))) : shared;
       const sent = await ctx.notifier.send(chatId, text);
-      if (sent.ok) delivered += 1;
+      if (!sent.ok) continue;
+      delivered += 1;
+      if (text !== shared) await keep(recordDigestForChat(ctx.pool, day, chatId, text));
     }
     await recordDigestRecipients(ctx.pool, day, delivered);
     await recordJobSuccess(ctx.pool, JOB_DAILY_DIGEST);
@@ -175,6 +196,26 @@ async function maybeSendDigest(ctx: WorkerContext, results: TrendUpsertResult[],
     await recordJobFailure(ctx.pool, JOB_DAILY_DIGEST, err).catch(() => undefined);
     throw err;
   }
+}
+
+/**
+ * Reads what every chat's "Của bạn" section needs once, and returns the
+ * per-chat formatter. Prices are the same daily closes the rest of the
+ * digest reads: the trend read for the core symbols, the scan for the rest.
+ */
+async function readPersonalDigest(
+  ctx: WorkerContext,
+  results: TrendUpsertResult[],
+  today: CoinScanRow[],
+  previous: CoinScanRow[],
+): Promise<(chatId: string, profile: RiskProfile | null) => string[]> {
+  const [open, openSetups] = await Promise.all([getTrades(ctx.pool, { status: 'open', limit: 500 }), getOpenTradeSetups(ctx.pool)]);
+  const prices = new Map<string, number>(today.map((r) => [r.symbol, r.close]));
+  for (const r of results) prices.set(r.row.symbol, r.row.lastClose);
+  // The baseline cohort is never alerted, so it is not anyone's setup to act on.
+  const setups = openSetups.filter((s) => s.cohort !== 'scan');
+  return (chatId, profile) =>
+    formatPersonalDigest({ openTrades: open.filter((t) => t.chatId === chatId), prices, today, previous, setups, profile }, scanSymbol);
 }
 
 const TREND_LABEL: Record<string, string> = {
@@ -199,9 +240,12 @@ export function formatDigest(
   signals: RecentSignalRow[],
   closedAt: number,
   coinLines: string[] = [],
+  personalLines: string[] = [],
 ): string {
   const date = new Date(closedAt - 1).toISOString().slice(0, 10).split('-').reverse().join('/');
   const lines: string[] = [`☀️ <b>Tóm tắt sau nến 1D ngày ${date}</b>`, ''];
+  // The reader's own positions first: the part only this chat gets.
+  if (personalLines.length > 0) lines.push(...personalLines, '');
 
   for (const r of results) {
     const row = r.row;

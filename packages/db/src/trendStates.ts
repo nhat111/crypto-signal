@@ -145,3 +145,46 @@ export async function claimDailyDigest(pool: Pool, day: string): Promise<boolean
 export async function recordDigestRecipients(pool: Pool, day: string, recipients: number): Promise<void> {
   await pool.query(`UPDATE daily_digests SET recipients = $2 WHERE day = $1::date`, [day, recipients]);
 }
+
+/** The shared part of a claimed day's digest, what a chat with no message of its own is shown by /digest. */
+export async function recordDigestBody(pool: Pool, day: string, body: string): Promise<void> {
+  await pool.query(`UPDATE daily_digests SET body = $2 WHERE day = $1::date`, [day, body]);
+}
+
+/** The full message one chat received for a claimed day. */
+export async function recordDigestForChat(pool: Pool, day: string, chatId: string, body: string): Promise<void> {
+  await pool.query(
+    `INSERT INTO daily_digest_chats (day, chat_id, body) VALUES ($1::date, $2, $3)
+     ON CONFLICT (day, chat_id) DO UPDATE SET body = EXCLUDED.body`,
+    [day, chatId, body],
+  );
+}
+
+export interface StoredDigest {
+  /** YYYY-MM-DD, the UTC day the digest was sent for (the day after the bar it reads). */
+  day: string;
+  sentAt: number;
+  text: string;
+  /** True when this is the chat's own message, with its "Của bạn" section. */
+  personal: boolean;
+}
+
+/**
+ * The most recent digest for a chat: its own message when it received one
+ * that day, else the shared part. Days without a stored body (sent before
+ * migration 036, or claimed and then failed) are skipped.
+ */
+export async function getLatestDigest(pool: Pool, chatId: string): Promise<StoredDigest | null> {
+  const { rows } = await pool.query(
+    `SELECT to_char(d.day, 'YYYY-MM-DD') AS day, extract(epoch from d.sent_at)*1000 AS sent_ms,
+            COALESCE(c.body, d.body) AS body, c.body IS NOT NULL AS personal
+     FROM daily_digests d
+     LEFT JOIN daily_digest_chats c ON c.day = d.day AND c.chat_id = $1
+     WHERE d.body IS NOT NULL
+     ORDER BY d.day DESC LIMIT 1`,
+    [chatId],
+  );
+  const r = rows[0] as Record<string, unknown> | undefined;
+  if (!r) return null;
+  return { day: r['day'] as string, sentAt: Number(r['sent_ms']), text: r['body'] as string, personal: r['personal'] === true };
+}

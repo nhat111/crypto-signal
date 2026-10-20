@@ -244,6 +244,15 @@ export interface TradeSummaryDTO {
   avgPnlPct: number | null;
 }
 
+/** The last morning digest as sent (/api/bot/digest/:chatId). `text` is Telegram HTML. */
+export interface StoredDigestDTO {
+  day: string;
+  sentAt: number;
+  text: string;
+  /** True when it is this chat's own message, with its "Của bạn" section. */
+  personal: boolean;
+}
+
 export interface StablecoinFlowWindowDTO {
   changeUsd: number;
   changePct: number;
@@ -456,6 +465,10 @@ export class ApiClient {
 
   getFlow(): Promise<{ stablecoin: StablecoinFlowDTO | null }> {
     return this.get('/api/flow');
+  }
+
+  getDigest(chatId: string): Promise<{ digest: StoredDigestDTO | null }> {
+    return this.get(`/api/bot/digest/${encodeURIComponent(chatId)}`);
   }
 
   registerUser(chatId: string, username: string | undefined): Promise<{ settings: BotSettings }> {

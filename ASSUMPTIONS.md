@@ -965,3 +965,28 @@ stablecoins: 30 days).
 - **Not done.** The web dashboard has no login, so it has no account to
   size for and keeps the guide's 1% rule as text. The journal does not
   store a stop yet, so a trade's result is not expressed in R.
+
+## 24. The digest's "Của bạn" section and `/digest`
+
+- **Question.** The morning digest was one text for every chat: the core
+  symbols, 4h signals and the top coins. Nothing in it said how the
+  reader's own positions stood, and the exit alert (§22) is silent on a
+  quiet day by design. A missed message was gone for good.
+- **"Của bạn"** (`apps/worker/src/personalDigest.ts`, pure), right under
+  the title, per chat: its open journal trades priced at the same daily
+  close the digest reads (trend read for the core symbols, coin scan for
+  the rest), P&L in % and in $ when a size was logged, the scan's flow
+  label and yesterday's when it changed on the same exchange; then the
+  open setups from the core and ⭐ cohorts (never the baseline), newest
+  first, sized for the chat's `/risk` account. Capped at 8 trades and 3
+  setups. A trade outside the scan says it has no price rather than
+  guessing one. A failed read sends everyone the shared text.
+- **Stored** (migration 036): the shared text on `daily_digests.body`,
+  each chat's full message in `daily_digest_chats`. Write failures are
+  logged and never cost the send.
+- **`/digest`** shows the stored message as sent, not a rebuild: one
+  builder (the worker), so what was asked for and what arrived cannot
+  drift apart. It says when the stored one is older than this morning
+  (worker down past the 12h window) or not the chat's own.
+- **Not done.** The section is a morning snapshot: a trade logged at noon
+  shows from the next digest.

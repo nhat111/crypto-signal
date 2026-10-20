@@ -349,6 +349,10 @@ Check items as they land; each phase's commit message references the phase.
 - [x] Position sizing from the user's own account and risk per trade:
       `/risk VỐN [%RỦI_RO]` per chat (migration 035), sized in the setup
       alert and /setups, capped at what spot can buy (ASSUMPTIONS §23).
+- [x] Morning digest gets a per-chat "Của bạn" section (open journal
+      trades at the daily close, open setups sized for `/risk`), and
+      `/digest` shows the stored message again (migration 036,
+      ASSUMPTIONS §24).
 - [ ] Optional stop on journal trades, so results read in R and the size
       a trade was opened with can be checked against the rule.
 - [ ] Read the comparison once both sides clear the floor; drop or keep
