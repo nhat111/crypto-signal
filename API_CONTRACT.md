@@ -707,6 +707,21 @@ riskPct?: number }`. `accountUsd` must be ≥ 10 or `null` (clears it);
 `riskPct` must be 0.1–5. A refused body is `400 { error }`, an unknown
 chat `404`. Returns the stored `settings`.
 
+## Morning digest — `GET /api/bot/digest/:chatId`
+
+Telegram only (`/digest`). The last morning digest as the worker sent it:
+
+```json
+{ "digest": { "day": "2026-10-20", "sentAt": 1792458367389, "text": "☀️ <b>Tóm tắt…</b>", "personal": true } }
+```
+
+`text` is Telegram HTML, built by the worker alone. `personal` is true when
+it is this chat's own message (with its "Của bạn" section: open journal
+trades, open setups sized for its `/risk` account); false means the chat
+was not a recipient that morning and gets the shared part. `day` is the
+UTC day it was sent for. `digest` is `null` until a digest has been stored
+(migration 036).
+
 ## Notes for the web app
 - This API is the **only** thing apps/web talks to — never Binance, never
   Postgres directly (rule: "Không để Telegram/web gọi trực tiếp Binance",

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { getBotSettings, updateBotSettings, upsertBotUser, type BotSettingsPatch } from '@crypto-signal/db';
+import { getBotSettings, getLatestDigest, updateBotSettings, upsertBotUser, type BotSettingsPatch } from '@crypto-signal/db';
 import { ACCOUNT_USD_MIN, RISK_PCT_MAX, RISK_PCT_MIN } from '@crypto-signal/shared';
 import type { ApiDeps } from '../deps.js';
 
@@ -56,6 +56,16 @@ export function registerBotRoutes(app: FastifyInstance, deps: ApiDeps): void {
     const settings = await getBotSettings(deps.pool, req.params.chatId);
     if (!settings) return reply.code(404).send({ error: 'unknown chat, call /api/bot/register first' });
     return { settings };
+  });
+
+  /**
+   * The last morning digest as the worker sent it: this chat's own message
+   * when it was a recipient, else the shared part. Built by the worker only,
+   * so what /digest shows and what arrived in the morning cannot differ.
+   */
+  app.get<{ Params: { chatId: string } }>('/api/bot/digest/:chatId', async (req) => {
+    const digest = await getLatestDigest(deps.pool, req.params.chatId);
+    return { digest };
   });
 
   app.post<{ Params: { chatId: string } }>('/api/bot/settings/:chatId', async (req, reply) => {

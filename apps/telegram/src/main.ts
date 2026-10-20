@@ -18,6 +18,7 @@ import {
   formatWatchList,
   formatRiskProfile,
   formatSetups,
+  formatStoredDigest,
   formatTrends,
   riskProfileOf,
 } from './formatting.js';
@@ -389,6 +390,16 @@ async function main(): Promise<void> {
     }
   });
 
+  bot.command('digest', async (ctx) => {
+    try {
+      const { digest } = await api.getDigest(String(ctx.chat.id));
+      await ctx.reply(formatStoredDigest(digest), { parse_mode: 'HTML' });
+    } catch (err) {
+      logger.error({ err }, '/digest failed');
+      await ctx.reply('Không đọc được báo cáo lúc này — thử lại sau ít phút.');
+    }
+  });
+
   bot.command('risk', async (ctx) => {
     const chatId = String(ctx.chat.id);
     const args = parseRiskArgs(ctx.message.text);
@@ -450,6 +461,7 @@ async function main(): Promise<void> {
     logger,
     attempt: async () => {
       await bot.telegram.setMyCommands([
+        { command: 'digest', description: 'Báo cáo sáng nay + lệnh đang giữ' },
         { command: 'status', description: `Sức khỏe thị trường (mặc định ${config.telegramDefaultTimeframe})` },
         { command: 'trend', description: 'Xu hướng 1D: tăng / giảm / đi ngang' },
         { command: 'setups', description: 'Setup 4H: vào / cắt lỗ / chốt lời' },

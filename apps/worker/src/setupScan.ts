@@ -80,13 +80,17 @@ export async function scanSetups(
   }
 }
 
-async function alertSetup(ctx: WorkerContext, setup: TradeSetupRow): Promise<void> {
+/**
+ * The alert chats and each one's /risk account, for anything sized per chat
+ * (the setup alert, the digest's "Của bạn" section).
+ *
+ * An operator chat from TELEGRAM_ALERT_CHAT_IDS is not in the subscriber
+ * list when it has /alerts off, so its settings are read on their own; one
+ * that never talked to the bot has none and its profile is null.
+ */
+export async function alertChatsWithProfiles(ctx: WorkerContext): Promise<{ chatIds: string[]; profileOf: (chatId: string) => RiskProfile | null }> {
   const subscribers = await getAllAlertSubscribers(ctx.pool);
   const chatIds = Array.from(new Set([...ctx.config.telegramAlertChatIds, ...subscribers.map((s) => s.chatId)]));
-  // Sized per chat, so each reader sees the position for their own account.
-  // An operator chat from TELEGRAM_ALERT_CHAT_IDS is not in the subscriber
-  // list when it has /alerts off, so its settings are read on their own;
-  // one that never talked to the bot has none and gets the example size.
   const settings = new Map(subscribers.map((s) => [s.chatId, s] as const));
   for (const chatId of ctx.config.telegramAlertChatIds) {
     if (!settings.has(chatId)) {
@@ -98,6 +102,13 @@ async function alertSetup(ctx: WorkerContext, setup: TradeSetupRow): Promise<voi
     const s = settings.get(chatId);
     return s && s.accountUsd !== null ? { accountUsd: s.accountUsd, riskPct: s.riskPct } : null;
   };
+  return { chatIds, profileOf };
+}
+
+async function alertSetup(ctx: WorkerContext, setup: TradeSetupRow): Promise<void> {
+  // Sized per chat, so each reader sees the position for their own account;
+  // a chat without one gets the example size.
+  const { chatIds, profileOf } = await alertChatsWithProfiles(ctx);
   for (const chatId of chatIds) await ctx.notifier.send(chatId, formatSetupAlert(setup, profileOf(chatId)));
 }
 

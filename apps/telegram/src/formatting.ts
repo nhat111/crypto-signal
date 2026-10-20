@@ -1,5 +1,5 @@
 import { formatPositionSize, positionSize, type RiskProfile } from '@crypto-signal/shared';
-import type { BotSettings, GemRow, GemWatchDTO, LookupDTO, LatestSymbolState, OverviewRow, PriceLevels, SignalRow, StablecoinFlowDTO, StablecoinFlowWindowDTO, TradeDTO, TradeSummaryDTO, TrendDTO, SetupDTO } from './apiClient.js';
+import type { BotSettings, GemRow, GemWatchDTO, LookupDTO, LatestSymbolState, OverviewRow, PriceLevels, SignalRow, StablecoinFlowDTO, StablecoinFlowWindowDTO, StoredDigestDTO, TradeDTO, TradeSummaryDTO, TrendDTO, SetupDTO } from './apiClient.js';
 
 function healthLine(row: OverviewRow): string {
   const score = row.healthScore === null ? 'N/A' : String(row.healthScore);
@@ -308,6 +308,7 @@ export function buildHelpText(symbols: string[]): string {
     '/coins [COIN] — top coin theo volume: mạnh/yếu so với BTC, spot hay đòn bẩy kéo giá (vd: /coins SOL)',
     '/close SYMBOL EXIT_PRICE — close your most recent open trade on that symbol',
     '/journal — your trade log + win rate / P&L summary',
+    '/digest — xem lại báo cáo sáng nay (kèm phần "Của bạn": lệnh đang giữ, setup đang mở)',
     '/risk [VỐN %RỦI_RO] — vốn và % rủi ro mỗi lệnh, để setup tính cỡ lệnh cho bro (vd /risk 1500 1)',
     '/flow — stablecoin supply: money entering or leaving crypto',
     '/alerts on|off — toggle alert push to this chat',
@@ -435,6 +436,23 @@ export function formatRiskProfile(profile: RiskProfile | null): string {
     'Đổi: <code>/risk VỐN [%RỦI_RO]</code> · Xoá: <code>/risk off</code>',
     '<i>Cập nhật vốn khi tài khoản thay đổi nhiều — cỡ lệnh chỉ đúng khi vốn đúng.</i>',
   ].join('\n');
+}
+
+/** Older than this, the stored digest is not this morning's, and says so. */
+const DIGEST_STALE_MS = 30 * 60 * 60_000;
+
+/**
+ * Reply to /digest: the morning message again, exactly as the worker built
+ * it, plus a line when it is not this morning's or not this chat's own.
+ */
+export function formatStoredDigest(digest: StoredDigestDTO | null, now = Date.now()): string {
+  if (!digest) return 'Chưa có báo cáo nào được lưu. Báo cáo gửi mỗi sáng sau khi nến 1D đóng (~7–8h giờ VN).';
+  const notes: string[] = [];
+  if (now - digest.sentAt > DIGEST_STALE_MS) {
+    notes.push(`<i>Đây là báo cáo gần nhất đã lưu (${digest.day.split('-').reverse().slice(0, 2).join('/')}) — sáng nay chưa có.</i>`);
+  }
+  if (!digest.personal) notes.push('<i>Chat này không nhận báo cáo sáng đó nên không có phần "Của bạn". Bật bằng /alerts on.</i>');
+  return notes.length > 0 ? `${digest.text}\n\n${notes.join('\n')}` : digest.text;
 }
 
 export function formatSetups(setups: SetupDTO[], profile: RiskProfile | null = null): string {

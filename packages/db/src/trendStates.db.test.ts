@@ -1,7 +1,15 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
 import { createTestPool, hasTestDatabase, lockTestTables } from './testPool.js';
-import { claimDailyDigest, getTrendStates, upsertTrendState, type TrendStateInput } from './trendStates.js';
+import {
+  claimDailyDigest,
+  getLatestDigest,
+  getTrendStates,
+  recordDigestBody,
+  recordDigestForChat,
+  upsertTrendState,
+  type TrendStateInput,
+} from './trendStates.js';
 
 const LOCK = 991_026;
 const DAY = 86_400_000;
@@ -62,5 +70,16 @@ describe.skipIf(!hasTestDatabase)('trend states against real Postgres', () => {
   it('lets exactly one caller claim a day', async () => {
     expect(await claimDailyDigest(pool, '2099-01-02')).toBe(true);
     expect(await claimDailyDigest(pool, '2099-01-02')).toBe(false);
+  });
+
+  it('serves a chat its own stored digest, others the shared body, and skips a day without a body', async () => {
+    await claimDailyDigest(pool, '2099-01-03');
+    await recordDigestBody(pool, '2099-01-03', 'shared');
+    await recordDigestForChat(pool, '2099-01-03', 'TEST-chat', 'mine');
+    // Claimed later but never built: must not hide the day before it.
+    await claimDailyDigest(pool, '2099-01-04');
+
+    expect(await getLatestDigest(pool, 'TEST-chat')).toMatchObject({ day: '2099-01-03', text: 'mine', personal: true });
+    expect(await getLatestDigest(pool, 'TEST-other')).toMatchObject({ day: '2099-01-03', text: 'shared', personal: false });
   });
 });
