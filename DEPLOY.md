@@ -347,14 +347,16 @@ If you do have a shell (a paid plan, or running locally against the
 production database), the same job is `node backfill.cjs` inside the worker
 image, or `npm run backfill -w @crypto-signal/worker` from a clone.
 
-## Enabling the small-cap discovery scanner (optional)
+## The small-cap discovery scanner
 
-A separate, opt-in subsystem — see ASSUMPTIONS.md §16 for what it can and
-cannot tell you before relying on it.
+A separate subsystem — see ASSUMPTIONS.md §16 for what it can and cannot
+tell you before relying on it. **On by default** since it had never been
+switched on in production: `GEM_SCAN_ENABLED` unset means on, and
+`render.yaml` lists it. Set `GEM_SCAN_ENABLED=false` to turn it off.
 
-On the **`worker`** service only, add:
+Variables (worker):
 
-- `GEM_SCAN_ENABLED=true`
+- `GEM_SCAN_ENABLED` — on unless `false`/`0`/`off`
 - `GEM_CHAINS=solana` — comma-separated DexScreener chain slugs. `solana`
   (RugCheck) and the EVM chains GoPlus covers (`bsc`, `ethereum`, `base`,
   `polygon`, `arbitrum`, `avalanche`, `optimism`) have a safety screen;
@@ -377,15 +379,24 @@ enough data yet" until 20 surfaced tokens have a recorded outcome.
 
 ### Position watches ("/watch SYMBOL")
 
-Unlike the rest of the gem scanner, this one **does** need `api` configured
-too, not just `worker`: `/api/watches` reads its own `GEM_SCAN_ENABLED` and
-`GEM_WATCH_*` env vars to know the sell-trigger defaults for a new watch, so
-add the same `GEM_SCAN_ENABLED=true` (and optionally the `GEM_WATCH_*`
-overrides) to the **`api`** service's variables as well. Without it,
+Unlike the rest of the gem scanner, this one reads `api`'s variables too:
+`/api/watches` uses its own `GEM_SCAN_ENABLED` and `GEM_WATCH_*` env vars
+for the sell-trigger defaults of a new watch. With the default on, and
+with worker and api in one container on Render, nothing extra is needed;
+on a split deploy keep the two services' values the same. Without it,
 `/watch` replies with "gem scanner is disabled" even while the worker is
 scanning fine. Migration `005_gem_watches.sql` runs automatically on the
 worker's next boot, same as the others. The bot needs a restart to register
 `/watch`, `/watches`, `/unwatch`.
+
+## Airdrop research list
+
+On by default (`AIRDROP_SCAN`, `off` disables). It needs no key: the
+worker reads DefiLlama `/protocols` every six hours, first pass five
+minutes after boot. Migration `037_airdrop.sql` runs on the worker's next
+boot. Tune with `AIRDROP_MIN_TVL_USD` (default 10000000) and
+`AIRDROP_MAX_CANDIDATES` (default 150). The bot needs a restart to show
+`/airdrops` and `/farm` in its menu. See ASSUMPTIONS.md §25.
 
 ## Appendix: Railway (paid, one service per process)
 

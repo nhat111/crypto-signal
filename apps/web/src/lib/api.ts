@@ -1,4 +1,8 @@
 import type {
+  AirdropsResponse,
+  Farm,
+  FarmStatus,
+  FarmsResponse,
   FlowResponse,
   GemHorizon,
   GemPerformance,
@@ -240,4 +244,31 @@ export function updateTrade(id: string, patch: UpdateTradeInput): Promise<{ trad
 
 export function deleteTrade(id: string): Promise<{ deleted: true }> {
   return sendJson('DELETE', `/api/journal/${id}`);
+}
+
+export function getAirdrops(): Promise<AirdropsResponse> {
+  return fetchJson('/api/airdrops?limit=300');
+}
+
+export function getFarms(): Promise<FarmsResponse> {
+  return fetchJson(`/api/airdrops/farms?chatId=${WEB_CHAT_ID}`);
+}
+
+export function startFarm(input: { name: string; slug?: string | null; wallet?: string | null }): Promise<{ farm: Farm }> {
+  return sendJson('POST', '/api/airdrops/farms', { chatId: WEB_CHAT_ID, ...input });
+}
+
+export function addFarmAction(id: string, costUsd: number, note: string | null): Promise<{ farm: Farm }> {
+  return sendJson('POST', `/api/airdrops/farms/${id}/actions`, { costUsd, note });
+}
+
+export function updateFarm(
+  id: string,
+  patch: { status?: FarmStatus; rewardUsd?: number | null; wallet?: string | null; note?: string | null },
+): Promise<{ farm: Farm }> {
+  return sendJson('PATCH', `/api/airdrops/farms/${id}`, patch);
+}
+
+export function deleteFarm(id: string): Promise<{ deleted: true }> {
+  return sendJson('DELETE', `/api/airdrops/farms/${id}`);
 }

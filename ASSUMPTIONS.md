@@ -990,3 +990,47 @@ stablecoins: 30 days).
   (worker down past the 12h window) or not the chat's own.
 - **Not done.** The section is a morning snapshot: a trade logged at noon
   shows from the next digest.
+
+## 25. Airdrop research (`/airdrops`, `/farm`)
+
+- **Question.** Which projects are worth farming for an airdrop, and has
+  farming them paid for itself? Asked for directly; it is a research aid
+  next to the gem scanner, not a signal.
+- **Source.** DefiLlama `/protocols` (free, keyless, ~9 MB, ~9,000 rows),
+  every six hours, first pass five minutes after boot
+  (`apps/worker/src/airdropScan.ts`). Funding rounds (`/raises`) would be
+  the other obvious input but answer HTTP 402 (paid plan), so the page
+  sends the reader to look them up. Rows that do not parse are dropped and
+  counted, not fatal.
+- **Screen** (`packages/indicators/src/airdrop.ts`, pure). Kept: TVL ≥
+  `AIRDROP_MIN_TVL_USD` (10M), no token (symbol `-`, no CoinGecko or CMC
+  id), not deprecated/rugged/dead, not a stablecoin issuer, not a child of
+  a parent that already has a token (read from its siblings). Dropped as
+  never-airdrop: custodial and infrastructure categories (CEX, chains,
+  canonical bridges, risk curators, capital allocators, stablecoin
+  wrappers, RWA funds…) and products named after an exchange or a
+  custodian ("Binance staked ETH", "WBTC"). Largest TVL first, capped at
+  `AIRDROP_MAX_CANDIDATES` (150). On 2026-10-21 that was 133 of 8,784.
+- **No score.** Each candidate carries reasons (TVL, +7d/+30d growth,
+  listed within 180 days, ≥3 chains, audited) and unknowns (money leaving,
+  no audit, no X account, no 30-day history yet). The web sorts by four
+  separate questions (TVL, 7d, 30d, newest) and the bot shows two lists
+  (largest, fastest-rising) rather than ranking them into one number.
+- **What it cannot know.** Whether a token will ever launch, whether users
+  get any of it, and a launch DefiLlama has not recorded yet: said once on
+  the page and in every bot reply, not on each card.
+- **30-day change** comes from our own stored rows (newest between 30 and
+  37 days back) since DefiLlama only gives 1d/7d; null until that history
+  exists. Rows are kept 120 days. A rerun replaces the day, so a protocol
+  that launched a token since the last pass drops off.
+- **Farm log** (migration 037): `airdrop_farms` (one active farm per
+  project per chat, keyed by the folded name so `/farm Symbiotic` and the
+  web button meet), `airdrop_farm_actions` (each interaction and its cost,
+  ≥ 0). Activity is counted as distinct Monday-based UTC weeks and
+  calendar months, because that is what recent airdrop criteria counted
+  and what sybil filters look for the lack of. A farm untouched for 14
+  days is called out. A claimed farm's net = reward − all costs logged.
+  `wallet` is a label only; nothing here asks for an address or a key.
+- **Strategy guide** (`/guide/airdrop`): choosing projects, a monthly gas
+  budget, steady activity over bursts, sybil patterns, wallet security,
+  what to record when the airdrop lands. It does not say to sell or hold.

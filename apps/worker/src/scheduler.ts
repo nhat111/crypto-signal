@@ -20,6 +20,7 @@ import { runBaselineAnnounceCycle, type BaselineAnnounceDeps } from './baselineA
 import { runHealthAlertCycle } from './healthAlerts.js';
 import { runAlertSelfTest } from './alertSelfTest.js';
 import { runStablecoinFlowCycle } from './stablecoinFlow.js';
+import { runAirdropScanCycle } from './airdropScan.js';
 import { runTrendCycle } from './trendCycle.js';
 import { runCoinSetupCycle } from './coinSetups.js';
 import { runCoinScanCycle } from './coinScan.js';
@@ -198,6 +199,16 @@ export function startSchedulers(ctx: WorkerContext): () => void {
     ),
   );
   void runStablecoinFlowCycle(stablecoinDeps).catch((err) => ctx.logger.error({ err }, 'initial stablecoin flow refresh failed'));
+
+  // Airdrop research list: DefiLlama's whole protocol list (~9 MB), so it
+  // runs every six hours rather than more, and the first pass waits five
+  // minutes so it never lands on top of a fresh boot's other work.
+  if (ctx.config.airdrop.enabled) {
+    const airdropDeps = { pool: ctx.pool, logger: ctx.logger, thresholds: ctx.config.airdrop };
+    const runAirdrop = () => void runAirdropScanCycle(airdropDeps).catch((err) => ctx.logger.error({ err }, 'airdrop scan failed'));
+    timers.push(setInterval(runAirdrop, 6 * 60 * 60_000));
+    timers.push(setTimeout(runAirdrop, 5 * 60_000));
+  }
 
   // Daily structure and the morning digest. Hourly, so a worker started at
   // any time picks up the latest daily close within the hour; most runs

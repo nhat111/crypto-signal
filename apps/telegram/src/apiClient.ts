@@ -1,3 +1,4 @@
+import type { AirdropsResponseDTO, FarmDTO } from './airdrop.js';
 import type { BaselineReportInput } from '@crypto-signal/shared';
 /**
  * Every command hits apps/api over HTTP — the bot never touches Postgres
@@ -419,6 +420,18 @@ export class ApiClient {
 
   unwatch(chatId: string, id: string): Promise<{ closed: true }> {
     return this.post(`/api/watches/${id}/close`, { chatId });
+  }
+
+  getAirdrops(limit = 200): Promise<AirdropsResponseDTO> {
+    return this.get(`/api/airdrops?limit=${limit}`);
+  }
+
+  getFarms(chatId: string): Promise<{ farms: FarmDTO[] }> {
+    return this.get(`/api/airdrops/farms?chatId=${encodeURIComponent(chatId)}`);
+  }
+
+  logFarm(chatId: string, name: string, costUsd: number, note: string | null): Promise<{ farm: FarmDTO }> {
+    return this.post('/api/airdrops/farms/log', { chatId, name, costUsd, note });
   }
 
   openTrade(

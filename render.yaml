@@ -24,3 +24,9 @@ services:
       # Vercel dashboard URL; enables the "Xem chart" link under /lookup.
       - key: WEB_BASE_URL
         sync: false
+      # Small-cap scanner (/gems). The code default is already on; listed so
+      # the Blueprint shows it and turning it off is one edit here.
+      - key: GEM_SCAN_ENABLED
+        value: "true"
+      - key: GEM_CHAINS
+        value: solana
