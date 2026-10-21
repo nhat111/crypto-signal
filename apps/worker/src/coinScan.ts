@@ -141,6 +141,8 @@ export interface CoinScanResult {
   skipped: string[];
   /** How many coins each venue's OI was summed into: whether the extra venues actually answer. */
   oiVenues: Record<string, number>;
+  /** The futures host refused the server at some point, so some or all coins have no OI or funding. */
+  futuresUnreadable: boolean;
 }
 
 /**
@@ -231,7 +233,7 @@ export async function scanCoins(source: CoinScanSource, config: CoinScanConfig, 
   // Thin spot is judged against the day's other coins, not a fixed ratio:
   // on OKX perps out-trade spot almost everywhere, BTC included.
   const reads = flagThinSpot(inputs.map((i) => i.read));
-  return { day, inputs: inputs.map((i, n) => ({ ...i, read: reads[n] ?? i.read })), skipped, oiVenues };
+  return { day, inputs: inputs.map((i, n) => ({ ...i, read: reads[n] ?? i.read })), skipped, oiVenues, futuresUnreadable: futuresBanned };
 }
 
 async function readLeverage(
@@ -256,8 +258,9 @@ export async function scanWithFallback(
   config: CoinScanConfig,
   now: number,
 ): Promise<{ result: CoinScanResult; exchange: CoinScanExchange; binanceError: string | null }> {
+  let binanceResult: CoinScanResult;
   try {
-    return { result: await scanCoins(binance, config, now), exchange: 'binance', binanceError: null };
+    binanceResult = await scanCoins(binance, config, now);
   } catch (err) {
     if (!okx || !isRefused(err)) throw err;
     try {
@@ -266,6 +269,25 @@ export async function scanWithFallback(
       throw new Error(`${message(err)} — OKX fallback failed too: ${message(okxErr)}`);
     }
   }
+
+  // Binance spot answered but its futures host refused the server. From
+  // Render's Singapore IP that is the normal case (fapi answers 451), and
+  // it stored whole days with no OI or funding: half the flow labels
+  // (leverage_led, short_squeeze, long_unwind…) cannot be reached without
+  // them. A day is one exchange, so the fix is the whole day from OKX,
+  // not Binance spot with OKX perps glued on. Binance's spot-only day is
+  // kept when OKX cannot do better.
+  if (binanceResult.futuresUnreadable && okx) {
+    try {
+      const okxResult = await scanCoins(okx, config, now);
+      if (!okxResult.futuresUnreadable && okxResult.inputs.length > 0) {
+        return { result: okxResult, exchange: 'okx', binanceError: 'Binance futures refused the server; read the whole day from OKX for OI and funding' };
+      }
+    } catch {
+      // OKX failing is no reason to lose the spot day Binance already gave.
+    }
+  }
+  return { result: binanceResult, exchange: 'binance', binanceError: null };
 }
 
 /** The day whose daily bar most recently closed, as YYYY-MM-DD. */

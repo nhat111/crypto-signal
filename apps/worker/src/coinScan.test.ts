@@ -150,6 +150,29 @@ describe('scanWithFallback', () => {
     await expect(scanWithFallback(source({ spotTickers: async () => Promise.reject(broken) }), source(), CONFIG, NOW)).rejects.toBe(broken);
   });
 
+  it('reads the day from OKX when Binance spot answers but its futures host refuses the server', async () => {
+    const blocked = new BinanceRestError('restricted location', 451, undefined);
+    const okx = source();
+    const out = await scanWithFallback(source({ futuresTickers: async () => Promise.reject(blocked) }), okx, CONFIG, NOW);
+    expect(out.exchange).toBe('okx');
+    expect(out.binanceError).toContain('futures');
+    expect(out.result.futuresUnreadable).toBe(false);
+    expect(okx.calls.some((c) => c.startsWith('oi:'))).toBe(true);
+  });
+
+  it('keeps the Binance spot day when OKX cannot read futures either, or fails', async () => {
+    const blocked = new BinanceRestError('restricted location', 451, undefined);
+    const okxNoFutures = source({ futuresTickers: async () => Promise.reject(new BinanceRestError('x', 451, undefined)) });
+    const a = await scanWithFallback(source({ futuresTickers: async () => Promise.reject(blocked) }), okxNoFutures, CONFIG, NOW);
+    expect(a.exchange).toBe('binance');
+    expect(a.result.futuresUnreadable).toBe(true);
+
+    const okxDown = source({ spotTickers: async () => Promise.reject(new Error('OKX down')) });
+    const b = await scanWithFallback(source({ futuresTickers: async () => Promise.reject(blocked) }), okxDown, CONFIG, NOW);
+    expect(b.exchange).toBe('binance');
+    expect(b.result.inputs).toHaveLength(2);
+  });
+
   it('names both failures when OKX fails too', async () => {
     const out = scanWithFallback(
       source({ spotTickers: async () => Promise.reject(ban) }),
