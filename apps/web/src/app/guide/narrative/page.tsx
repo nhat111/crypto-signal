@@ -15,6 +15,9 @@ const TOC = [
   { id: 'flywheel', label: 'Flywheel là gì' },
   { id: 'doc-flywheel', label: 'Đọc một thẻ flywheel' },
   { id: 'quy-trinh', label: 'Quy trình mỗi ngày' },
+  { id: 'chon-coin', label: 'Chọn coin nào trong mảng' },
+  { id: 'thesis', label: 'Tìm thesis của một coin' },
+  { id: 'vao-lenh', label: 'Vào lệnh và thoát lệnh' },
   { id: 'hieu-nham', label: 'Dễ hiểu nhầm' },
   { id: 'trong', label: 'Khi trang trống hoặc báo lỗi' },
 ];
@@ -185,6 +188,78 @@ export default function NarrativeGuidePage() {
               hơn một coin chỉ có câu chuyện.
             </p>
           </Story>
+        </Section>
+
+        <Section id="chon-coin" eyebrow="Từ mảng đang nổi tới lệnh" title="Chọn coin nào trong mảng">
+          <p>
+            Coin đứng đầu “Dẫn đầu 7 ngày” thường là coin <Term>đã chạy xong một nhịp</Term>: tăng 30–50% trong tuần, ai mua lúc này là
+            mua của người vào sớm. Thay vì đuổi theo nó, tìm coin thoả phần lớn các điều kiện dưới đây.
+          </p>
+          <Table
+            head={['Tiêu chí', 'Vì sao', 'Xem ở đâu']}
+            rows={[
+              [<Term key="a">Mạnh hơn BTC nhưng chưa tăng quá xa</Term>, 'Đã có lực mua (khác coin đứng im), nhưng chưa tăng 50% trong tuần. Tăng 10–25% trong lúc mảng mới nổi là vùng dễ chịu.', 'Thẻ mảng, CoinGecko'],
+              [<Term key="b">Cùng câu chuyện với coin dẫn đầu</Term>, 'Khi coin số 1 chạy, tiền thường xoay sang coin số 2, số 3 cùng loại (cùng sản phẩm, cùng hệ sinh thái).', 'X, mô tả dự án'],
+              [<Term key="c">Tiền vào là spot</Term>, 'Người mua thật giữ được giá; đòn bẩy thì bị thanh lý là sập.', <code key="lk" className="rounded bg-slate-900 px-1">/lookup TICKER</code>],
+              [<Term key="d">Có doanh thu, tốt nhất là có flywheel</Term>, 'Khi narrative nguội, coin có doanh thu thật rơi chậm hơn và hồi trước.', 'Narrative → Flywheel'],
+              [<Term key="e">Thanh khoản đủ</Term>, 'Có trên sàn lớn, khối lượng ngày ít nhất vài triệu USD: vào và ra được mà không trượt giá.', 'CoinGecko, sàn'],
+              [<Term key="f">Không có đợt mở khoá lớn sắp tới</Term>, 'Một đợt mở khoá 5–10% nguồn cung trong 1–2 tháng tới có thể xoá hết nhịp tăng.', 'Tokenomist, CryptoRank'],
+              [<Term key="g">Đang có điểm vào đẹp</Term>, 'Giá chỉnh về vùng hỗ trợ hoặc vừa phá lên rồi test lại, thay vì đang ở đỉnh nến xanh.', <><code className="rounded bg-slate-900 px-1">/setups</code>, chart</>],
+            ]}
+          />
+          <Story title="Ví dụ">
+            <p>
+              Mảng Perp DEX chuyển sang Đang nổi. Coin A tăng 60% trong tuần, coin B tăng 18%, coin C đứng im.
+            </p>
+            <p>
+              C chưa có ai mua, có thể không bao giờ chạy. A đã chạy xa. B mạnh hơn BTC, cùng loại sàn perp với A, Lookup cho thấy tiền
+              vào là spot, có tên trong Flywheel với doanh thu đang tăng, và đang chỉnh về hỗ trợ trên khung 4H. <Term>B</Term> là coin để
+              đọc kỹ trước.
+            </p>
+          </Story>
+          <Warning>
+            <p>
+              “Coin chưa tăng thì sẽ tăng sau.” Không chắc. Coin đứng im trong lúc cả mảng chạy thường là coin thị trường không muốn. Chỉ
+              chọn coin <Term>đã bắt đầu mạnh hơn BTC</Term>, đừng chọn coin chưa nhúc nhích.
+            </p>
+          </Warning>
+        </Section>
+
+        <Section id="thesis" eyebrow="Từ mảng đang nổi tới lệnh" title="Tìm thesis của một coin">
+          <Steps
+            items={[
+              <>Trên X, tìm <Term>$TICKER</Term>, xem cả tab Top lẫn Latest. Tìm bài <Term>giải thích vì sao</Term>, không phải bài chỉ hô “moon”. Shill không có thesis coi như không có gì.</>,
+              <><Term>Ai viết?</Term> Trader có lịch sử call thật, được nhiều người trong giới follow, hay tài khoản mới chuyên shill kèo mỗi ngày?</>,
+              <><Term>Có hợp lý không?</Term> Dựa trên sự kiện có thật: ra sản phẩm, doanh thu tăng, lên sàn lớn, đối tác, buyback.</>,
+              <><Term>Đã vào giá chưa?</Term> Câu chuyện ai cũng biết và giá đã gấp đôi thì phần lớn đã nằm trong giá.</>,
+              <>Đối chiếu bằng dữ liệu: <code className="rounded bg-slate-900 px-1">/lookup TICKER</code> (spot hay đòn bẩy), Flywheel (có doanh thu không), thẻ mảng (rộng hay hẹp).</>,
+              <>Có nhóm trade chung thì đưa thesis vào hỏi trước khi vào tiền.</>,
+            ]}
+          />
+          <Takeaway>Không viết được một câu “coin này sẽ tăng vì…” thì bỏ qua coin đó.</Takeaway>
+        </Section>
+
+        <Section id="vao-lenh" eyebrow="Từ mảng đang nổi tới lệnh" title="Vào lệnh và thoát lệnh">
+          <p>
+            Đây là <Term>trade theo narrative</Term>, không phải đầu tư: phần lớn coin theo narrative mất gần hết giá trị khi narrative
+            qua đi. Vào nhỏ, có điểm cắt lỗ, chốt dần.
+          </p>
+          <Steps
+            items={[
+              <>Đặt vốn và rủi ro mỗi lệnh một lần: <code className="rounded bg-slate-900 px-1">/risk 1000 1</code> (vốn $1000, mỗi lệnh lỗ tối đa 1%). Coin narrative mới nên giảm còn 0,5%.</>,
+              <>Đợi điểm vào: <code className="rounded bg-slate-900 px-1">/setups</code> báo pullback hoặc breakout-retest kèm điểm vào, cắt lỗ, chốt lời (lời/lỗ ít nhất 1:2) và cỡ lệnh theo vốn của bro. Đừng mua giữa cây nến xanh.</>,
+              <>Ghi lệnh bằng <code className="rounded bg-slate-900 px-1">/trade</code> kèm <Term>nguồn kèo</Term> và <Term>thesis</Term>. Sau 20–30 lệnh, Journal cho biết nguồn nào đáng tin.</>,
+              <>Chốt từng phần: ví dụ bán một nửa ở mục tiêu đầu, dời cắt lỗ phần còn lại về giá vào.</>,
+              <>Ra hết khi: chạm cắt lỗ; mảng chuyển sang <Term>Hạ nhiệt</Term>; bot gửi cảnh báo thoát (chỉ với coin nằm trong tab Coins và đã ghi lệnh trong Journal); hoặc sự kiện của thesis đã xảy ra mà giá không tăng.</>,
+            ]}
+          />
+          <Warning>
+            <p>
+              “Giảm thì mua thêm cho giá vốn thấp.” Bình quân giá xuống ở altcoin narrative là uống thuốc độc giải khát: bớt khó chịu hôm
+              nay, khó chịu hơn ngày mai. Thesis sai thì cắt, không gồng.
+            </p>
+            <p>Đừng ôm nhiều coin cùng một mảng: mảng quay đầu thì tất cả cùng giảm, cỡ lệnh thực tế lớn hơn bro tưởng.</p>
+          </Warning>
         </Section>
 
         <Section id="hieu-nham" eyebrow="Đọc cho đúng" title="Dễ hiểu nhầm">
