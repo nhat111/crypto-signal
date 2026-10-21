@@ -425,7 +425,7 @@ async function main(): Promise<void> {
 
   bot.command('sectors', async (ctx) => {
     try {
-      await ctx.reply(formatSectors(await api.getSectors()), { parse_mode: 'HTML' });
+      await ctx.reply(formatSectors(await api.getSectors(), config.webBaseUrl), { parse_mode: 'HTML', link_preview_options: { is_disabled: true } });
     } catch (err) {
       logger.error({ err }, '/sectors failed');
       await ctx.reply('Không tải được dòng tiền theo mảng lúc này — thử lại sau ít phút.');
@@ -434,7 +434,7 @@ async function main(): Promise<void> {
 
   bot.command('flywheel', async (ctx) => {
     try {
-      await ctx.reply(formatFlywheel(await api.getFlywheel()), { parse_mode: 'HTML' });
+      await ctx.reply(formatFlywheel(await api.getFlywheel(), config.webBaseUrl), { parse_mode: 'HTML', link_preview_options: { is_disabled: true } });
     } catch (err) {
       logger.error({ err }, '/flywheel failed');
       await ctx.reply('Không tải được danh sách flywheel lúc này — thử lại sau ít phút.');

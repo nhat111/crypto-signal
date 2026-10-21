@@ -26,6 +26,12 @@ describe('formatSectors', () => {
     expect(text).toContain('TAO +25.0%');
     expect(text).toContain('hôm trước: Đang nổi');
     expect(text).toContain('BTC: +2.0% 7 ngày');
+    expect(text).not.toContain('Cách đọc');
+  });
+
+  it('links the guide when the web address is known', () => {
+    const text = formatSectors({ enabled: true, day: '2026-10-21', fetch: null, sectors: [sector('AI', 'leading', 1)] }, 'https://x.app');
+    expect(text).toContain('Cách đọc: https://x.app/guide/narrative');
   });
 
   it('says why it is empty', () => {

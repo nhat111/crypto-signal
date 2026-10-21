@@ -15,6 +15,7 @@ const TABS = [
   { href: '/guide', label: 'Đọc dashboard' },
   { href: '/guide/ta', label: 'Học phân tích kỹ thuật' },
   { href: '/guide/methodology', label: 'Phương pháp' },
+  { href: '/guide/narrative', label: 'Đọc Narrative' },
   { href: '/guide/airdrop', label: 'Chiến thuật airdrop' },
 ];
 
