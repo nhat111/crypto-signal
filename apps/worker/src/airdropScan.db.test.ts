@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
-import { createTestPool, getJobHealth, getLatestAirdropCandidates, hasTestDatabase, JOB_AIRDROP_SCAN } from '@crypto-signal/db';
+import { createTestPool, getJobHealth, hasTestDatabase, JOB_AIRDROP_SCAN } from '@crypto-signal/db';
 import type { Logger } from '@crypto-signal/shared';
 import { runAirdropScanCycle } from './airdropScan.js';
 
@@ -32,9 +32,9 @@ describe.skipIf(!hasTestDatabase)('airdrop scan cycle against real Postgres', ()
     };
     await runAirdropScanCycle({ pool, logger, source, nowMs: NOW, thresholds: { minTvlUsd: 10_000_000, maxCandidates: 50 } });
 
-    const latest = await getLatestAirdropCandidates(pool);
-    expect(latest.day).toBe('2098-06-01');
-    expect(latest.candidates.map((c) => c.slug)).toEqual(['test-fresh']);
+    // Read by day, not "latest": the db package's tests store far-future days in parallel.
+    const { rows } = await pool.query("SELECT slug FROM airdrop_candidates WHERE day = '2098-06-01'");
+    expect(rows.map((r) => r.slug)).toEqual(['test-fresh']);
     expect((await getJobHealth(pool, JOB_AIRDROP_SCAN))?.consecutiveFailures).toBe(0);
   });
 

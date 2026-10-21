@@ -14,3 +14,5 @@ export * from './okx/coinScanData.js';
 export * from './defillama/fundamentals.js';
 export * from './bybit/openInterest.js';
 export * from './gate/openInterest.js';
+export * from './coingecko/markets.js';
+export * from './defillama/holdersRevenue.js';

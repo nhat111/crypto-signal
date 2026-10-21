@@ -21,6 +21,8 @@ import { runHealthAlertCycle } from './healthAlerts.js';
 import { runAlertSelfTest } from './alertSelfTest.js';
 import { runStablecoinFlowCycle } from './stablecoinFlow.js';
 import { runAirdropScanCycle } from './airdropScan.js';
+import { runSectorScanCycle } from './sectorScan.js';
+import { runFlywheelCycle } from './flywheelScan.js';
 import { runTrendCycle } from './trendCycle.js';
 import { runCoinSetupCycle } from './coinSetups.js';
 import { runCoinScanCycle } from './coinScan.js';
@@ -208,6 +210,22 @@ export function startSchedulers(ctx: WorkerContext): () => void {
     const runAirdrop = () => void runAirdropScanCycle(airdropDeps).catch((err) => ctx.logger.error({ err }, 'airdrop scan failed'));
     timers.push(setInterval(runAirdrop, 6 * 60 * 60_000));
     timers.push(setTimeout(runAirdrop, 5 * 60_000));
+  }
+
+  // Sector read and flywheel list: once per UTC day each, on hourly ticks
+  // that are no-ops once the day is stored. Staggered after boot (10 and
+  // 15 minutes) so the big DefiLlama lists never load at the same time.
+  if (ctx.config.flywheel.enabled) {
+    const flywheelDeps = { pool: ctx.pool, logger: ctx.logger, config: ctx.config.flywheel, coingeckoApiKey: ctx.config.sectors.coingeckoApiKey };
+    const runFlywheel = () => void runFlywheelCycle(flywheelDeps).catch((err) => ctx.logger.error({ err }, 'flywheel scan failed'));
+    timers.push(setInterval(runFlywheel, 60 * 60_000));
+    timers.push(setTimeout(runFlywheel, 10 * 60_000));
+  }
+  if (ctx.config.sectors.enabled) {
+    const sectorDeps = { pool: ctx.pool, logger: ctx.logger, config: ctx.config.sectors };
+    const runSectors = () => void runSectorScanCycle(sectorDeps).catch((err) => ctx.logger.error({ err }, 'sector scan failed'));
+    timers.push(setInterval(runSectors, 60 * 60_000));
+    timers.push(setTimeout(runSectors, 15 * 60_000));
   }
 
   // Daily structure and the morning digest. Hourly, so a worker started at

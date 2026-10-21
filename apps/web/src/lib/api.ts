@@ -1,4 +1,6 @@
 import type {
+  FlywheelResponse,
+  SectorsResponse,
   AirdropsResponse,
   Farm,
   FarmStatus,
@@ -271,4 +273,12 @@ export function updateFarm(
 
 export function deleteFarm(id: string): Promise<{ deleted: true }> {
   return sendJson('DELETE', `/api/airdrops/farms/${id}`);
+}
+
+export function getSectors(): Promise<SectorsResponse> {
+  return fetchJson('/api/sectors');
+}
+
+export function getFlywheel(): Promise<FlywheelResponse> {
+  return fetchJson('/api/flywheel?limit=100');
 }

@@ -1,3 +1,4 @@
+import type { FlywheelResponseDTO, SectorsResponseDTO } from './sectorsFormat.js';
 import type { AirdropsResponseDTO, FarmDTO } from './airdrop.js';
 import type { BaselineReportInput } from '@crypto-signal/shared';
 /**
@@ -420,6 +421,14 @@ export class ApiClient {
 
   unwatch(chatId: string, id: string): Promise<{ closed: true }> {
     return this.post(`/api/watches/${id}/close`, { chatId });
+  }
+
+  getSectors(): Promise<SectorsResponseDTO> {
+    return this.get('/api/sectors');
+  }
+
+  getFlywheel(limit = 30): Promise<FlywheelResponseDTO> {
+    return this.get(`/api/flywheel?limit=${limit}`);
   }
 
   getAirdrops(limit = 200): Promise<AirdropsResponseDTO> {

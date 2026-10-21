@@ -64,6 +64,18 @@ const envSchema = z.object({
   AIRDROP_MIN_TVL_USD: numeric(10_000_000),
   // Candidates kept per day, largest TVL first.
   AIRDROP_MAX_CANDIDATES: numeric(150),
+  // Sector read (/sectors): CoinGecko categories against BTC, once a day. On unless off/0/false.
+  SECTOR_SCAN: z.string().default('on'),
+  // CoinGecko category ids, comma-separated. Empty = the default list (DEFAULT_SECTOR_CATEGORIES).
+  SECTOR_CATEGORIES: z.string().default(''),
+  // Largest coins read per category.
+  SECTOR_COINS_PER_CATEGORY: numeric(30),
+  // Optional free CoinGecko "demo" key; without it the public limit applies (a few calls a minute).
+  COINGECKO_API_KEY: z.string().default(''),
+  // Flywheel list (/flywheel): DefiLlama holders revenue, once a day. On unless off/0/false.
+  FLYWHEEL_SCAN: z.string().default('on'),
+  // Smallest 30-day payout to holders, in USD.
+  FLYWHEEL_MIN_HOLDERS_REVENUE_30D: numeric(100_000),
 
   SYMBOLS: z.string().default('BTCUSDT,ETHUSDT,SOLUSDT'),
   /** Futures-only symbols (no Binance Spot listing) — see ASSUMPTIONS.md §15. Tracked with a reduced indicator/signal set. */
@@ -199,6 +211,49 @@ export interface CoinScanThresholds {
   fundingShortsPayPct: number;
 }
 
+/**
+ * The default sectors: the ones a narrative trade usually rotates through,
+ * plus the three the "highest valued" argument names (chains, exchange
+ * tokens, and stablecoin issuers, read here through DeFi/RWA since
+ * stablecoins themselves do not move). CoinGecko category ids, verified
+ * against /coins/categories/list (2026-10).
+ */
+export const DEFAULT_SECTOR_CATEGORIES = [
+  'layer-1',
+  'layer-2',
+  'artificial-intelligence',
+  'ai-agents',
+  'meme-token',
+  'solana-meme-coins',
+  'decentralized-exchange',
+  'decentralized-perpetuals',
+  'lending-borrowing',
+  'liquid-staking-governance-tokens',
+  'real-world-assets-rwa',
+  'depin',
+  'gaming',
+  'privacy-coins',
+  'oracle',
+  'prediction-markets',
+  'exchange-based-tokens',
+  'launchpad',
+  'zero-knowledge-zk',
+  'hyperliquid-ecosystem',
+] as const;
+
+export interface SectorScanConfig {
+  enabled: boolean;
+  categories: string[];
+  coinsPerCategory: number;
+  coingeckoApiKey: string;
+}
+
+export interface FlywheelConfig {
+  enabled: boolean;
+  minHoldersRevenue30dUsd: number;
+  maxRows: number;
+}
+
 export interface AirdropScanConfig {
   enabled: boolean;
   minTvlUsd: number;
@@ -253,6 +308,8 @@ export interface AppConfig {
   telegramAlertChatIds: string[];
   coinScan: CoinScanConfig;
   airdrop: AirdropScanConfig;
+  sectors: SectorScanConfig;
+  flywheel: FlywheelConfig;
   symbols: string[];
   /** Symbols tracked in reduced (Futures-only, no Spot) mode — disjoint from `symbols`. */
   futuresOnlySymbols: string[];
@@ -332,6 +389,12 @@ function assertSumsTo100(name: string, values: number[]): void {
  * codebase spells it "1", "true" or "yes", and a flag that silently
  * ignores "true" is a flag that gets reported as broken.
  */
+/** Lowercased, deduplicated, at most 40 (each is one request a day); empty means the default list. */
+export function parseSectorCategories(raw: string): string[] {
+  const ids = [...new Set(raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean))].slice(0, 40);
+  return ids.length > 0 ? ids : [...DEFAULT_SECTOR_CATEGORIES];
+}
+
 export function isEnabledFlag(value: string): boolean {
   return !['', '0', 'false', 'no', 'off'].includes(value.trim().toLowerCase());
 }
@@ -410,6 +473,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       minTvlUsd: Math.max(0, parsed.AIRDROP_MIN_TVL_USD),
       // Clamped: each row is stored once a day and kept 120 days.
       maxCandidates: Math.min(500, Math.max(10, Math.round(parsed.AIRDROP_MAX_CANDIDATES) || 150)),
+    },
+    sectors: {
+      enabled: isEnabledFlag(parsed.SECTOR_SCAN),
+      categories: parseSectorCategories(parsed.SECTOR_CATEGORIES),
+      // Clamped: 250 is CoinGecko's page size, and under 10 a median says little.
+      coinsPerCategory: Math.min(100, Math.max(10, Math.round(parsed.SECTOR_COINS_PER_CATEGORY) || 30)),
+      coingeckoApiKey: parsed.COINGECKO_API_KEY.trim(),
+    },
+    flywheel: {
+      enabled: isEnabledFlag(parsed.FLYWHEEL_SCAN),
+      minHoldersRevenue30dUsd: Math.max(0, parsed.FLYWHEEL_MIN_HOLDERS_REVENUE_30D),
+      maxRows: 100,
     },
     symbols: parsed.SYMBOLS.split(',').map((s) => s.trim()).filter(Boolean),
     futuresOnlySymbols: parsed.FUTURES_ONLY_SYMBOLS.split(',').map((s) => s.trim()).filter(Boolean),
