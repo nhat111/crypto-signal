@@ -120,7 +120,7 @@ function LookupContent() {
       </form>
 
       {error && <StatePanel tone="error" title="No result" detail={error} />}
-      {data && <LookupResultView result={data.result} />}
+      {data && <LookupResultView result={data.result} context={data.context} />}
     </div>
   );
 }

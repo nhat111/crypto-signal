@@ -9,6 +9,7 @@ import {
 } from '@crypto-signal/gem-scanner';
 import { runLookup } from '@crypto-signal/lookup';
 import type { ApiDeps } from '../deps.js';
+import { loadLookupContext, type LookupContext } from './lookupContext.js';
 
 /**
  * On-demand analysis of anything, rather than only what the collector
@@ -78,6 +79,17 @@ export function registerLookupRoute(app: FastifyInstance, deps: ApiDeps): void {
     );
 
     if (result.kind === 'not_found') return reply.code(404).send({ error: result.reason, query: q });
-    return { query: q, timeframe, result };
+
+    // What the worker already stored about this coin. Optional by design:
+    // a database hiccup costs the extra context, never the lookup.
+    let context: LookupContext | null = null;
+    if (result.kind === 'exchange') {
+      try {
+        context = await loadLookupContext(deps.pool, result.symbol);
+      } catch (err) {
+        logger.warn({ err, symbol: result.symbol }, 'lookup: stored context unavailable');
+      }
+    }
+    return { query: q, timeframe, result, context };
   });
 }

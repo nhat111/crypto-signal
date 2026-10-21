@@ -1002,10 +1002,29 @@ export type LookupResult =
       otherPools: Array<{ chainId: string; dexId: string; liquidityUsd: number | null }>;
     };
 
+/** What the worker stored about a looked-up exchange coin (coin scan, sectors, flywheel). */
+export interface LookupContext {
+  coinScan: CoinScanRow | null;
+  coinScanDay: string | null;
+  coinScanSize: number;
+  sectors: Array<{ categoryId: string; name: string; label: SectorLabel; rank: number; change7dPct: number }>;
+  flywheel: {
+    name: string;
+    symbol: string | null;
+    holdersRevenue30dUsd: number;
+    holdersRevenueChangePct: number | null;
+    yieldPct: number | null;
+    priceChange30dPct: number | null;
+    mechanism: string | null;
+  } | null;
+}
+
 export interface LookupResponse {
   query: string;
   timeframe: string;
   result: LookupResult;
+  /** Optional: added after this shipped; null when the database could not be read. */
+  context?: LookupContext | null;
 }
 
 // --- Airdrop research (/api/airdrops) ---

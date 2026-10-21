@@ -1,4 +1,4 @@
-import type { FlywheelResponseDTO, SectorsResponseDTO } from './sectorsFormat.js';
+import type { FlywheelResponseDTO, SectorLabelDTO, SectorsResponseDTO } from './sectorsFormat.js';
 import type { AirdropsResponseDTO, FarmDTO } from './airdrop.js';
 import type { BaselineReportInput } from '@crypto-signal/shared';
 /**
@@ -268,9 +268,19 @@ export interface StablecoinFlowDTO {
   change30d: StablecoinFlowWindowDTO | null;
 }
 
+export interface LookupContextDTO {
+  coinScan: CoinScanDTO | null;
+  coinScanDay: string | null;
+  coinScanSize: number;
+  sectors: Array<{ categoryId: string; name: string; label: SectorLabelDTO; rank: number; change7dPct: number }>;
+  flywheel: { name: string; symbol: string | null; holdersRevenue30dUsd: number; holdersRevenueChangePct: number | null; yieldPct: number | null } | null;
+}
+
 export interface LookupDTO {
   query: string;
   timeframe: string;
+  /** What the worker stored about the coin; absent from older APIs, null when it could not be read. */
+  context?: LookupContextDTO | null;
   result:
     | {
         kind: 'exchange';
@@ -291,6 +301,8 @@ export interface LookupDTO {
           missing: string[];
         };
         fundamentals: { unknowns: string[] };
+        /** The same read on 1h/4h/1d. Absent from older APIs. */
+        timeframes?: Array<{ timeframe: string; trend: { direction: string; separationPct: number } | null; rsi14: number | null; changePct: number | null }>;
       }
     | {
         kind: 'onchain';

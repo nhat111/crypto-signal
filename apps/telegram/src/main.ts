@@ -5,7 +5,6 @@ import {
   buildHelpText,
   escapeHtml,
   formatGemList,
-  formatLookup,
   formatFlow,
   formatHeatmap,
   formatJournal,
@@ -32,6 +31,7 @@ import { parseRiskArgs } from './riskArgs.js';
 import { parseTradeArgs } from './tradeArgs.js';
 import { formatAirdrops, formatFarmLogged, formatFarms, parseFarmArgs } from './airdrop.js';
 import { formatFlywheel, formatSectors } from './sectorsFormat.js';
+import { formatLookup } from './lookupFormat.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();

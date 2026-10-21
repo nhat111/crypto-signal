@@ -1,5 +1,5 @@
 import { formatPositionSize, positionSize, type RiskProfile } from '@crypto-signal/shared';
-import type { BotSettings, GemRow, GemWatchDTO, LookupDTO, LatestSymbolState, OverviewRow, PriceLevels, SignalRow, StablecoinFlowDTO, StablecoinFlowWindowDTO, StoredDigestDTO, TradeDTO, TradeSummaryDTO, TrendDTO, SetupDTO } from './apiClient.js';
+import type { BotSettings, GemRow, GemWatchDTO, LatestSymbolState, OverviewRow, PriceLevels, SignalRow, StablecoinFlowDTO, StablecoinFlowWindowDTO, StoredDigestDTO, TradeDTO, TradeSummaryDTO, TrendDTO, SetupDTO } from './apiClient.js';
 
 function healthLine(row: OverviewRow): string {
   const score = row.healthScore === null ? 'N/A' : String(row.healthScore);
@@ -338,59 +338,6 @@ export function buildHelpText(symbols: string[]): string {
 export function lookupChartUrl(webBaseUrl: string, symbol: string, timeframe: string): string | null {
   if (webBaseUrl === '') return null;
   return `${webBaseUrl}/lookup?${new URLSearchParams({ q: symbol, tf: timeframe }).toString()}`;
-}
-
-/** The API sends `{ price, distancePct }`; interpolating it whole printed "[object Object]". */
-function levelText(level: number | { price: number; distancePct: number } | null): string {
-  if (level === null) return '—';
-  if (typeof level === 'number') return String(level);
-  const sign = level.distancePct > 0 ? '+' : '';
-  return `${level.price} (${sign}${level.distancePct.toFixed(1)}%)`;
-}
-
-export function formatLookup(data: LookupDTO, webBaseUrl = ''): string {
-  const lines: string[] = [];
-
-  if (data.result.kind === 'exchange') {
-    const { symbol, technical: t } = data.result;
-    const fromFallback = data.result.source !== undefined && data.result.source !== 'binance';
-    const source = fromFallback ? (data.result.source ?? '').toUpperCase() : 'Binance';
-    lines.push(`🔎 <b>${escapeHtml(symbol)}</b> · ${escapeHtml(source)} · ${escapeHtml(data.result.timeframe)}`);
-    if (fromFallback) lines.push(`<i>Binance is refusing the server right now, so these bars come from ${escapeHtml(source)}.</i>`);
-    lines.push(`Price ${t.lastPrice}`);
-    if (t.trend) lines.push(`Structure: ${t.trend.direction === 'up' ? 'EMA20 > EMA50' : t.trend.direction === 'down' ? 'EMA20 < EMA50' : 'flat'} (${t.trend.separationPct.toFixed(2)}%)`);
-    if (t.rsi14 !== null) lines.push(`RSI 14: ${t.rsi14.toFixed(1)}`);
-    if (t.atrPct !== null) lines.push(`ATR range: ${t.atrPct.toFixed(2)}%`);
-    if (t.support !== null || t.resistance !== null) {
-      lines.push(`Nearest low/high: ${levelText(t.support)} / ${levelText(t.resistance)}`);
-    }
-    if (t.rangePositionPct !== null) lines.push(`Position in the ${t.barCount}-bar range: ${t.rangePositionPct.toFixed(0)}/100`);
-    if (t.missing.length > 0) lines.push(`<i>Not enough history for: ${escapeHtml(t.missing.join(', '))}</i>`);
-    const chartUrl = lookupChartUrl(webBaseUrl, symbol, data.result.timeframe);
-    if (chartUrl) lines.push(`📈 <a href="${escapeHtml(chartUrl)}">Xem chart</a>`);
-    lines.push('');
-    lines.push('<i>Describes where price sits against its own history — not a recommendation.</i>');
-    return lines.join('\n');
-  }
-
-  const f = data.result.fundamentals;
-  lines.push(`🔎 <b>${escapeHtml(f.symbol)}</b> · ${escapeHtml(f.name)}`);
-  lines.push(`${escapeHtml(f.chainId)} · ${escapeHtml(f.dexId)}`);
-  if (f.priceUsd !== null) lines.push(`Price $${f.priceUsd}`);
-  if (f.liquidityUsd !== null) lines.push(`Liquidity $${Math.round(f.liquidityUsd).toLocaleString('en-US')}`);
-  if (f.fdvUsd !== null) lines.push(`FDV $${Math.round(f.fdvUsd).toLocaleString('en-US')}`);
-  if (f.volume24hUsd !== null) lines.push(`Vol 24h $${Math.round(f.volume24hUsd).toLocaleString('en-US')}`);
-  if (f.liquidityToFdvPct !== null) lines.push(`Liquidity/FDV: ${f.liquidityToFdvPct.toFixed(2)}%`);
-  if (f.ageDays !== null) lines.push(`Pool age: ${Math.floor(f.ageDays)}d`);
-  lines.push(`Screen: ${f.safetyVerdict === null ? '❔ no source covers this chain' : f.safetyVerdict}`);
-  if (f.topHolderPct !== null) lines.push(`Largest holder: ${(f.topHolderPct * 100).toFixed(1)}%`);
-  if (f.lpLocked !== null) lines.push(`LP locked: ${f.lpLocked ? 'yes' : 'NO'}`);
-  for (const flag of f.safetyFlags) lines.push(`⚠️ ${escapeHtml(flag)}`);
-  if (f.unknowns.length > 0) {
-    lines.push('');
-    lines.push(`<i>Could not be read: ${escapeHtml(f.unknowns.join(', '))}</i>`);
-  }
-  return lines.join('\n');
 }
 
 const TREND_TEXT: Record<TrendDTO['trend'], string> = { up: '🟢 Tăng', down: '🔴 Giảm', sideways: '⚪ Đi ngang' };
