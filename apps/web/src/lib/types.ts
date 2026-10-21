@@ -930,6 +930,16 @@ export interface LookupTechnical {
   missing: string[];
 }
 
+/** The 1D levels the 4H setup detector watches. */
+export interface LookupDailyLevels {
+  trend: 'up' | 'down' | 'sideways';
+  aboveEma: boolean | null;
+  emaPeriod: number;
+  swingLow: LookupLevel | null;
+  swingHigh: LookupLevel | null;
+  watch: string[];
+}
+
 export interface LookupTimeframeGlance {
   timeframe: string;
   trend: { direction: 'up' | 'down' | 'sideways'; separationPct: number } | null;
@@ -993,6 +1003,8 @@ export type LookupResult =
       triedSymbols: string[];
       /** Optional: an API deployed before the multi-frame glance sends none. */
       timeframes?: LookupTimeframeGlance[];
+      /** Optional: older APIs send none; null when the daily bars could not be read. */
+      daily?: LookupDailyLevels | null;
     }
   | {
       kind: 'onchain';

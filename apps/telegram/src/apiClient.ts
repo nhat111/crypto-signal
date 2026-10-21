@@ -301,6 +301,15 @@ export interface LookupDTO {
           missing: string[];
         };
         fundamentals: { unknowns: string[] };
+        /** The 1D levels the setup detector watches. Absent from older APIs, null when unreadable. */
+        daily?: {
+          trend: 'up' | 'down' | 'sideways';
+          aboveEma: boolean | null;
+          emaPeriod: number;
+          swingLow: { price: number; distancePct: number } | null;
+          swingHigh: { price: number; distancePct: number } | null;
+          watch: string[];
+        } | null;
         /** The same read on 1h/4h/1d. Absent from older APIs. */
         timeframes?: Array<{ timeframe: string; trend: { direction: string; separationPct: number } | null; rsi14: number | null; changePct: number | null }>;
       }
