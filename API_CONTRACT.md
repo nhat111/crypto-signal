@@ -688,6 +688,65 @@ Source is DefiLlama, refreshed a few times a day by the worker. It says
 nothing about *which* asset the money buys, so it is context only — never
 render it as trend confirmation or as a signal.
 
+## Airdrop research — `GET /api/airdrops`
+The worker's latest stored day of tokenless protocols (ASSUMPTIONS §25),
+largest TVL first. `limit` 1–500, default 200.
+```json
+{
+  "enabled": true,
+  "day": "2026-10-21",
+  "candidates": [
+    {
+      "day": "2026-10-21", "slug": "curvance", "name": "Curvance", "category": "Lending",
+      "chains": ["Monad", "Ethereum"], "tvlUsd": 132000000,
+      "change1dPct": 1.2, "change7dPct": 31.0, "change30dPct": null,
+      "url": "https://curvance.com", "twitter": "Curvance", "logo": "https://…",
+      "listedAtMs": 1789000000000, "audits": 2, "parentSlug": null,
+      "reasons": ["Chưa có token, đang giữ $132M TVL", "TVL +31% trong 7 ngày: tiền đang chảy vào"],
+      "unknowns": ["Chưa đủ 30 ngày lịch sử để tính TVL 30 ngày"]
+    }
+  ],
+  "fetch": { "lastAttemptAt": 0, "lastSuccessAt": 0, "consecutiveFailures": 0, "lastError": null },
+  "serverTime": 1792552544954
+}
+```
+`day: null` and an empty list until the first scan lands; `fetch` reads
+the same way as on `/api/flow`. `change30dPct` is null until 30 days of
+our own history exist. `enabled: false` when the worker's `AIRDROP_SCAN`
+is off (read from the API's own environment, same variable).
+
+## Airdrop farms — `GET/POST /api/airdrops/farms`, `POST /api/airdrops/farms/log`, `POST /api/airdrops/farms/:id/actions`, `PATCH /api/airdrops/farms/:id`, `DELETE /api/airdrops/farms/:id`
+A hand-kept log, like the journal: the web sends `chatId: "web"`, the bot
+its chat id.
+
+- `GET ?chatId=` → `{ farms: Farm[], serverTime }`, active first.
+- `POST /farms` `{ chatId, name, slug?, wallet?, note? }` → `{ farm }`.
+  Returns the existing active farm for that project (name folded to
+  lowercase, single spaces) instead of a duplicate.
+- `POST /farms/log` `{ chatId, name, costUsd, note? }` → `{ farm }`: starts
+  the farm if needed and logs one action (the `/farm` command).
+- `POST /farms/:id/actions` `{ costUsd, note? }` → `{ farm }`.
+- `PATCH /farms/:id` `{ status?: "active"|"claimed"|"dropped", rewardUsd?, wallet?, note? }`
+  → `{ farm }`; 409 when reopening while another farm on the same project
+  is active.
+- `DELETE /farms/:id` → `{ deleted: true }` (actions go with it).
+
+`costUsd`/`rewardUsd` must be finite numbers ≥ 0; `name` 1–80 chars,
+`note` ≤ 500. `Farm`:
+```json
+{
+  "id": "9", "chatId": "web", "projectKey": "symbiotic", "name": "Symbiotic", "slug": "symbiotic",
+  "status": "active", "wallet": "ví 2", "note": null, "rewardUsd": null,
+  "createdAt": 1792552551037, "closedAt": null,
+  "activity": { "actionCount": 3, "totalCostUsd": 4.5, "activeWeeks": 2, "activeMonths": 1,
+                "firstActionAt": 1792000000000, "lastActionAt": 1792552551037, "daysSinceLast": 0 },
+  "netUsd": null,
+  "recentActions": [{ "id": "12", "at": 1792552551037, "costUsd": 1.2, "note": "restake" }]
+}
+```
+`netUsd` = `rewardUsd − activity.totalCostUsd`, null until a reward is
+recorded. `recentActions` is the newest 20.
+
 ## Bot settings — `POST /api/bot/register`, `GET /api/bot/settings/:chatId`, `POST /api/bot/settings/:chatId`
 
 Telegram only. `settings`:

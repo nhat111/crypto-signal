@@ -358,6 +358,20 @@ Check items as they land; each phase's commit message references the phase.
 - [ ] Read the comparison once both sides clear the floor; drop or keep
       the watchlist alerts on what it says.
 
+## Phase 21 — Airdrop research
+- [x] Gem scanner on by default (`GEM_SCAN_ENABLED` unset = on); it had
+      never been enabled in production, so /gems was empty.
+- [x] Daily list of tokenless protocols from DefiLlama with reasons and
+      unknowns, no score (migration 037, ASSUMPTIONS §25). Web /airdrops,
+      bot /airdrops.
+- [x] Farm log: projects farmed, each action and its cost, active
+      weeks/months, net after the airdrop (web, bot /farm).
+- [x] Strategy guide /guide/airdrop.
+- [ ] Funding rounds per candidate (DefiLlama `/raises` is paid; find a
+      free source or leave it to the reader).
+- [ ] Check candidates against CoinGecko to catch a token launch DefiLlama
+      has not recorded yet.
+
 ## Known limitations (carried forward, not silently hidden)
 - [x] Components now render against older API payloads in the test suite
       (`apps/web/src/lib/legacyPayload.test.ts`). The optional fields are

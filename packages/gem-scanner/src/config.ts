@@ -15,9 +15,13 @@ const numeric = (defaultValue: number) =>
   z.preprocess((v) => (v === undefined || v === '' ? defaultValue : Number(v)), z.number());
 
 export const gemEnvSchema = z.object({
-  GEM_SCAN_ENABLED: z
-    .preprocess((v) => v === 'true' || v === '1', z.boolean())
-    .default(false),
+  // On unless explicitly off. It used to be opt-in, and the production
+  // service never had the variable, so /gems sat empty for weeks with
+  // nothing on the page saying why.
+  GEM_SCAN_ENABLED: z.preprocess(
+    (v) => (typeof v === 'string' ? !['0', 'false', 'no', 'off'].includes(v.trim().toLowerCase()) : true),
+    z.boolean(),
+  ),
   GEM_CHAINS: z.string().default('solana'),
   GEM_SCAN_INTERVAL_MINUTES: numeric(30),
   /**

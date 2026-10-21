@@ -32,6 +32,11 @@ score, no "buy/sell" wording.
 - `apps/api`: Fastify, read-only. `apps/web`: Next.js (see
   `apps/web/AGENTS.md`: this Next.js version differs from training data).
   `apps/telegram`: Telegraf, calls the API only.
+- Airdrop research: `packages/indicators/src/airdrop.ts` (screen),
+  `packages/market-data/src/airdrop/defillama.ts`, `packages/db/src/airdrop.ts`
+  (candidates + farm log), `apps/worker/src/airdropScan.ts`,
+  `apps/api/src/routes/airdrops.ts`, web `/airdrops` + `/guide/airdrop`,
+  bot `/airdrops` + `/farm` (`apps/telegram/src/airdrop.ts`). ASSUMPTIONS §25.
 - `db/migrations/NNN_*.sql`: forward-only, numbered.
 
 ## Conventions
@@ -81,6 +86,9 @@ Run them before pushing.
   thin-spot note relative to the day's median (`flagThinSpot`). First run
   with it: the scan of 16/10. Check `/api/status` jobs and the worker log
   line `coin watch alert sent` if it seems silent (no change = no message).
+- Phase 21 (2026-10-21): gem scanner on by default (it had never been
+  enabled in production); airdrop research list, farm log and strategy
+  guide (migration 037).
 - Open questions, from `TODO.md`: the coin-scan edge report has 0 samples
   until enough days are stored (verdicts expected ~mid-December 2026);
   intraday funding/OI refresh for ⭐/held coins; a stop on journal trades

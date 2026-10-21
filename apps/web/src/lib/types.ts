@@ -1007,3 +1007,73 @@ export interface LookupResponse {
   timeframe: string;
   result: LookupResult;
 }
+
+// --- Airdrop research (/api/airdrops) ---
+
+export interface AirdropCandidate {
+  day: string;
+  slug: string;
+  name: string;
+  category: string | null;
+  chains: string[];
+  tvlUsd: number;
+  change1dPct: number | null;
+  change7dPct: number | null;
+  /** From the worker's own stored history; null until ~30 days of it exist. */
+  change30dPct: number | null;
+  url: string | null;
+  twitter: string | null;
+  logo: string | null;
+  listedAtMs: number | null;
+  audits: number | null;
+  parentSlug: string | null;
+  reasons: string[];
+  unknowns: string[];
+}
+
+export interface AirdropsResponse {
+  enabled: boolean;
+  day: string | null;
+  candidates: AirdropCandidate[];
+  fetch: { lastAttemptAt: number | null; lastSuccessAt: number | null; consecutiveFailures: number; lastError: string | null } | null;
+  serverTime: number;
+}
+
+export type FarmStatus = 'active' | 'claimed' | 'dropped';
+
+export interface FarmAction {
+  id: string;
+  at: number;
+  costUsd: number;
+  note: string | null;
+}
+
+export interface Farm {
+  id: string;
+  chatId: string;
+  projectKey: string;
+  name: string;
+  slug: string | null;
+  status: FarmStatus;
+  wallet: string | null;
+  note: string | null;
+  rewardUsd: number | null;
+  createdAt: number;
+  closedAt: number | null;
+  activity: {
+    actionCount: number;
+    totalCostUsd: number;
+    activeWeeks: number;
+    activeMonths: number;
+    firstActionAt: number | null;
+    lastActionAt: number | null;
+    daysSinceLast: number | null;
+  };
+  netUsd: number | null;
+  recentActions: FarmAction[];
+}
+
+export interface FarmsResponse {
+  farms: Farm[];
+  serverTime: number;
+}

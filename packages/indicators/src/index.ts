@@ -16,3 +16,4 @@ export * from './coinScan.js';
 export * from './coinFundamentals.js';
 export * from './watchlist.js';
 export * from './oiAggregate.js';
+export * from './airdrop.js';

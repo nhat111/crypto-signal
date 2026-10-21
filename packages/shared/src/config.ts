@@ -58,6 +58,12 @@ const envSchema = z.object({
   COIN_SETUPS: z.string().default('on'),
   // How many scanned coins make the daily watchlist whose setups are alerted.
   COIN_WATCHLIST_SIZE: numeric(6),
+  // Airdrop research list (/airdrops): tokenless protocols from DefiLlama. On unless off/0/false.
+  AIRDROP_SCAN: z.string().default('on'),
+  // Smallest TVL a candidate needs, in USD.
+  AIRDROP_MIN_TVL_USD: numeric(10_000_000),
+  // Candidates kept per day, largest TVL first.
+  AIRDROP_MAX_CANDIDATES: numeric(150),
 
   SYMBOLS: z.string().default('BTCUSDT,ETHUSDT,SOLUSDT'),
   /** Futures-only symbols (no Binance Spot listing) — see ASSUMPTIONS.md §15. Tracked with a reduced indicator/signal set. */
@@ -193,6 +199,12 @@ export interface CoinScanThresholds {
   fundingShortsPayPct: number;
 }
 
+export interface AirdropScanConfig {
+  enabled: boolean;
+  minTvlUsd: number;
+  maxCandidates: number;
+}
+
 export interface CoinScanConfig {
   enabled: boolean;
   topN: number;
@@ -240,6 +252,7 @@ export interface AppConfig {
   setupAlerts: boolean;
   telegramAlertChatIds: string[];
   coinScan: CoinScanConfig;
+  airdrop: AirdropScanConfig;
   symbols: string[];
   /** Symbols tracked in reduced (Futures-only, no Spot) mode — disjoint from `symbols`. */
   futuresOnlySymbols: string[];
@@ -391,6 +404,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       setups: isEnabledFlag(parsed.COIN_SCAN) && isEnabledFlag(parsed.COIN_SETUPS),
       watchlistSize: Math.min(20, Math.max(0, Math.round(parsed.COIN_WATCHLIST_SIZE))),
       oiVenues: parseOiVenues(parsed.COIN_SCAN_OI_VENUES),
+    },
+    airdrop: {
+      enabled: isEnabledFlag(parsed.AIRDROP_SCAN),
+      minTvlUsd: Math.max(0, parsed.AIRDROP_MIN_TVL_USD),
+      // Clamped: each row is stored once a day and kept 120 days.
+      maxCandidates: Math.min(500, Math.max(10, Math.round(parsed.AIRDROP_MAX_CANDIDATES) || 150)),
     },
     symbols: parsed.SYMBOLS.split(',').map((s) => s.trim()).filter(Boolean),
     futuresOnlySymbols: parsed.FUTURES_ONLY_SYMBOLS.split(',').map((s) => s.trim()).filter(Boolean),

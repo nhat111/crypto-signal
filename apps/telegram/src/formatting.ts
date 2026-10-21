@@ -310,6 +310,8 @@ export function buildHelpText(symbols: string[]): string {
     '/journal — your trade log + win rate / P&L summary',
     '/digest — xem lại báo cáo sáng nay (kèm phần "Của bạn": lệnh đang giữ, setup đang mở)',
     '/risk [VỐN %RỦI_RO] — vốn và % rủi ro mỗi lệnh, để setup tính cỡ lệnh cho bro (vd /risk 1500 1)',
+    '/airdrops — dự án chưa có token (nghiên cứu airdrop)',
+    '/farm — xem farm; /farm DỰ_ÁN CHI_PHÍ [ghi chú] để ghi một lần tương tác',
     '/flow — stablecoin supply: money entering or leaving crypto',
     '/alerts on|off — toggle alert push to this chat',
     '/id — chat id của chat này (cần để bật cảnh báo sự cố hệ thống)',

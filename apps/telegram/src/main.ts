@@ -30,6 +30,7 @@ import { parseSignalsArg, resolveSignalsScope } from './signalsScope.js';
 import { parseTimeframeArg, type TimeframeChoice } from './timeframeArg.js';
 import { parseRiskArgs } from './riskArgs.js';
 import { parseTradeArgs } from './tradeArgs.js';
+import { formatAirdrops, formatFarmLogged, formatFarms, parseFarmArgs } from './airdrop.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -421,6 +422,37 @@ async function main(): Promise<void> {
     }
   });
 
+  bot.command('airdrops', async (ctx) => {
+    try {
+      const data = await api.getAirdrops();
+      await ctx.reply(formatAirdrops(data, config.webBaseUrl), { parse_mode: 'HTML', link_preview_options: { is_disabled: true } });
+    } catch (err) {
+      logger.error({ err }, '/airdrops failed');
+      await ctx.reply('Không tải được danh sách airdrop lúc này — thử lại sau ít phút.');
+    }
+  });
+
+  bot.command('farm', async (ctx) => {
+    const chatId = String(ctx.chat.id);
+    const args = parseFarmArgs(ctx.message.text);
+    if (args.kind === 'error') {
+      await ctx.reply(args.message);
+      return;
+    }
+    try {
+      if (args.kind === 'list') {
+        const { farms } = await api.getFarms(chatId);
+        await ctx.reply(formatFarms(farms), { parse_mode: 'HTML' });
+        return;
+      }
+      const { farm } = await api.logFarm(chatId, args.name, args.costUsd, args.note);
+      await ctx.reply(formatFarmLogged(farm, args.costUsd), { parse_mode: 'HTML' });
+    } catch (err) {
+      logger.error({ err }, '/farm failed');
+      await ctx.reply(err instanceof ApiError ? err.message : 'Không ghi được lúc này — thử lại sau ít phút.');
+    }
+  });
+
   bot.command('flow', async (ctx) => {
     try {
       const { stablecoin } = await api.getFlow();
@@ -479,6 +511,8 @@ async function main(): Promise<void> {
         { command: 'close', description: 'Close a logged trade' },
         { command: 'journal', description: 'Your trade log + P&L summary' },
         { command: 'risk', description: 'Vốn + % rủi ro: tính cỡ lệnh cho setup' },
+        { command: 'airdrops', description: 'Dự án chưa có token để nghiên cứu airdrop' },
+        { command: 'farm', description: 'Ghi / xem việc farm airdrop + chi phí' },
         { command: 'flow', description: 'Stablecoin supply / macro flow' },
         { command: 'alerts', description: 'Toggle alerts for this chat' },
         { command: 'id', description: 'Chat ID của chat này (để bật cảnh báo)' },
