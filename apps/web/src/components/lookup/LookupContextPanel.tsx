@@ -67,6 +67,9 @@ export function LookupContextPanel({ context, base }: { context: LookupContext; 
               <li key={b} className="text-rose-300">▼ {b}</li>
             ))}
           </ul>
+          <Link href="/guide#oi-funding" className="inline-block text-[11px] font-semibold text-sky-300 hover:text-sky-200">
+            OI và funding là gì? →
+          </Link>
           {[...c.unknowns, ...(c.fundamentals?.unknowns ?? [])].length > 0 && (
             <p className="text-[11px] text-amber-300/80">Không đọc được: {[...c.unknowns, ...(c.fundamentals?.unknowns ?? [])].join(' ')}</p>
           )}

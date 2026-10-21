@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { getCoins, getCoinsLive } from '@/lib/api';
 import { usePolling } from '@/lib/usePolling';
@@ -56,7 +57,10 @@ export default function CoinsPage() {
           7 ngày qua giá được kéo bởi <b className="text-slate-300">spot mua thật hay đòn bẩy</b>. Bấm vào một dòng để
           xem số liệu đằng sau nhãn. Cột <b className="text-slate-300">Cơ bản</b> lấy phí, TVL và stablecoin của chain hoặc
           protocol từ DefiLlama (chỉ tính khi phí đổi ≥20%, TVL ≥10%, stablecoin ≥5%); lịch unlock token chưa có vì chưa có
-          nguồn miễn phí.
+          nguồn miễn phí.{' '}
+          <Link href="/guide#oi-funding" className="font-semibold text-sky-300 hover:text-sky-200">
+            OI và funding là gì? →
+          </Link>
         </p>
       </header>
 
