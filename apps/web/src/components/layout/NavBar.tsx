@@ -10,6 +10,7 @@ const LINKS = [
   { href: '/', label: 'Overview' },
   { href: '/signals', label: 'Signals' },
   { href: '/coins', label: 'Coins' },
+  { href: '/narratives', label: 'Narrative' },
   { href: '/gems', label: 'Gems' },
   { href: '/airdrops', label: 'Airdrop' },
   { href: '/lookup', label: 'Lookup' },

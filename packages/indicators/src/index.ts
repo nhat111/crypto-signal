@@ -17,3 +17,5 @@ export * from './coinFundamentals.js';
 export * from './watchlist.js';
 export * from './oiAggregate.js';
 export * from './airdrop.js';
+export * from './sectors.js';
+export * from './flywheel.js';

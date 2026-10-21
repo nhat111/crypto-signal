@@ -31,6 +31,7 @@ import { parseTimeframeArg, type TimeframeChoice } from './timeframeArg.js';
 import { parseRiskArgs } from './riskArgs.js';
 import { parseTradeArgs } from './tradeArgs.js';
 import { formatAirdrops, formatFarmLogged, formatFarms, parseFarmArgs } from './airdrop.js';
+import { formatFlywheel, formatSectors } from './sectorsFormat.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -422,6 +423,24 @@ async function main(): Promise<void> {
     }
   });
 
+  bot.command('sectors', async (ctx) => {
+    try {
+      await ctx.reply(formatSectors(await api.getSectors()), { parse_mode: 'HTML' });
+    } catch (err) {
+      logger.error({ err }, '/sectors failed');
+      await ctx.reply('Không tải được dòng tiền theo mảng lúc này — thử lại sau ít phút.');
+    }
+  });
+
+  bot.command('flywheel', async (ctx) => {
+    try {
+      await ctx.reply(formatFlywheel(await api.getFlywheel()), { parse_mode: 'HTML' });
+    } catch (err) {
+      logger.error({ err }, '/flywheel failed');
+      await ctx.reply('Không tải được danh sách flywheel lúc này — thử lại sau ít phút.');
+    }
+  });
+
   bot.command('airdrops', async (ctx) => {
     try {
       const data = await api.getAirdrops();
@@ -511,6 +530,8 @@ async function main(): Promise<void> {
         { command: 'close', description: 'Close a logged trade' },
         { command: 'journal', description: 'Your trade log + P&L summary' },
         { command: 'risk', description: 'Vốn + % rủi ro: tính cỡ lệnh cho setup' },
+        { command: 'sectors', description: 'Dòng tiền theo mảng: mảng nào đang thắng BTC' },
+        { command: 'flywheel', description: 'Dự án dùng doanh thu mua lại / đốt / chia cho holder' },
         { command: 'airdrops', description: 'Dự án chưa có token để nghiên cứu airdrop' },
         { command: 'farm', description: 'Ghi / xem việc farm airdrop + chi phí' },
         { command: 'flow', description: 'Stablecoin supply / macro flow' },

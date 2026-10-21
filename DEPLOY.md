@@ -398,6 +398,17 @@ boot. Tune with `AIRDROP_MIN_TVL_USD` (default 10000000) and
 `AIRDROP_MAX_CANDIDATES` (default 150). The bot needs a restart to show
 `/airdrops` and `/farm` in its menu. See ASSUMPTIONS.md §25.
 
+## Sectors and flywheel
+
+Both on by default (`SECTOR_SCAN`, `FLYWHEEL_SCAN`; `off` disables).
+Migration `038_sectors_flywheel.sql` runs on the worker's next boot. The
+flywheel list lands about 10 minutes after boot, the sector read from 15
+minutes, then once a day each. Keyless CoinGecko is rate-limited per IP
+and Render's IP is shared: if `/status` shows `sector_scan` failing with
+HTTP 429, add a free demo key as `COINGECKO_API_KEY` (coingecko.com →
+Developer Dashboard). The bot needs a restart to list `/sectors` and
+`/flywheel`. See ASSUMPTIONS.md §26.
+
 ## Appendix: Railway (paid, one service per process)
 
 The original setup, before the Railway trial ran out. Everything above about

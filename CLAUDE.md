@@ -37,6 +37,11 @@ score, no "buy/sell" wording.
   (candidates + farm log), `apps/worker/src/airdropScan.ts`,
   `apps/api/src/routes/airdrops.ts`, web `/airdrops` + `/guide/airdrop`,
   bot `/airdrops` + `/farm` (`apps/telegram/src/airdrop.ts`). ASSUMPTIONS §25.
+- Sectors and flywheel: `packages/indicators/src/sectors.ts` and
+  `flywheel.ts`, `packages/market-data/src/coingecko/markets.ts` and
+  `defillama/holdersRevenue.ts`, `packages/db/src/sectorsFlywheel.ts`,
+  worker `sectorScan.ts` + `flywheelScan.ts`, web `/narratives`, bot
+  `/sectors` + `/flywheel`. ASSUMPTIONS §26.
 - `db/migrations/NNN_*.sql`: forward-only, numbered.
 
 ## Conventions
@@ -89,6 +94,8 @@ Run them before pushing.
 - Phase 21 (2026-10-21): gem scanner on by default (it had never been
   enabled in production); airdrop research list, farm log and strategy
   guide (migration 037).
+- Phase 22 (2026-10-21): sector read against BTC and flywheel list
+  (migration 038).
 - Open questions, from `TODO.md`: the coin-scan edge report has 0 samples
   until enough days are stored (verdicts expected ~mid-December 2026);
   intraday funding/OI refresh for ⭐/held coins; a stop on journal trades

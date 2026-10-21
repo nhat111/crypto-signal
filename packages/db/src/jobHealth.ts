@@ -77,6 +77,8 @@ export const JOB_SETUP_SCAN = 'setup_scan';
 export const JOB_COIN_SCAN = 'coin_scan';
 export const JOB_COIN_SETUP_SCAN = 'coin_setup_scan';
 export const JOB_AIRDROP_SCAN = 'airdrop_scan';
+export const JOB_SECTOR_SCAN = 'sector_scan';
+export const JOB_FLYWHEEL_SCAN = 'flywheel_scan';
 
 /** Every recorded job, for the operator status page. Ordered by name so the page does not reshuffle between polls. */
 export async function getAllJobHealth(pool: Pool): Promise<JobHealth[]> {

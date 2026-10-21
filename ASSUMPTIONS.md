@@ -1034,3 +1034,50 @@ stablecoins: 30 days).
 - **Strategy guide** (`/guide/airdrop`): choosing projects, a monthly gas
   budget, steady activity over bursts, sybil patterns, wallet security,
   what to record when the airdrop lands. It does not say to sell or hold.
+
+## 26. Sectors and flywheel (`/narratives`, `/sectors`, `/flywheel`)
+
+- **Question.** Two reads from a trading course the user shared: "only one
+  or two sectors pump at a time, the market tells you where money is",
+  and "a project whose own cash flow buys its token (Hyperliquid's
+  buyback) is the long-term sign". Both measured with free data.
+- **Sectors** (`packages/indicators/src/sectors.ts`, worker
+  `sectorScan.ts`). CoinGecko `/coins/markets` per category, the 30
+  largest by market cap (`SECTOR_CATEGORIES`, default 20 categories in
+  `DEFAULT_SECTOR_CATEGORIES`, `SECTOR_COINS_PER_CATEGORY`). Left out:
+  stablecoins (CoinGecko's own list), coins under $10M market cap (a small
+  category's top 30 reaches illiquid tokens), and coins up over 1,000% in
+  7 days (listed that week, measured from launch). At least 5 coins or the
+  sector is skipped for the day.
+  - The median coin's 7d/30d return minus BTC's (`rs7d`, `rs30d`), so one
+    big coin cannot speak for the sector; the market-cap weighted 7d return
+    is kept beside it and a ≥10-point gap is called out.
+  - Breadth: % of the coins beating BTC over the window. A plain average
+    ≥5 points over BTC with breadth under 35% reads "Hẹp" (a few coins
+    carry it); the median cannot show that, since a median above BTC
+    already means half the coins beat it.
+  - Labels from the two windows: leading (both beat BTC), emerging (7d
+    only), fading (30d only), lagging (neither). No score.
+  - Hourly ticks, incremental: only categories missing for the UTC day are
+    fetched, BTC first (one failed call stops the run). Keyless CoinGecko
+    allows a few calls a minute per IP, shared on Render, so calls are 6 s
+    apart (2.5 s with `COINGECKO_API_KEY`, a free demo key).
+- **Flywheel** (`packages/indicators/src/flywheel.ts`, worker
+  `flywheelScan.ts`). DefiLlama `overview/fees?dataType=dailyHoldersRevenue`:
+  what reached token holders in 30 days (buyback, burn, fee share), summed
+  per parent protocol, against the 30 days before. Token and market cap
+  from `lite/protocols2` (protocols and parents with CoinGecko ids) and
+  `/v2/chains`; price and market cap preferably from CoinGecko, falling
+  back to DefiLlama's. Kept: ≥ $100K in 30 days
+  (`FLYWHEEL_MIN_HOLDERS_REVENUE_30D`) and a token to hold; top 100.
+  - "%/năm vốn hoá" = 30 days × 365/30 ÷ market cap, like a dividend
+    yield at today's price. Over 50% is flagged: usually a one-off payout
+    or a tiny circulating cap.
+  - "Lệch pha" when holders revenue is up ≥20% on the month while the
+    price is down ≥10%: the loop and the price disagree.
+  - DefiLlama's own `methodology.HoldersRevenue` sentence is shown as the
+    mechanism, in English, rather than paraphrased.
+  - On 2026-10-21: 1,230 holders-revenue rows → 73 families, 67 priced.
+- Both kept 120 days, one row per item per UTC day (migration 038).
+- **Not done.** Sector history is stored but not yet charted; flywheel is
+  not yet shown on `/lookup` for the coin being looked up.

@@ -1077,3 +1077,70 @@ export interface FarmsResponse {
   farms: Farm[];
   serverTime: number;
 }
+
+// --- Sector read (/api/sectors) and flywheel list (/api/flywheel) ---
+
+export type SectorLabel = 'leading' | 'emerging' | 'fading' | 'lagging';
+
+interface JobFetch {
+  lastAttemptAt: number | null;
+  lastSuccessAt: number | null;
+  consecutiveFailures: number;
+  lastError: string | null;
+}
+
+export interface Sector {
+  day: string;
+  categoryId: string;
+  name: string;
+  coinCount: number;
+  median7dPct: number;
+  median30dPct: number;
+  rs7d: number;
+  rs30d: number;
+  breadth7dPct: number;
+  breadth30dPct: number;
+  weighted7dPct: number | null;
+  btc7dPct: number;
+  btc30dPct: number;
+  label: SectorLabel;
+  previousLabel: SectorLabel | null;
+  leaders: { symbol: string; name: string; change7dPct: number }[];
+  reasons: string[];
+}
+
+export interface SectorsResponse {
+  enabled: boolean;
+  day: string | null;
+  sectors: Sector[];
+  fetch: JobFetch | null;
+  serverTime: number;
+}
+
+export interface FlywheelRow {
+  day: string;
+  familyKey: string;
+  name: string;
+  symbol: string | null;
+  geckoId: string | null;
+  category: string | null;
+  holdersRevenue30dUsd: number;
+  holdersRevenuePrev30dUsd: number | null;
+  holdersRevenueChangePct: number | null;
+  annualizedUsd: number;
+  marketCapUsd: number | null;
+  yieldPct: number | null;
+  priceChange30dPct: number | null;
+  mechanism: string | null;
+  sources: string[];
+  reasons: string[];
+  unknowns: string[];
+}
+
+export interface FlywheelResponse {
+  enabled: boolean;
+  day: string | null;
+  rows: FlywheelRow[];
+  fetch: JobFetch | null;
+  serverTime: number;
+}

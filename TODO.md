@@ -372,6 +372,15 @@ Check items as they land; each phase's commit message references the phase.
 - [ ] Check candidates against CoinGecko to catch a token launch DefiLlama
       has not recorded yet.
 
+## Phase 22 — Narrative and flywheel
+- [x] Sector read against BTC from CoinGecko categories: median coin,
+      breadth, four labels, leaders (migration 038, ASSUMPTIONS §26).
+      Web /narratives, bot /sectors.
+- [x] Flywheel list from DefiLlama holders revenue, per parent, with % of
+      market cap per year and the price over the same month. Bot /flywheel.
+- [ ] Chart a sector's label and breadth over the stored days.
+- [ ] Show the flywheel line on /lookup for the coin looked up.
+
 ## Known limitations (carried forward, not silently hidden)
 - [x] Components now render against older API payloads in the test suite
       (`apps/web/src/lib/legacyPayload.test.ts`). The optional fields are

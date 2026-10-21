@@ -747,6 +747,61 @@ its chat id.
 `netUsd` = `rewardUsd − activity.totalCostUsd`, null until a reward is
 recorded. `recentActions` is the newest 20.
 
+## Sectors — `GET /api/sectors`
+The latest stored day of the sector read (ASSUMPTIONS §26), strongest
+7-day relative strength first.
+```json
+{
+  "enabled": true,
+  "day": "2026-10-21",
+  "sectors": [
+    {
+      "day": "2026-10-21", "categoryId": "real-world-assets-rwa", "name": "RWA", "coinCount": 28,
+      "median7dPct": 0.0, "median30dPct": 0.3, "rs7d": 1.1, "rs30d": -1.4,
+      "breadth7dPct": 61, "breadth30dPct": 43, "weighted7dPct": 1.8,
+      "btc7dPct": -1.1, "btc30dPct": 1.7,
+      "label": "emerging", "previousLabel": "lagging",
+      "leaders": [{ "symbol": "CARDS", "name": "Collector Crypt", "change7dPct": 35.2 }],
+      "reasons": ["Coin trung vị +0.0% 7 ngày, …", "61% số coin thắng BTC trong 7 ngày (28 coin)"]
+    }
+  ],
+  "fetch": { "lastAttemptAt": 0, "lastSuccessAt": 0, "consecutiveFailures": 0, "lastError": null },
+  "serverTime": 0
+}
+```
+`label` is one of `leading | emerging | fading | lagging`; `previousLabel`
+is the label on the previous stored day (null when the sector was not
+stored then). `rs*` are percentage points against BTC. The first two
+`reasons` restate the numbers; the rest are notes (narrow, broad, big
+coins vs median). `fetch` reads as on `/api/flow`.
+
+## Flywheel — `GET /api/flywheel?limit=`
+The latest stored day of protocols and chains paying revenue to token
+holders, largest 30-day amount first. `limit` 1–200, default 100.
+```json
+{
+  "enabled": true,
+  "day": "2026-10-21",
+  "rows": [
+    {
+      "day": "2026-10-21", "familyKey": "parent#hyperliquid", "name": "Hyperliquid", "symbol": "HYPE",
+      "geckoId": "hyperliquid", "category": "Derivatives",
+      "holdersRevenue30dUsd": 68501337, "holdersRevenuePrev30dUsd": 78597650, "holdersRevenueChangePct": -12.8,
+      "annualizedUsd": 833432933, "marketCapUsd": 18038338673, "yieldPct": 4.6, "priceChange30dPct": -12.9,
+      "mechanism": "99% of fees go to Assistance Fund for buying HYPE tokens, …",
+      "sources": ["Hyperliquid Perps", "Hyperliquid Spot Orderbook", "Hyperliquid Outcomes"],
+      "reasons": ["Trả $68.5M cho holder trong 30 ngày (buyback, burn hoặc chia phí)", "…"],
+      "unknowns": []
+    }
+  ],
+  "fetch": null,
+  "serverTime": 0
+}
+```
+`yieldPct` = `annualizedUsd / marketCapUsd × 100`; null without a market
+cap. `holdersRevenueChangePct` null when the prior 30 days are unknown or
+zero. `mechanism` is DefiLlama's text, in English.
+
 ## Bot settings — `POST /api/bot/register`, `GET /api/bot/settings/:chatId`, `POST /api/bot/settings/:chatId`
 
 Telegram only. `settings`:
