@@ -11,6 +11,8 @@
  * Pure: markets in, read out.
  */
 
+import { SECTOR_BROAD_BREADTH_PCT, SECTOR_NARROW_BREADTH_PCT } from '@crypto-signal/shared';
+
 export type SectorLabel = 'leading' | 'emerging' | 'fading' | 'lagging';
 export const ALL_SECTOR_LABELS: readonly SectorLabel[] = ['leading', 'emerging', 'fading', 'lagging'];
 
@@ -66,9 +68,9 @@ export const SECTOR_MIN_COIN_MCAP_USD = 10_000_000;
  * with the rest and would swamp the average, so it is left out.
  */
 export const SECTOR_MAX_PLAUSIBLE_7D_PCT = 1_000;
-/** Under this share of coins beating BTC, a strong median is a few coins carrying the rest. */
-const NARROW_BREADTH_PCT = 35;
-const BROAD_BREADTH_PCT = 65;
+// The same edges as the one-word breadth on the card and in the bot.
+const NARROW_BREADTH_PCT = SECTOR_NARROW_BREADTH_PCT;
+const BROAD_BREADTH_PCT = SECTOR_BROAD_BREADTH_PCT;
 /** How far the average must beat BTC (points) before a narrow sector is worth calling out. */
 const NARROW_MEAN_GAP = 5;
 

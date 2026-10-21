@@ -1,5 +1,5 @@
 import { cx, formatUsd } from '@/lib/format';
-import { signedPct } from '@/lib/narratives';
+import { pctTone, signedPct } from '@/lib/narratives';
 import type { FlywheelRow } from '@/lib/types';
 
 /** One protocol or chain whose revenue goes back to its token holders. */
@@ -27,10 +27,7 @@ export function FlywheelCard({ row }: { row: FlywheelRow }) {
         <div>
           <dt className="text-slate-500">So tháng trước</dt>
           <dd
-            className={cx(
-              'font-semibold tabular-nums',
-              row.holdersRevenueChangePct === null ? 'text-slate-500' : row.holdersRevenueChangePct >= 0 ? 'text-emerald-300' : 'text-rose-300',
-            )}
+            className={cx('font-semibold tabular-nums', pctTone(row.holdersRevenueChangePct, 0))}
           >
             {signedPct(row.holdersRevenueChangePct, 0)}
           </dd>
@@ -44,10 +41,7 @@ export function FlywheelCard({ row }: { row: FlywheelRow }) {
         <div>
           <dt className="text-slate-500">Giá 30 ngày</dt>
           <dd
-            className={cx(
-              'font-semibold tabular-nums',
-              row.priceChange30dPct === null ? 'text-slate-500' : row.priceChange30dPct >= 0 ? 'text-emerald-300' : 'text-rose-300',
-            )}
+            className={cx('font-semibold tabular-nums', pctTone(row.priceChange30dPct, 0))}
           >
             {signedPct(row.priceChange30dPct, 0)}
           </dd>

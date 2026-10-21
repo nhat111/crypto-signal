@@ -26,6 +26,7 @@ describe('formatSectors', () => {
     expect(text).toContain('TAO +25.0%');
     expect(text).toContain('hôm trước: Đang nổi');
     expect(text).toContain('BTC: +2.0% 7 ngày');
+    expect(text).toContain('60% thắng BTC (vừa)');
     expect(text).not.toContain('Cách đọc');
   });
 
