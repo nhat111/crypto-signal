@@ -95,7 +95,7 @@ export default function NarrativeGuidePage() {
             rows={[
               [<Term key="a">7 ngày / 30 ngày</Term>, 'Lợi nhuận của coin trung vị trong mảng (coin đứng giữa khi xếp từ tăng nhiều nhất tới giảm nhiều nhất).'],
               [<Term key="b">so BTC</Term>, 'Hơn hay kém BTC bao nhiêu điểm %. Dương là mảng mạnh hơn BTC.'],
-              [<Term key="c">Thắng BTC (7d)</Term>, 'Bao nhiêu % số coin trong mảng tăng hơn BTC. Thanh xanh càng dài thì sóng càng rộng.'],
+              [<Term key="c">Thắng BTC (7d)</Term>, 'Bao nhiêu % số coin trong mảng tăng hơn BTC, kèm một chữ: Rộng (từ 65%), Vừa (35–65%), Ít (dưới 35%). Thanh xanh càng dài thì sóng càng rộng.'],
               [<Term key="d">Dẫn đầu 7 ngày</Term>, 'Ba coin mạnh nhất mảng tuần này: chỗ để bắt đầu tìm hiểu.'],
             ]}
           />
@@ -109,11 +109,14 @@ export default function NarrativeGuidePage() {
               thẻ sẽ ghi <Term>“Hẹp: chỉ vài coin kéo”</Term>.
             </p>
           </Story>
-          <p>Các dòng ghi chú dưới thẻ:</p>
+          <p>
+            Các dòng ghi chú dưới thẻ chỉ hiện khi có điều đáng nói. Một thị trường yếu đều thường không có ghi chú nào: khi đó đọc chữ
+            Rộng / Vừa / Ít cạnh ô “Thắng BTC”.
+          </p>
           <Table
             head={['Ghi chú', 'Nghĩa là']}
             rows={[
-              [<Term key="a">Rộng</Term>, 'Đa số coin trong mảng cùng tăng hơn BTC: sóng của cả mảng, không phải của một coin.'],
+              [<Term key="a">Rộng</Term>, 'Từ 65% số coin trong mảng cùng tăng hơn BTC: sóng của cả mảng, không phải của một coin.'],
               [<Term key="b">Hẹp</Term>, 'Vài coin bay kéo trung bình lên, phần lớn vẫn thua BTC. Đu theo mảng lúc này là đu theo vài coin.'],
               [<Term key="c">Coin lớn kéo</Term>, 'Coin vốn hoá lớn tăng mạnh hơn hẳn coin trung vị: tiền lớn vào hàng đầu ngành trước.'],
               [<Term key="d">Coin nhỏ chạy trước</Term>, 'Coin nhỏ tăng mạnh hơn coin lớn: thường là giai đoạn đầu cơ, rủi ro cao hơn.'],

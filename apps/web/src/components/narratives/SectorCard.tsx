@@ -1,15 +1,12 @@
 import { cx } from '@/lib/format';
-import { SECTOR_LABEL_META, signedPct } from '@/lib/narratives';
+import { SECTOR_LABEL_META, breadthWord, pctTone, signedPct } from '@/lib/narratives';
 import type { Sector } from '@/lib/types';
-
-function tone(value: number): string {
-  return value >= 0 ? 'text-emerald-300' : 'text-rose-300';
-}
 
 /** One sector against BTC: the median coin, how many coins beat BTC, and who leads. */
 export function SectorCard({ sector }: { sector: Sector }) {
   const meta = SECTOR_LABEL_META[sector.label];
   const changed = sector.previousLabel !== null && sector.previousLabel !== sector.label;
+  const breadth = breadthWord(sector.breadth7dPct);
 
   return (
     <article className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
@@ -31,17 +28,19 @@ export function SectorCard({ sector }: { sector: Sector }) {
       <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
         <div>
           <dt className="text-slate-500">7 ngày</dt>
-          <dd className={cx('font-semibold tabular-nums', tone(sector.median7dPct))}>{signedPct(sector.median7dPct)}</dd>
+          <dd className={cx('font-semibold tabular-nums', pctTone(sector.median7dPct))}>{signedPct(sector.median7dPct)}</dd>
           <dd className="tabular-nums text-slate-500">so BTC {signedPct(sector.rs7d)}</dd>
         </div>
         <div>
           <dt className="text-slate-500">30 ngày</dt>
-          <dd className={cx('font-semibold tabular-nums', tone(sector.median30dPct))}>{signedPct(sector.median30dPct)}</dd>
+          <dd className={cx('font-semibold tabular-nums', pctTone(sector.median30dPct))}>{signedPct(sector.median30dPct)}</dd>
           <dd className="tabular-nums text-slate-500">so BTC {signedPct(sector.rs30d)}</dd>
         </div>
         <div>
           <dt className="text-slate-500">Thắng BTC (7d)</dt>
-          <dd className="font-semibold tabular-nums text-slate-200">{sector.breadth7dPct.toFixed(0)}%</dd>
+          <dd className="font-semibold tabular-nums text-slate-200">
+            {sector.breadth7dPct.toFixed(0)}% <span className={cx('text-[11px] font-semibold', breadth.className)}>· {breadth.text}</span>
+          </dd>
           <dd className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-800" aria-hidden>
             <div className="h-full rounded-full bg-sky-400/70" style={{ width: `${Math.min(100, Math.max(0, sector.breadth7dPct))}%` }} />
           </dd>
@@ -54,7 +53,7 @@ export function SectorCard({ sector }: { sector: Sector }) {
           {sector.leaders.map((l, i) => (
             <span key={l.symbol}>
               {i > 0 && ', '}
-              <span className="font-semibold text-slate-200">{l.symbol}</span> <span className={tone(l.change7dPct)}>{signedPct(l.change7dPct, 0)}</span>
+              <span className="font-semibold text-slate-200">{l.symbol}</span> <span className={pctTone(l.change7dPct, 0)}>{signedPct(l.change7dPct, 0)}</span>
             </span>
           ))}
         </p>

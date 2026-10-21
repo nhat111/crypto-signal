@@ -1,3 +1,4 @@
+import { sectorBreadthWord } from '@crypto-signal/shared';
 import { escapeHtml } from './formatting.js';
 
 /** Mirrors /api/sectors and /api/flywheel (API_CONTRACT.md); only the fields read here. */
@@ -85,13 +86,13 @@ export function formatSectors(data: SectorsResponseDTO, webBaseUrl = ''): string
     for (const s of group) {
       const changed = s.previousLabel && s.previousLabel !== s.label ? ` <i>(hôm trước: ${SECTOR_LABEL_TEXT[s.previousLabel].slice(3)})</i>` : '';
       const leaders = s.leaders.map((l) => `${escapeHtml(l.symbol)} ${pct(l.change7dPct)}`).join(', ');
-      parts.push(`• <b>${escapeHtml(s.name)}</b> ${pct(s.median7dPct)} · ${s.breadth7dPct.toFixed(0)}% thắng BTC${changed}`);
+      parts.push(`• <b>${escapeHtml(s.name)}</b> ${pct(s.median7dPct)} · ${s.breadth7dPct.toFixed(0)}% thắng BTC (${sectorBreadthWord(s.breadth7dPct).toLowerCase()})${changed}`);
       if (label === 'leading' || label === 'emerging') parts.push(`  ${leaders}`);
     }
   }
   parts.push(
     '',
-    '<i>Số là của coin trung vị trong mảng (30 coin vốn hoá lớn nhất, CoinGecko). "Thắng BTC" là % số coin tăng hơn BTC. Mô tả dòng tiền, không phải lời khuyên mua bán.</i>',
+    '<i>Số là của coin trung vị trong mảng (30 coin vốn hoá lớn nhất, CoinGecko). "Thắng BTC" là % số coin tăng hơn BTC: rộng từ 65%, vừa 35–65%, ít dưới 35%. Mô tả dòng tiền, không phải lời khuyên mua bán.</i>',
   );
   if (webBaseUrl) parts.push(`Cách đọc: ${webBaseUrl}/guide/narrative`);
   return parts.join('\n');

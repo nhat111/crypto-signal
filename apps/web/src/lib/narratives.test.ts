@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { signedPct, sortFlywheel } from './narratives';
+import { breadthWord, pctTone, signedPct, sortFlywheel } from './narratives';
 import type { FlywheelRow } from './types';
 
 const row = (name: string, o: Partial<FlywheelRow>): FlywheelRow => ({
@@ -36,5 +36,21 @@ describe('signedPct', () => {
     expect(signedPct(3.21)).toBe('+3.2%');
     expect(signedPct(-4)).toBe('-4.0%');
     expect(signedPct(null)).toBe('—');
+  });
+
+  it('never prints a negative zero', () => {
+    expect(signedPct(-0.004)).toBe('0.0%');
+    expect(signedPct(-0.4, 0)).toBe('0%');
+    expect(pctTone(-0.004)).toBe('text-slate-300');
+    expect(pctTone(-0.06)).toBe('text-rose-300');
+  });
+});
+
+describe('breadthWord', () => {
+  it('matches the shared edges', () => {
+    expect(breadthWord(65).text).toBe('Rộng');
+    expect(breadthWord(57).text).toBe('Vừa');
+    expect(breadthWord(35).text).toBe('Vừa');
+    expect(breadthWord(16).text).toBe('Ít');
   });
 });
