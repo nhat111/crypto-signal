@@ -58,7 +58,8 @@ function contextLines(data: LookupDTO, base: string): string[] {
     lines.push('', `💧 <b>Dòng tiền 7 ngày</b> (quét ${dayVi(c.day)})`, FLOW_LABEL[c.flow] ?? c.flow);
     lines.push(`Giá 7N ${signed(c.ret7d)} · 30N ${signed(c.ret30d)}`);
     if (base !== 'BTC') lines.push(`So với BTC: 7N ${signed(c.rs7d)} · 30N ${signed(c.rs30d)}`);
-    for (const r of c.reasons) lines.push(`• ${escapeHtml(r)}`);
+    // The scan's first reason restates the 7-day return printed just above.
+    for (const r of c.reasons.filter((x) => !x.startsWith('Giá 7 ngày'))) lines.push(`• ${escapeHtml(r)}`);
     const f = c.fundamentals;
     if (f && (f.bull.length > 0 || f.bear.length > 0)) {
       for (const b of f.bull) lines.push(`▲ ${escapeHtml(b)}`);
@@ -114,6 +115,15 @@ export function formatLookup(data: LookupDTO, webBaseUrl = ''): string {
       lines.push(`Khung khác: ${parts.join(' · ')}`);
     }
     if (t.missing.length > 0) lines.push(`<i>Chưa đủ nến để tính: ${escapeHtml(t.missing.join(', '))}</i>`);
+
+    const d = data.result.daily;
+    if (d) {
+      const trendVi = d.trend === 'up' ? '🟢 tăng' : d.trend === 'down' ? '🔴 giảm' : '⚪ đi ngang';
+      const ema = d.aboveEma === null ? '' : ` · ${d.aboveEma ? 'trên' : 'dưới'} EMA${d.emaPeriod}`;
+      lines.push('', `🎯 <b>Mức 1D bộ setup canh</b> (cấu trúc ${trendVi}${ema})`);
+      lines.push(`Đáy 1D: ${d.swingLow ? levelText(d.swingLow) : '—'} · Đỉnh 1D: ${d.swingHigh ? levelText(d.swingHigh) : '—'}`);
+      for (const w of d.watch) lines.push(`• ${escapeHtml(w)}`);
+    }
 
     lines.push(...contextLines(data, base.toUpperCase()));
 

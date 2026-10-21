@@ -1,4 +1,4 @@
-import type { LookupContext, LookupLevel, LookupResult, LookupTechnical, LookupTimeframeGlance } from '@/lib/types';
+import type { LookupContext, LookupDailyLevels, LookupLevel, LookupResult, LookupTechnical, LookupTimeframeGlance } from '@/lib/types';
 import { SafetyBadge } from '@/components/gems/SafetyBadge';
 import { formatTokenPrice, formatUsd } from '@/lib/format';
 import { apiPredatesReadings } from '@/lib/openPnl';
@@ -42,6 +42,7 @@ export function LookupResultView({ result, context }: { result: LookupResult; co
         {result.timeframes && result.timeframes.length > 0 && (
           <TimeframePanel chosen={result.timeframe} glances={result.timeframes} />
         )}
+        {result.daily && <DailyLevelsPanel daily={result.daily} />}
         {context && <LookupContextPanel context={context} base={result.symbol.replace(/(FDUSD|USDT|USDC|BUSD|BTC)$/, '') || result.symbol} />}
         <LinkRow
           links={[
@@ -367,4 +368,29 @@ function trendLabel(direction: 'up' | 'down' | 'sideways'): string {
   if (direction === 'up') return 'EMA20 > EMA50';
   if (direction === 'down') return 'EMA20 < EMA50';
   return 'flat';
+}
+
+/**
+ * The 1D levels the setup detector watches, which are not the chart's own
+ * nearest low/high above: those come from the frame being looked at.
+ */
+function DailyLevelsPanel({ daily }: { daily: LookupDailyLevels }) {
+  const trend = daily.trend === 'up' ? 'tăng' : daily.trend === 'down' ? 'giảm' : 'đi ngang';
+  return (
+    <Panel title="Mức 1D bộ setup canh">
+      <p className="mb-2 text-xs text-slate-400">
+        Cấu trúc 1D {trend}
+        {daily.aboveEma !== null && ` · ${daily.aboveEma ? 'trên' : 'dưới'} EMA${daily.emaPeriod}`}
+      </p>
+      <dl className="grid grid-cols-2 gap-2 text-sm">
+        <Metric label="Đáy 1D" value={levelText(daily.swingLow, '—')} />
+        <Metric label="Đỉnh 1D" value={levelText(daily.swingHigh, '—')} />
+      </dl>
+      <ul className="mt-2 space-y-1 text-xs text-slate-300">
+        {daily.watch.map((w) => (
+          <li key={w}>• {w}</li>
+        ))}
+      </ul>
+    </Panel>
+  );
 }

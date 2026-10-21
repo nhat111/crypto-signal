@@ -115,6 +115,34 @@ describe('formatLookup with what the app already stored', () => {
   });
 });
 
+describe('formatLookup 1D levels', () => {
+  it('shows the levels the setups watch and what each needs', () => {
+    const data = exchange();
+    if (data.result.kind === 'exchange') {
+      data.result.daily = {
+        trend: 'up',
+        aboveEma: true,
+        emaPeriod: 200,
+        swingLow: { price: 7.9, distancePct: -9.4 },
+        swingHigh: { price: 9.2, distancePct: 5.5 },
+        watch: ['Hồi về đáy: chờ nến 4H chạm vùng quanh 7.900 (đáy 1D) rồi bị đẩy lên.'],
+      };
+    }
+    const text = formatLookup(data);
+    expect(text).toContain('Mức 1D bộ setup canh</b> (cấu trúc 🟢 tăng · trên EMA200)');
+    expect(text).toContain('Đáy 1D: 7.9 (-9.4%) · Đỉnh 1D: 9.2 (+5.5%)');
+    expect(text).toContain('• Hồi về đáy: chờ nến 4H chạm vùng quanh 7.900');
+  });
+
+  it('does not repeat the 7-day return from the scan reasons', () => {
+    const text = formatLookup(
+      withContext({ coinScan: { ...scanRow, reasons: ['Giá 7 ngày +10.3%.', 'Spot gần cân bằng.'] }, coinScanDay: '2026-10-20', coinScanSize: 29, sectors: [], flywheel: null }),
+    );
+    expect(text).not.toContain('• Giá 7 ngày');
+    expect(text).toContain('• Spot gần cân bằng.');
+  });
+});
+
 describe('lookupChartUrl', () => {
   it('builds the query the web page parses, and nothing without a base URL', () => {
     expect(lookupChartUrl('https://x.app', 'BTCUSDT', '1h')).toBe('https://x.app/lookup?q=BTCUSDT&tf=1h');

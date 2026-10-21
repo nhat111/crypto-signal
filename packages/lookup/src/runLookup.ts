@@ -5,6 +5,7 @@ import { buildOnChainFundamentals, EXCHANGE_FUNDAMENTAL_GAPS, type ExchangeFunda
 import { binanceTradeUrl } from './explorers.js';
 import { QUOTE_FALLBACKS, candidateSymbols, resolveQuery } from './resolveQuery.js';
 import { buildTechnicalRead, type TechnicalRead } from './technicalRead.js';
+import { DAILY_LEVEL_BARS, readDailyLevels, type DailyLevels } from './dailyLevels.js';
 
 /**
  * One lookup, either kind, assembled from injected sources.
@@ -60,6 +61,12 @@ export interface ExchangeLookup {
    * usually the more useful half.
    */
   timeframes: TimeframeGlance[];
+  /**
+   * The 1D levels the setup detector watches. Optional so tests and older
+   * callers that build an ExchangeLookup by hand still type-check; null
+   * when the daily bars could not be read or are too few for EMA200.
+   */
+  daily?: DailyLevels | null;
 }
 
 export interface OnChainLookup {
@@ -99,10 +106,10 @@ export async function runLookup(
   if (query.kind === 'invalid') return { kind: 'not_found', reason: query.reason };
 
   if (query.kind === 'address') return lookupAddress(deps, query.address, opts.now ?? Date.now());
-  return lookupExchange(deps, query.symbol, opts.timeframe ?? '4h');
+  return lookupExchange(deps, query.symbol, opts.timeframe ?? '4h', opts.now ?? Date.now());
 }
 
-async function lookupExchange(deps: LookupDeps, symbol: string, timeframe: string): Promise<LookupResult> {
+async function lookupExchange(deps: LookupDeps, symbol: string, timeframe: string, now: number): Promise<LookupResult> {
   const candidates = candidateSymbols(symbol);
   const tried: string[] = [];
   // Only Binance's 400 ("Invalid symbol") means unlisted. A ban (418), a
@@ -150,6 +157,12 @@ async function lookupExchange(deps: LookupDeps, symbol: string, timeframe: strin
     const technical = buildTechnicalRead(bars);
     if (technical === null) continue;
 
+    // One daily read serves both the 1D glance and the setup levels.
+    const dailyBars = await fetchBars(candidate, '1d', DAILY_LEVEL_BARS).catch((err: unknown) => {
+      deps.logger.warn({ err, candidate }, 'lookup: daily bars failed, omitting the 1D levels');
+      return null;
+    });
+
     return {
       kind: 'exchange',
       symbol: candidate,
@@ -157,7 +170,8 @@ async function lookupExchange(deps: LookupDeps, symbol: string, timeframe: strin
       timeframe,
       technical,
       bars,
-      timeframes: await glanceOtherTimeframes({ ...deps, fetchBars }, candidate, timeframe),
+      timeframes: await glanceOtherTimeframes({ ...deps, fetchBars }, candidate, timeframe, dailyBars),
+      daily: dailyBars ? readDailyLevels(dailyBars, technical.lastPrice, now) : null,
       fundamentals: {
         symbol: candidate,
         spotListed: true,
@@ -245,12 +259,21 @@ async function lookupAddress(deps: LookupDeps, address: string, now: number): Pr
  * real answer, and a frame that could not be fetched should quietly not
  * appear rather than turn a working lookup into an error.
  */
-async function glanceOtherTimeframes(deps: LookupDeps, symbol: string, chosen: string): Promise<TimeframeGlance[]> {
+async function glanceOtherTimeframes(
+  deps: LookupDeps,
+  symbol: string,
+  chosen: string,
+  /** Already fetched for the 1D levels; the 1D glance reads its newest 200 rather than asking again. */
+  dailyBars: OhlcvBar[] | null = null,
+): Promise<TimeframeGlance[]> {
   const frames = GLANCE_TIMEFRAMES.filter((tf) => tf !== chosen);
   const glances = await Promise.all(
     frames.map(async (tf): Promise<TimeframeGlance | null> => {
       try {
-        const bars = await deps.fetchBars(symbol, tf, DEFAULT_BAR_LIMIT);
+        const bars =
+          tf === '1d' && dailyBars && dailyBars.length > 0
+            ? dailyBars.slice(-DEFAULT_BAR_LIMIT)
+            : await deps.fetchBars(symbol, tf, DEFAULT_BAR_LIMIT);
         const read = buildTechnicalRead(bars);
         if (read === null) return null;
         return { timeframe: tf, trend: read.trend, rsi14: read.rsi14, changePct: read.changePct.last24Bars };

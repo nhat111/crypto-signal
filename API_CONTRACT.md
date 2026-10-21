@@ -239,6 +239,24 @@ scanner uses, so the two cannot disagree. Other pools are listed in
 falls back to `4h` rather than erroring, since it only changes the
 resolution of the answer.
 
+An exchange result also carries `result.daily`: the 1D levels the 4H setup
+detector watches, read the way the worker reads them (400 closed daily
+bars, pivots three bars wide, EMA200). `null` when the daily bars could
+not be read or are too few for EMA200; absent from older APIs.
+```json
+{
+  "daily": {
+    "trend": "sideways", "aboveEma": true, "emaPeriod": 200,
+    "swingLow": { "price": 6.417, "distancePct": -26.6 },
+    "swingHigh": { "price": 9.413, "distancePct": 7.6 },
+    "watch": ["Hồi về đáy: chỉ xét khi 1D đang tăng …", "Phá đỉnh: chờ nến 4H đóng trên 9.413 …"]
+  }
+}
+```
+These differ from `technical.support`/`resistance`, which come from the
+frame being looked at. The 1D glance reuses the same daily bars, so this
+costs one request, not two.
+
 For an exchange result the response also carries `context`: what the
 worker already stored about the coin, read from the database only (no
 extra outside request), matched by base ticker (`INJUSDC` → `INJ`).
