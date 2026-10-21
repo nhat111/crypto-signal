@@ -71,7 +71,7 @@ function emptyText(what: string, enabled: boolean, fetch: FetchDTO | null, offFl
 }
 
 /** Grouped by label, strongest first inside each group, so the rotation reads top to bottom. */
-export function formatSectors(data: SectorsResponseDTO): string {
+export function formatSectors(data: SectorsResponseDTO, webBaseUrl = ''): string {
   if (data.sectors.length === 0) return emptyText('Dòng tiền theo mảng', data.enabled, data.fetch, 'SECTOR_SCAN');
   const first = data.sectors[0] as SectorDTO;
   const parts = [
@@ -93,10 +93,11 @@ export function formatSectors(data: SectorsResponseDTO): string {
     '',
     '<i>Số là của coin trung vị trong mảng (30 coin vốn hoá lớn nhất, CoinGecko). "Thắng BTC" là % số coin tăng hơn BTC. Mô tả dòng tiền, không phải lời khuyên mua bán.</i>',
   );
+  if (webBaseUrl) parts.push(`Cách đọc: ${webBaseUrl}/guide/narrative`);
   return parts.join('\n');
 }
 
-export function formatFlywheel(data: FlywheelResponseDTO, limit = 15): string {
+export function formatFlywheel(data: FlywheelResponseDTO, webBaseUrl = '', limit = 15): string {
   if (data.rows.length === 0) return emptyText('Flywheel', data.enabled, data.fetch, 'FLYWHEEL_SCAN');
   const parts = [`🔁 <b>FLYWHEEL: DOANH THU QUAY VỀ HOLDER</b> (${data.day})`, ''];
   for (const r of data.rows.slice(0, limit)) {
@@ -110,5 +111,6 @@ export function formatFlywheel(data: FlywheelResponseDTO, limit = 15): string {
     '',
     '<i>Holders revenue theo DefiLlama: buyback, burn hoặc chia phí cho người giữ token. "%/năm vốn hoá" = 30 ngày × 12 chia vốn hoá hiện tại; trên 50% thường là khoản trả một lần. Không phải lời khuyên mua bán.</i>',
   );
+  if (webBaseUrl) parts.push(`Cách đọc: ${webBaseUrl}/guide/narrative#flywheel`);
   return parts.join('\n');
 }

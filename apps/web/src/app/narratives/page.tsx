@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 import { getFlywheel, getSectors } from '@/lib/api';
 import { FLYWHEEL_SORTS, SECTOR_LABEL_META, SECTOR_LABEL_ORDER, signedPct, sortFlywheel, type FlywheelSort } from '@/lib/narratives';
@@ -41,6 +42,9 @@ export default function NarrativesPage() {
           kéo, và dự án nào đang dùng doanh thu thật để mua lại, đốt hoặc chia cho người giữ token. Cập nhật mỗi ngày.
           Mô tả dòng tiền, không phải lời khuyên mua bán.
         </p>
+        <Link href="/guide/narrative" className="mt-2 inline-block text-xs font-semibold text-sky-300 hover:text-sky-200">
+          Cách đọc trang này →
+        </Link>
         <nav className="mt-3 flex gap-2 text-xs">
           <a href="#sectors" className="rounded-md border border-slate-800 px-2.5 py-1.5 text-slate-300 hover:border-slate-700">
             Dòng tiền theo mảng
