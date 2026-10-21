@@ -798,6 +798,17 @@ three requests per coin plus two ticker calls. Decisions:
   sandbox this was built in gets 451 from `fapi.binance.com`, which is how
   this case was found. A refused spot host fails the run, and the hourly
   tick retries it.
+- **…but a spot-only day is the last resort (2026-10-21).** Production's
+  Render IP got spot from Binance and 451 from its futures host, so whole
+  days were stored with no OI or funding for any coin: seven of the
+  fourteen labels (leverage_led, short_squeeze, short_covering,
+  spot_and_leverage, shorts_building, long_unwind, leverage_building)
+  cannot be reached without them, and the exit alert's funding flip was
+  blind. On 20/10 ZEC and WLD read "Tăng, spot chưa xác nhận" from Binance
+  spot alone and "Đòn bẩy kéo" from OKX (OI +20% and +25%). Now a Binance
+  day whose futures were refused is re-read whole from OKX, still one
+  exchange a day; the Binance spot-only day is kept only when OKX cannot
+  read futures either or fails.
 - **OKX when Binance refuses the server.** Production's shared Render IP is
   banned by Binance spot for hours at a time (the setup scan had failed 68
   runs in a row before this shipped), so a refused Binance scan is re-run
