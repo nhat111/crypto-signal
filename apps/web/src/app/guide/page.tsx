@@ -11,6 +11,7 @@ export const metadata: Metadata = {
 const TOC = [
   { id: 'lam-gi', label: 'Hệ thống này làm gì' },
   { id: 'tien-that', label: 'Tiền thật và tiền vay' },
+  { id: 'oi-funding', label: 'OI và funding: đo tiền vay' },
   { id: 'overview', label: 'Trang Overview' },
   { id: 'signals', label: 'Trang Signals' },
   { id: 'performance', label: 'Trang Performance' },
@@ -98,6 +99,84 @@ export default function GuidePage() {
             Cả hệ thống này sinh ra chỉ để trả lời: cú tăng đang diễn ra là loại &ldquo;tiền mặt&rdquo; hay loại
             &ldquo;vay ngân hàng&rdquo;.
           </Takeaway>
+        </Section>
+
+        {/* ---------------------------------------------------------- */}
+        <Section id="oi-funding" eyebrow="Khái niệm nền" title="OI và funding: đo tiền vay">
+          <p>
+            Tiền vay nằm ở thị trường <Term>futures</Term>: hợp đồng đánh lên (long) hoặc đánh xuống (short) bằng đòn bẩy. Hai con số
+            cho biết tiền vay đang làm gì.
+          </p>
+
+          <p>
+            <Term>Open Interest (OI)</Term> là tổng số hợp đồng đang mở, chưa đóng. Mỗi hợp đồng có một người long và một người short.
+            OI tăng nghĩa là có thêm người vào cược bằng tiền vay; OI giảm nghĩa là người ta đang đóng lệnh hoặc bị thanh lý. OI một
+            mình không nói gì, phải đọc cùng giá:
+          </p>
+          <Table
+            head={['Giá', 'OI', 'Nghĩa là', 'Nhãn trên trang Coins']}
+            rows={[
+              ['Tăng', 'Tăng mạnh', 'Tiền vay đổ vào đánh lên', <span key="a" className="text-orange-300">Đòn bẩy kéo</span>],
+              ['Tăng', 'Giảm mạnh', 'Phe short bị ép mua lại để cắt lỗ', <span key="b" className="text-orange-300">Short đóng lệnh</span>],
+              ['Giảm', 'Tăng mạnh', 'Có thêm người mở short đánh xuống', <span key="c" className="text-rose-300">Short mở thêm</span>],
+              ['Giảm', 'Giảm mạnh', 'Long đang xả hoặc bị thanh lý', <span key="d" className="text-orange-300">Long xả đòn bẩy</span>],
+              ['Đi ngang', 'Tăng mạnh', 'Đòn bẩy âm thầm chồng lên', <span key="e" className="text-amber-300">Đi ngang, đòn bẩy tích tụ</span>],
+            ]}
+          />
+          <p className="text-sm text-slate-400">“Mạnh” ở đây là OI thay đổi từ 10% trở lên trong 7 ngày.</p>
+
+          <p>
+            <Term>Funding</Term> là phí hai phe trả cho nhau mỗi 8 tiếng để giá futures bám giá spot. Funding dương: phe long trả phe
+            short, tức long đang đông và chịu trả tiền để giữ lệnh. Funding âm: phe short trả phe long, tức thị trường đang bi quan.
+          </p>
+          <Table
+            head={['Funding trung bình 7 ngày', 'Nghĩa là']}
+            rows={[
+              [<Term key="a">Từ +0,03%/8h</Term>, 'Long trả cao, khoảng 33%/năm: rất nhiều người đang long bằng tiền vay. Đám đông thường đông nhất ở gần đỉnh.'],
+              [<Term key="b">Quanh 0</Term>, 'Hai phe cân bằng, đòn bẩy không nóng.'],
+              [<Term key="c">Từ −0,005%/8h trở xuống</Term>, 'Short đang trả. Nếu giá vẫn tăng và OI tăng, phe short đang bị ép: nhãn Short bị ép, tăng nhanh nhưng cũng hụt hơi nhanh.'],
+            ]}
+          />
+
+          <Story title="Vì sao tiền vay làm giá dễ sập">
+            <p>
+              Giá tăng nhờ người mua spot: giá giảm thì họ vẫn giữ coin, không ai ép bán. Giá tăng nhờ long đòn bẩy: chỉ cần giá giảm
+              một chút, lệnh long bị thanh lý, sàn bán coin của họ ra, giá giảm tiếp, thêm lệnh khác bị thanh lý. Một vòng như vậy
+              gọi là thác thanh lý, và nó chỉ xảy ra ở phần giá được đẩy bằng tiền vay.
+            </p>
+          </Story>
+
+          <p>Trang Coins ghép spot với OI và funding để ra nhãn cho giá tăng:</p>
+          <Table
+            head={['Khi giá tăng và…', 'Nhãn', 'Đọc thế nào']}
+            rows={[
+              ['Spot mua ròng, đòn bẩy không nóng', <span key="a" className="text-emerald-300">Spot mua dẫn</span>, 'Tốt nhất: tiền thật kéo giá.'],
+              ['Spot mua ròng, kèm OI tăng hoặc funding cao', <span key="b" className="text-amber-300">Spot + đòn bẩy</span>, 'Có tiền thật, nhưng có cả rủi ro thanh lý.'],
+              ['Không có spot mua ròng, OI tăng hoặc funding cao', <span key="c" className="text-orange-300">Đòn bẩy kéo</span>, 'Dễ sập nhất.'],
+              ['Không thấy spot mua, cũng không thấy đòn bẩy', <span key="d" className="text-slate-300">Tăng, spot chưa xác nhận</span>, 'Chưa rõ ai đẩy giá.'],
+            ]}
+          />
+
+          <Warning>
+            <p>
+              “Không có dòng OI và funding thì coin an toàn.” Ngược lại: thiếu hai số này, trang Coins không phân biệt được Spot mua
+              dẫn với Spot + đòn bẩy, và không thấy Đòn bẩy kéo. Một coin tăng nhờ tiền vay sẽ hiện là “chưa xác nhận”, nghe an toàn
+              hơn thực tế. Dòng <Term>“không đọc được thị trường futures”</Term> dưới một coin nghĩa là nhãn của nó chỉ dựa vào spot.
+            </p>
+            <p>
+              Ví dụ ngày 20/10: WLD đọc riêng spot là “Tăng, spot chưa xác nhận”; có thêm futures thì là “Đòn bẩy kéo”, OI +25% trong 7
+              ngày.
+            </p>
+          </Warning>
+
+          <Steps
+            items={[
+              <>Trước khi vào lệnh: ưu tiên <Term>Spot mua dẫn</Term>. Gặp <Term>Đòn bẩy kéo</Term> hay <Term>Short bị ép</Term> thì vào nhỏ hơn và cắt lỗ chặt hơn, nếu vẫn vào.</>,
+              <>Khi đang giữ: để ý funding chuyển sang dương cao, hoặc OI tăng vọt mà spot không mua thêm. Đó là đám đông đang đuổi giá bằng tiền vay. Bot tự gửi cảnh báo thoát khi funding đổi chiều với coin bro đang giữ.</>,
+              <>OI và funding cho biết <Term>ai</Term> đang đẩy giá, không cho biết <Term>lúc nào</Term> giá đảo chiều: funding có thể cao rất lâu trong một nhịp tăng mạnh.</>,
+            ]}
+          />
+          <Takeaway>Giá tăng nhờ người mua spot thì đứng vững hơn giá tăng nhờ tiền vay. OI và funding là cách nhìn thấy tiền vay.</Takeaway>
         </Section>
 
         {/* ---------------------------------------------------------- */}
