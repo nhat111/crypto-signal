@@ -1,9 +1,10 @@
-import type { LookupLevel, LookupResult, LookupTechnical, LookupTimeframeGlance } from '@/lib/types';
+import type { LookupContext, LookupLevel, LookupResult, LookupTechnical, LookupTimeframeGlance } from '@/lib/types';
 import { SafetyBadge } from '@/components/gems/SafetyBadge';
 import { formatTokenPrice, formatUsd } from '@/lib/format';
 import { apiPredatesReadings } from '@/lib/openPnl';
 import { Glossary, ONCHAIN_GLOSSARY, TECHNICAL_GLOSSARY } from './Glossary';
 import { LookupChart } from './LookupChart';
+import { LookupContextPanel } from './LookupContextPanel';
 
 /**
  * The answer to one lookup.
@@ -16,7 +17,7 @@ import { LookupChart } from './LookupChart';
  *
  * Whatever could not be read is printed by name at the bottom instead.
  */
-export function LookupResultView({ result }: { result: LookupResult }) {
+export function LookupResultView({ result, context }: { result: LookupResult; context?: LookupContext | null }) {
   if (result.kind === 'exchange') {
     return (
       <div className="space-y-4">
@@ -41,6 +42,7 @@ export function LookupResultView({ result }: { result: LookupResult }) {
         {result.timeframes && result.timeframes.length > 0 && (
           <TimeframePanel chosen={result.timeframe} glances={result.timeframes} />
         )}
+        {context && <LookupContextPanel context={context} base={result.symbol.replace(/(FDUSD|USDT|USDC|BUSD|BTC)$/, '') || result.symbol} />}
         <LinkRow
           links={[
             result.fundamentals.exchangeUrl

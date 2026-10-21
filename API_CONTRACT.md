@@ -239,6 +239,26 @@ scanner uses, so the two cannot disagree. Other pools are listed in
 falls back to `4h` rather than erroring, since it only changes the
 resolution of the answer.
 
+For an exchange result the response also carries `context`: what the
+worker already stored about the coin, read from the database only (no
+extra outside request), matched by base ticker (`INJUSDC` → `INJ`).
+`null` when the database could not be read; absent from older APIs.
+```json
+{
+  "context": {
+    "coinScan": { "…": "the coin's row from GET /api/coins, or null when it is outside the scan" },
+    "coinScanDay": "2026-10-20",
+    "coinScanSize": 29,
+    "sectors": [{ "categoryId": "real-world-assets-rwa", "name": "RWA", "label": "emerging", "rank": 2, "change7dPct": 7.4 }],
+    "flywheel": { "name": "Injective", "symbol": "INJ", "holdersRevenue30dUsd": 245195, "holdersRevenueChangePct": 18,
+                  "yieldPct": null, "priceChange30dPct": null, "mechanism": "…" }
+  }
+}
+```
+`sectors` lists only the sectors whose top three over 7 days include the
+coin (`rank` 1–3), not every category it belongs to. `flywheel` matches by
+ticker; when two projects share one, the larger payout is shown.
+
 An on-chain result also carries links: `explorer` (null for a chain whose
 explorer URL shape has not been verified — a wrong link makes the reader
 doubt the address), `dexScreenerUrl`, and `websites`/`socials` exactly as
