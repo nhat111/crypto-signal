@@ -270,7 +270,17 @@ export interface CoinScanConfig {
   watchlistSize: number;
   /** Extra venues summed into the 7-day OI change (`bybit`, `gate`); the scan's own exchange is always in. */
   oiVenues: CoinScanOiVenue[];
+  /** The intraday exit check on held and ⭐ coins (ASSUMPTIONS §22). */
+  intraday: CoinWatchIntradayThresholds;
 }
+
+/** Moves since the last daily close, in percent. Under a day, so smaller than the scan's seven-day ones. */
+export interface CoinWatchIntradayThresholds {
+  priceMovePct: number;
+  oiChangePct: number;
+}
+
+const COIN_WATCH_INTRADAY: CoinWatchIntradayThresholds = { priceMovePct: 3, oiChangePct: 5 };
 
 export const COIN_SCAN_OI_VENUES = ['bybit', 'gate'] as const;
 export type CoinScanOiVenue = (typeof COIN_SCAN_OI_VENUES)[number];
@@ -467,6 +477,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       setups: isEnabledFlag(parsed.COIN_SCAN) && isEnabledFlag(parsed.COIN_SETUPS),
       watchlistSize: Math.min(20, Math.max(0, Math.round(parsed.COIN_WATCHLIST_SIZE))),
       oiVenues: parseOiVenues(parsed.COIN_SCAN_OI_VENUES),
+      intraday: COIN_WATCH_INTRADAY,
     },
     airdrop: {
       enabled: isEnabledFlag(parsed.AIRDROP_SCAN),

@@ -26,6 +26,7 @@ import { runFlywheelCycle } from './flywheelScan.js';
 import { runTrendCycle } from './trendCycle.js';
 import { runCoinSetupCycle } from './coinSetups.js';
 import { runCoinScanCycle } from './coinScan.js';
+import { runCoinWatchIntraday } from './coinWatchIntraday.js';
 import { readMemory } from './memory.js';
 import type { WorkerContext } from './context.js';
 
@@ -239,6 +240,15 @@ export function startSchedulers(ctx: WorkerContext): () => void {
   if (ctx.config.coinScan.enabled) {
     timers.push(setInterval(() => void runCoinScanCycle(ctx).catch((err) => ctx.logger.error({ err }, 'coin scan failed')), 60 * 60_000));
     void runCoinScanCycle(ctx).catch((err) => ctx.logger.error({ err }, 'initial coin scan failed'));
+  }
+
+  // The exit alert between daily closes, for held and ⭐ coins only. The
+  // first run waits twenty minutes so a fresh boot's coin scan goes first;
+  // findings are claimed per day, so a restart does not repeat them.
+  if (ctx.config.coinScan.enabled) {
+    const runIntraday = () => void runCoinWatchIntraday(ctx).catch((err) => ctx.logger.error({ err }, 'coin watch intraday failed'));
+    timers.push(setInterval(runIntraday, 60 * 60_000));
+    timers.push(setTimeout(runIntraday, 20 * 60_000));
   }
 
   // 4H setups on the scanned coins: the watchlist alerted, the rest kept as

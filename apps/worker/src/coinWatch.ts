@@ -28,6 +28,25 @@ export interface CoinWatchChange {
   reasons: string[];
 }
 
+/**
+ * Who is watched: the given ⭐ coins, and every open long or spot trade in
+ * the journal. Shorts are left out: a coin weakening is good news for them.
+ * `normalize` turns a hand-typed journal symbol into the scan's.
+ */
+export function watchedCoins(
+  starred: ReadonlySet<string>,
+  openTrades: ReadonlyArray<{ symbol: string; side: string }>,
+  normalize: (raw: string) => string,
+): Map<string, WatchedCoin> {
+  const watched = new Map<string, WatchedCoin>();
+  for (const s of starred) watched.set(s, { held: false, starred: true });
+  for (const t of openTrades.filter((t) => t.side !== 'short')) {
+    const symbol = normalize(t.symbol);
+    watched.set(symbol, { held: true, starred: starred.has(symbol) });
+  }
+  return watched;
+}
+
 const pct = (n: number): string => `${n >= 0 ? '+' : ''}${n.toFixed(4)}%`;
 
 /** Pure: what changed for each watched coin between two scan days. Coins with nothing to report are left out. */
@@ -75,8 +94,8 @@ export function coinWatchChanges(
   return changes.sort((a, b) => Number(b.watched.held) - Number(a.watched.held) || a.symbol.localeCompare(b.symbol));
 }
 
-const escapeHtml = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const dayVi = (day: string): string => day.split('-').reverse().slice(0, 2).join('/');
+export const escapeHtml = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+export const dayVi = (day: string): string => day.split('-').reverse().slice(0, 2).join('/');
 
 /** One message for the day's changes; null when there are none, so nothing is sent. */
 export function formatCoinWatch(changes: CoinWatchChange[], day: string): string | null {

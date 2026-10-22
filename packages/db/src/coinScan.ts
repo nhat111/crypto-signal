@@ -153,3 +153,16 @@ export async function getLatestCoinScanDay(pool: Pool): Promise<string | null> {
   const { rows } = await pool.query(`SELECT to_char(max(day), 'YYYY-MM-DD') AS day FROM coin_scan_rows`);
   return (rows[0]?.day as string | null) ?? null;
 }
+
+/**
+ * Claims one intraday finding (ASSUMPTIONS §22) for a UTC day. True the
+ * first time, false when it was already claimed — sent earlier that day,
+ * before a restart included.
+ */
+export async function claimCoinWatchIntraday(pool: Pool, day: string, symbol: string, kind: string): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    `INSERT INTO coin_watch_intraday_sent (day, symbol, kind) VALUES ($1::date, $2, $3) ON CONFLICT DO NOTHING`,
+    [day, symbol, kind],
+  );
+  return (rowCount ?? 0) > 0;
+}

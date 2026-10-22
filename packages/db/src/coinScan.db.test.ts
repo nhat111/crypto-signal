@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
 import type { CoinRead } from '@crypto-signal/indicators';
 import { createTestPool, hasTestDatabase, lockTestTables } from './testPool.js';
-import { getCoinScanForDay, getLatestCoinScan, getLatestCoinScanDay, saveCoinScan } from './coinScan.js';
+import { claimCoinWatchIntraday, getCoinScanForDay, getLatestCoinScan, getLatestCoinScanDay, saveCoinScan } from './coinScan.js';
 import { getCoinScanEdge } from './coinScanEdge.js';
 
 const LOCK = 991_028;
@@ -44,6 +44,7 @@ describe.skipIf(!hasTestDatabase)('coin scan rows against real Postgres', () => 
   });
   afterAll(async () => {
     await pool.query("DELETE FROM coin_scan_rows WHERE day >= '2099-01-01'");
+    await pool.query("DELETE FROM coin_watch_intraday_sent WHERE day >= '2099-01-01'");
     await release();
     await pool.end();
   });
@@ -120,5 +121,13 @@ describe.skipIf(!hasTestDatabase)('coin scan rows against real Postgres', () => 
     await saveCoinScan(pool, '2099-01-04', [{ read: read('BTCUSDT'), volumeRank: 1, futuresSymbol: 'BTCUSDT', spotQuoteVolume24h: 1 }], 'okx');
     const { rows } = await getLatestCoinScan(pool);
     expect(rows[0]?.exchange).toBe('okx');
+  });
+
+  it('claims an intraday finding once per coin, kind and day', async () => {
+    await pool.query("DELETE FROM coin_watch_intraday_sent WHERE day >= '2099-01-01'");
+    expect(await claimCoinWatchIntraday(pool, '2099-05-01', 'SOLUSDT', 'long_unwind')).toBe(true);
+    expect(await claimCoinWatchIntraday(pool, '2099-05-01', 'SOLUSDT', 'long_unwind')).toBe(false);
+    expect(await claimCoinWatchIntraday(pool, '2099-05-01', 'SOLUSDT', 'funding_flip')).toBe(true);
+    expect(await claimCoinWatchIntraday(pool, '2099-05-02', 'SOLUSDT', 'long_unwind')).toBe(true);
   });
 });
