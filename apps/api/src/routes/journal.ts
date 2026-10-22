@@ -3,11 +3,13 @@ import {
   computeUnrealized,
   deleteTrade,
   getMarkPrices,
+  getTradeById,
   getTradeSourceStats,
   getTradeSummary,
   getTrades,
   insertTrade,
   isTradeSide,
+  stopProblem,
   TRADE_SOURCE_MAX,
   TRADE_THESIS_MAX,
   updateTrade,
@@ -27,6 +29,7 @@ interface CreateTradeBody {
   note?: string | null;
   source?: string | null;
   thesis?: string | null;
+  stopPrice?: number | null;
 }
 
 interface UpdateTradeBody {
@@ -38,6 +41,7 @@ interface UpdateTradeBody {
   note?: string | null;
   source?: string | null;
   thesis?: string | null;
+  stopPrice?: number | null;
 }
 
 interface TradesQuery {
@@ -106,6 +110,11 @@ export function registerJournalRoutes(app: FastifyInstance, deps: ApiDeps): void
     }
     const createTextProblem = textProblem(req.body);
     if (createTextProblem) return reply.code(400).send({ error: createTextProblem });
+    const stopPrice = req.body.stopPrice ?? null;
+    if (stopPrice !== null) {
+      const problem = invalidPrice(stopPrice, 'stopPrice') ?? stopProblem(side, entryPrice, stopPrice);
+      if (problem) return reply.code(400).send({ error: problem });
+    }
     const trade = await insertTrade(deps.pool, {
       chatId,
       // Casing is decided in one place (normalizeTradeSymbol), because a
@@ -117,6 +126,7 @@ export function registerJournalRoutes(app: FastifyInstance, deps: ApiDeps): void
       note: req.body.note ?? null,
       source: req.body.source ?? null,
       thesis: req.body.thesis ?? null,
+      stopPrice,
     });
     return { trade };
   });
@@ -154,6 +164,7 @@ export function registerJournalRoutes(app: FastifyInstance, deps: ApiDeps): void
       ['entryPrice', req.body.entryPrice],
       ['exitPrice', req.body.exitPrice],
       ['size', req.body.size],
+      ['stopPrice', req.body.stopPrice],
     ] as const) {
       if (value === undefined || value === null) continue;
       const problem = invalidPrice(value, field);
@@ -161,6 +172,17 @@ export function registerJournalRoutes(app: FastifyInstance, deps: ApiDeps): void
     }
     const patchTextProblem = textProblem(req.body);
     if (patchTextProblem) return reply.code(400).send({ error: patchTextProblem });
+
+    // The stop is checked against the trade as it will be after the patch:
+    // a side or entry changed on its own can put an existing stop on the
+    // wrong side of the entry.
+    if (req.body.stopPrice !== undefined || req.body.side !== undefined || req.body.entryPrice !== undefined) {
+      const existing = await getTradeById(deps.pool, req.params.id);
+      if (!existing) return reply.code(404).send({ error: 'unknown trade' });
+      const stop = req.body.stopPrice !== undefined ? req.body.stopPrice : existing.stopPrice;
+      const problem = stop === null ? null : stopProblem(req.body.side ?? existing.side, req.body.entryPrice ?? existing.entryPrice, stop);
+      if (problem) return reply.code(400).send({ error: problem });
+    }
 
     const trade = await updateTrade(deps.pool, req.params.id, req.body);
     if (!trade) return reply.code(404).send({ error: 'unknown trade' });

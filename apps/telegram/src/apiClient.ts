@@ -154,6 +154,10 @@ export interface TradeDTO {
   /** Optional: an API that predates these columns sends neither. */
   source?: string | null;
   thesis?: string | null;
+  /** Optional: an API that predates stops sends none of these. */
+  stopPrice?: number | null;
+  rMultiple?: number | null;
+  riskUsd?: number | null;
   openedAt: number;
   closedAt: number | null;
 }
@@ -244,6 +248,9 @@ export interface TradeSummaryDTO {
   /** Null when no closed trade recorded a size — "$0.00" would read as break-even rather than "not knowable". */
   totalPnlUsd: number | null;
   avgPnlPct: number | null;
+  /** Optional: an API that predates stops sends neither. */
+  avgR?: number | null;
+  rCount?: number;
 }
 
 /** The last morning digest as sent (/api/bot/digest/:chatId). `text` is Telegram HTML. */
@@ -472,8 +479,14 @@ export class ApiClient {
     size: number | null,
     source: string | null = null,
     thesis: string | null = null,
+    stopPrice: number | null = null,
   ): Promise<{ trade: TradeDTO }> {
-    return this.post('/api/journal', { chatId, symbol, side, entryPrice, size, source, thesis });
+    return this.post('/api/journal', { chatId, symbol, side, entryPrice, size, source, thesis, stopPrice });
+  }
+
+  /** Sets, moves or (with null) clears the stop on a logged trade. */
+  setStop(id: string, stopPrice: number | null): Promise<{ trade: TradeDTO }> {
+    return this.patch(`/api/journal/${id}`, { stopPrice });
   }
 
   getTrend(): Promise<{ trends: TrendDTO[] }> {

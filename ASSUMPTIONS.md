@@ -992,6 +992,25 @@ stablecoins: 30 days).
   size for and keeps the guide's 1% rule as text. The journal does not
   store a stop yet, so a trade's result is not expressed in R.
 
+- **Stop on journal trades** (migration 040). Optional, set on `/trade …
+  sl 140`, with `/stop SYMBOL GIÁ|off`, or on the web form; it must sit on
+  the losing side of the entry. With a size, the bot prices the stop
+  (`size × |entry − stop|`) against the chat's `/risk` rule and says when
+  a trade risks more than 1.1× it, and when `/stop` moves a stop further
+  from the entry. At close the result is stored in R
+  (`(exit − entry) ÷ |entry − stop|`, sign flipped for a short) beside
+  `pnl_pct`, never recomputed; under −1.1R is called out as a stop not
+  honoured. The journal average in R covers only trades with a stop; the
+  % figures still cover all. Never backfilled: a stop not written at
+  entry cannot be recovered.
+- **Stop alert** (`coinWatchIntraday.ts`, hourly). Open trades with a stop,
+  shorts included, read on OKX spot: "hit" when the price is at or past
+  the stop, "near" when under a quarter of the entry-to-stop distance is
+  left. Sent to the chat that logged the trade (web trades to the alert
+  chats), once per trade and kind a UTC day. Read at the hour: a wick
+  through the stop between reads is missed, and a coin OKX does not list
+  is never checked. It is a reminder of the plan, not an order.
+
 ## 24. The digest's "Của bạn" section and `/digest`
 
 - **Question.** The morning digest was one text for every chat: the core

@@ -174,10 +174,40 @@ export function formatWatchList(watches: GemWatchDTO[]): string {
   return lines.join('\n');
 }
 
-export function formatTradeOpened(trade: TradeDTO): string {
+/** A result in R, signed: "+2.50R". */
+export const formatR = (r: number): string => `${r >= 0 ? '+' : ''}${r.toFixed(2)}R`;
+
+/**
+ * The stop and what it costs, checked against the chat's /risk rule when
+ * one is set. Over the rule by more than a tenth is said plainly: the size
+ * is the one decision that protects the account whether or not the trade
+ * works. No stop is said too, with how to add one.
+ */
+export function formatTradeStop(trade: TradeDTO, profile: RiskProfile | null = null): string[] {
+  const stop = trade.stopPrice ?? null;
+  if (stop === null) return [`<i>Chưa có stop (mức cắt lỗ): /stop ${escapeHtml(trade.symbol)} GIÁ để đặt.</i>`];
+  const distancePct = (Math.abs(trade.entryPrice - stop) / trade.entryPrice) * 100;
+  const lines = [`Stop: $${formatPrice(stop)} (cách giá vào ${distancePct.toFixed(1)}%)`];
+  const risk = trade.riskUsd ?? null;
+  if (risk === null) {
+    lines.push('<i>Chưa ghi size: không tính được số $ mất nếu chạm stop.</i>');
+  } else if (profile === null) {
+    lines.push(`Nếu chạm stop: mất $${formatPrice(risk)}.`);
+  } else {
+    const pctOfAccount = (risk / profile.accountUsd) * 100;
+    lines.push(`Nếu chạm stop: mất $${formatPrice(risk)} = ${pctOfAccount.toFixed(2)}% vốn (quy tắc /risk: ${profile.riskPct}%).`);
+    if (pctOfAccount > profile.riskPct * 1.1) {
+      lines.push(`⚠️ Lệnh này rủi ro gấp ${(pctOfAccount / profile.riskPct).toFixed(1)} lần quy tắc của bạn.`);
+    }
+  }
+  return lines;
+}
+
+export function formatTradeOpened(trade: TradeDTO, profile: RiskProfile | null = null): string {
   const lines = [
     `📓 Logged <b>${escapeHtml(trade.symbol)}</b> ${trade.side.toUpperCase()}`,
     `Entry: $${formatPrice(trade.entryPrice)}${trade.size !== null ? ` · size ${trade.size}` : ''}`,
+    ...formatTradeStop(trade, profile),
     ...(trade.source ? [`Nguồn: ${escapeHtml(trade.source)}`] : []),
     ...(trade.thesis ? [`Lý do: ${escapeHtml(trade.thesis)}`] : []),
     '',
@@ -195,6 +225,10 @@ export function formatTradeClosed(trade: TradeDTO): string {
     `${won ? '✅' : '🔻'} Closed <b>${escapeHtml(trade.symbol)}</b> ${trade.side.toUpperCase()}`,
     `Entry $${formatPrice(trade.entryPrice)} → Exit $${formatPrice(trade.exitPrice ?? 0)}`,
     `P&L: <b>${pctText}</b>${usdText}`,
+    ...(trade.rMultiple === null || trade.rMultiple === undefined
+      ? []
+      : // Worse than −1R by more than slippage means the stop was moved or skipped.
+        [`Kết quả: <b>${formatR(trade.rMultiple)}</b>${trade.rMultiple < -1.1 ? ' — lỗ quá mức stop đã đặt' : ''}`]),
   ].join('\n');
 }
 
@@ -213,6 +247,9 @@ export function formatJournal(trades: TradeDTO[], summary: TradeSummaryDTO): str
       `Total P&L: ${totalPnl}` +
         (summary.avgPnlPct === null ? '' : ` · avg ${summary.avgPnlPct >= 0 ? '+' : ''}${summary.avgPnlPct.toFixed(2)}%/trade`),
     );
+    if (summary.avgR !== null && summary.avgR !== undefined) {
+      lines.push(`Trung bình theo R: <b>${formatR(summary.avgR)}</b> (${summary.rCount ?? 0} lệnh có stop)`);
+    }
   }
   if (summary.openCount > 0) lines.push(`Open positions: ${summary.openCount}`);
   lines.push('');
@@ -224,11 +261,12 @@ export function formatJournal(trades: TradeDTO[], summary: TradeSummaryDTO): str
 
   for (const t of trades) {
     if (t.status === 'open') {
-      lines.push(`🟡 <b>${escapeHtml(t.symbol)}</b> ${t.side.toUpperCase()} · entry $${formatPrice(t.entryPrice)} · open`);
+      const stop = t.stopPrice === null || t.stopPrice === undefined ? ' · chưa có stop' : ` · stop $${formatPrice(t.stopPrice)}`;
+      lines.push(`🟡 <b>${escapeHtml(t.symbol)}</b> ${t.side.toUpperCase()} · entry $${formatPrice(t.entryPrice)}${stop} · open`);
     } else {
       const pct = t.pnlPct ?? 0;
       lines.push(
-        `${pct > 0 ? '🟢' : '🔴'} <b>${escapeHtml(t.symbol)}</b> ${t.side.toUpperCase()} · $${formatPrice(t.entryPrice)} → $${formatPrice(t.exitPrice ?? 0)} · ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`,
+        `${pct > 0 ? '🟢' : '🔴'} <b>${escapeHtml(t.symbol)}</b> ${t.side.toUpperCase()} · $${formatPrice(t.entryPrice)} → $${formatPrice(t.exitPrice ?? 0)} · ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%${t.rMultiple === null || t.rMultiple === undefined ? '' : ` · ${formatR(t.rMultiple)}`}`,
       );
     }
   }
@@ -302,7 +340,8 @@ export function buildHelpText(symbols: string[]): string {
     '/watch SYMBOL — track a position you bought, get a sell alert here',
     '/watches — list your active watches',
     '/unwatch SYMBOL — stop tracking one',
-    '/trade SYMBOL spot|long|short ENTRY [SIZE] [NGUỒN] [| LÝ DO] — ghi lệnh đã vào, vd /trade SOLUSDT spot 150 2 @CryptoCred | hồi về hỗ trợ 1D',
+    '/trade SYMBOL spot|long|short ENTRY [SIZE] [sl STOP] [NGUỒN] [| LÝ DO] — ghi lệnh đã vào, vd /trade SOLUSDT spot 150 2 sl 140 @CryptoCred | hồi về hỗ trợ 1D',
+    '/stop SYMBOL GIÁ — đặt hoặc dời stop (mức cắt lỗ) cho lệnh đang mở; /stop SYMBOL off để bỏ',
     '/trend — xu hướng 1D của từng coin (đỉnh/đáy, EMA200)',
     '/setups — setup 4H đang mở (vào / cắt lỗ / chốt lời) và kết quả các setup trước',
     '/coins [COIN] — top coin theo volume: mạnh/yếu so với BTC, spot hay đòn bẩy kéo giá (vd: /coins SOL)',

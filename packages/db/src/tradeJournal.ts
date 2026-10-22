@@ -75,6 +75,38 @@ export function computeTradePnl(side: TradeSide, entryPrice: number, exitPrice: 
   return { pnlPct, pnlUsd };
 }
 
+/**
+ * Why a stop cannot be the one given, or null when it can. A stop sits on
+ * the losing side of the entry: under it for spot and long, over it for a
+ * short. One on the other side would make every R sign backwards and a
+ * "risk" of a gain.
+ */
+export function stopProblem(side: TradeSide, entryPrice: number, stopPrice: number): string | null {
+  if (!Number.isFinite(stopPrice) || stopPrice <= 0) return 'stopPrice must be greater than zero';
+  if (side === 'short' ? stopPrice <= entryPrice : stopPrice >= entryPrice) {
+    return side === 'short' ? 'stopPrice must be above entryPrice for a short' : 'stopPrice must be below entryPrice';
+  }
+  return null;
+}
+
+/**
+ * The result in R: what the trade made, divided by what it risked
+ * (entry to stop). +2 is twice the risk won, −1 the stop taken as planned,
+ * below −1 a stop that was not honoured. Null without a stop.
+ */
+export function computeTradeR(side: TradeSide, entryPrice: number, exitPrice: number, stopPrice: number | null): number | null {
+  if (stopPrice === null) return null;
+  const risk = Math.abs(entryPrice - stopPrice);
+  if (risk === 0) return null;
+  const direction = side === 'short' ? -1 : 1;
+  return ((exitPrice - entryPrice) * direction) / risk;
+}
+
+/** Dollars lost if the stop is hit: size × entry-to-stop. Null without both. */
+export function tradeRiskUsd(entryPrice: number, stopPrice: number | null, size: number | null): number | null {
+  return stopPrice === null || size === null ? null : Math.abs(entryPrice - stopPrice) * size;
+}
+
 export interface TradeRow {
   id: string;
   chatId: string;
@@ -91,6 +123,12 @@ export interface TradeRow {
   source: string | null;
   /** Why it was taken, written at entry. */
   thesis: string | null;
+  /** The cut-loss price written for it; null when none was. */
+  stopPrice: number | null;
+  /** The result in R, stored at close; null while open or without a stop. */
+  rMultiple: number | null;
+  /** What hitting the stop costs in $, from size; derived on read. */
+  riskUsd: number | null;
   openedAt: number;
   closedAt: number | null;
 }
@@ -105,6 +143,7 @@ export interface InsertTradeInput {
   /** Optional so callers that predate these fields keep compiling and writing null. */
   source?: string | null;
   thesis?: string | null;
+  stopPrice?: number | null;
 }
 
 export interface UpdateTradeInput {
@@ -117,15 +156,20 @@ export interface UpdateTradeInput {
   note?: string | null;
   source?: string | null;
   thesis?: string | null;
+  /** Explicit `null` clears it. */
+  stopPrice?: number | null;
 }
 
 const SELECT_COLUMNS = `
-  id, chat_id, symbol, side, entry_price, exit_price, size, pnl_pct, pnl_usd, status, note, source, thesis,
+  id, chat_id, symbol, side, entry_price, exit_price, size, pnl_pct, pnl_usd, status, note, source, thesis, stop_price, r_multiple,
   extract(epoch from opened_at)*1000 AS opened_at_ms,
   extract(epoch from closed_at)*1000 AS closed_at_ms
 `;
 
 function toTradeRow(r: Record<string, unknown>): TradeRow {
+  const entryPrice = Number(r['entry_price']);
+  const size = r['size'] === null ? null : Number(r['size']);
+  const stopPrice = r['stop_price'] === null || r['stop_price'] === undefined ? null : Number(r['stop_price']);
   return {
     id: String(r['id']),
     chatId: r['chat_id'] as string,
@@ -140,6 +184,9 @@ function toTradeRow(r: Record<string, unknown>): TradeRow {
     note: (r['note'] as string | null) ?? null,
     source: (r['source'] as string | null) ?? null,
     thesis: (r['thesis'] as string | null) ?? null,
+    stopPrice,
+    rMultiple: r['r_multiple'] === null || r['r_multiple'] === undefined ? null : Number(r['r_multiple']),
+    riskUsd: tradeRiskUsd(entryPrice, stopPrice, size),
     openedAt: Number(r['opened_at_ms']),
     closedAt: r['closed_at_ms'] === null ? null : Number(r['closed_at_ms']),
   };
@@ -147,8 +194,8 @@ function toTradeRow(r: Record<string, unknown>): TradeRow {
 
 export async function insertTrade(pool: Pool, input: InsertTradeInput): Promise<TradeRow> {
   const { rows } = await pool.query(
-    `INSERT INTO trade_journal (chat_id, symbol, side, entry_price, size, note, source, thesis)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+    `INSERT INTO trade_journal (chat_id, symbol, side, entry_price, size, note, source, thesis, stop_price)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
      RETURNING ${SELECT_COLUMNS}`,
     [
       input.chatId,
@@ -159,6 +206,7 @@ export async function insertTrade(pool: Pool, input: InsertTradeInput): Promise<
       input.note,
       cleanTradeText(input.source),
       cleanTradeText(input.thesis),
+      input.stopPrice ?? null,
     ],
   );
   return toTradeRow(rows[0]);
@@ -231,9 +279,11 @@ export async function updateTrade(pool: Pool, id: string, patch: UpdateTradeInpu
     note: patch.note !== undefined ? patch.note : existing.note,
     source: patch.source !== undefined ? cleanTradeText(patch.source) : existing.source,
     thesis: patch.thesis !== undefined ? cleanTradeText(patch.thesis) : existing.thesis,
+    stopPrice: patch.stopPrice !== undefined ? patch.stopPrice : existing.stopPrice,
   };
 
   const pnl = merged.exitPrice !== null ? computeTradePnl(merged.side, merged.entryPrice, merged.exitPrice, merged.size) : null;
+  const rMultiple = merged.exitPrice !== null ? computeTradeR(merged.side, merged.entryPrice, merged.exitPrice, merged.stopPrice) : null;
   const status: TradeStatus = merged.exitPrice !== null ? 'closed' : 'open';
   const closedAtMs = status === 'closed' ? (existing.status === 'closed' ? existing.closedAt : Date.now()) : null;
 
@@ -242,7 +292,7 @@ export async function updateTrade(pool: Pool, id: string, patch: UpdateTradeInpu
        symbol = $1, side = $2, entry_price = $3, exit_price = $4, size = $5, note = $6,
        pnl_pct = $7, pnl_usd = $8, status = $9,
        closed_at = CASE WHEN $10::double precision IS NULL THEN NULL ELSE to_timestamp($10/1000.0) END,
-       source = $12, thesis = $13
+       source = $12, thesis = $13, stop_price = $14, r_multiple = $15
      WHERE id = $11
      RETURNING ${SELECT_COLUMNS}`,
     [
@@ -259,6 +309,8 @@ export async function updateTrade(pool: Pool, id: string, patch: UpdateTradeInpu
       id,
       merged.source,
       merged.thesis,
+      merged.stopPrice,
+      rMultiple,
     ],
   );
   return toTradeRow(rows[0]);
@@ -279,6 +331,10 @@ export interface TradeSummary {
   /** Null when no closed trade recorded a size — $0.00 would read as "broke even" rather than "not knowable without a size". */
   totalPnlUsd: number | null;
   avgPnlPct: number | null;
+  /** Average result in R over the closed trades that had a stop; null when none did. */
+  avgR: number | null;
+  /** How many closed trades that average covers. */
+  rCount: number;
 }
 
 export async function getTradeSummary(pool: Pool, chatId?: string): Promise<TradeSummary> {
@@ -298,7 +354,9 @@ export async function getTradeSummary(pool: Pool, chatId?: string): Promise<Trad
             count(*) FILTER (WHERE pnl_pct > 0) AS wins,
             count(*) FILTER (WHERE pnl_pct <= 0) AS losses,
             sum(pnl_usd) AS total_pnl_usd,
-            avg(pnl_pct) AS avg_pnl_pct
+            avg(pnl_pct) AS avg_pnl_pct,
+            avg(r_multiple) AS avg_r,
+            count(r_multiple) AS r_count
      FROM trade_journal WHERE status = 'closed' ${chatFilter}`,
     params,
   );
@@ -314,6 +372,8 @@ export async function getTradeSummary(pool: Pool, chatId?: string): Promise<Trad
     winRatePct: closedCount > 0 ? (Number(closed.wins) / closedCount) * 100 : null,
     totalPnlUsd: closed.total_pnl_usd === null ? null : Number(closed.total_pnl_usd),
     avgPnlPct: closed.avg_pnl_pct === null ? null : Number(closed.avg_pnl_pct),
+    avgR: closed.avg_r === null ? null : Number(closed.avg_r),
+    rCount: Number(closed.r_count),
   };
 }
 

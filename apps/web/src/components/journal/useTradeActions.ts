@@ -11,6 +11,7 @@ export interface TradeEditDraft {
   entryPrice: string;
   exitPrice: string;
   size: string;
+  stopPrice: string;
   note: string;
   source: string;
   thesis: string;
@@ -38,6 +39,7 @@ export function useTradeActions(trade: Trade, onChanged: () => void) {
     entryPrice: String(trade.entryPrice),
     exitPrice: trade.exitPrice === null ? '' : String(trade.exitPrice),
     size: trade.size === null ? '' : String(trade.size),
+    stopPrice: trade.stopPrice === null || trade.stopPrice === undefined ? '' : String(trade.stopPrice),
     note: trade.note ?? '',
     source: trade.source ?? '',
     thesis: trade.thesis ?? '',
@@ -65,6 +67,9 @@ export function useTradeActions(trade: Trade, onChanged: () => void) {
   // recorded" — so only a non-blank field that will not parse is invalid.
   const editExitValid = editDraft.exitPrice.trim() === '' || parsePriceInput(editDraft.exitPrice) !== null;
   const editSizeValid = editDraft.size.trim() === '' || parseSizeInput(editDraft.size) !== null;
+  // Blank clears the stop. Which side of the entry it must sit is the
+  // API's check, shown as its error.
+  const editStopValid = editDraft.stopPrice.trim() === '' || parsePriceInput(editDraft.stopPrice) !== null;
 
   return {
     mode,
@@ -80,19 +85,20 @@ export function useTradeActions(trade: Trade, onChanged: () => void) {
       parsedExit === null
         ? undefined
         : run(() => updateTrade(trade.id, { exitPrice: parsedExit }), 'Could not close trade.'),
-    canSaveEdit: parsedEditEntry !== null && editExitValid && editSizeValid,
+    canSaveEdit: parsedEditEntry !== null && editExitValid && editSizeValid && editStopValid,
     handleSaveEdit: () => {
       // Guarded rather than clamped: a price we cannot read is a question
       // for the person who typed it, not something to substitute a value
       // for. The button is disabled on the same condition, so this is the
       // backstop, not the message.
-      if (parsedEditEntry === null || !editExitValid || !editSizeValid) return undefined;
+      if (parsedEditEntry === null || !editExitValid || !editSizeValid || !editStopValid) return undefined;
       return run(
         () =>
           updateTrade(trade.id, {
             entryPrice: parsedEditEntry,
             exitPrice: editDraft.exitPrice.trim() === '' ? null : parsePriceInput(editDraft.exitPrice),
             size: editDraft.size.trim() === '' ? null : parseSizeInput(editDraft.size),
+            stopPrice: editDraft.stopPrice.trim() === '' ? null : parsePriceInput(editDraft.stopPrice),
             note: editDraft.note.trim() === '' ? null : editDraft.note.trim(),
             source: editDraft.source.trim() === '' ? null : editDraft.source.trim(),
             thesis: editDraft.thesis.trim() === '' ? null : editDraft.thesis.trim(),

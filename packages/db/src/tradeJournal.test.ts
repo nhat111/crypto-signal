@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanTradeText, computeTradePnl, isTradeSide, normalizeTradeSymbol, tradeSourceKey } from './tradeJournal.js';
+import { cleanTradeText, computeTradePnl, computeTradeR, isTradeSide, normalizeTradeSymbol, stopProblem, tradeRiskUsd, tradeSourceKey } from './tradeJournal.js';
 
 describe('computeTradePnl', () => {
   it('is positive for a long that closed above entry', () => {
@@ -130,5 +130,30 @@ describe('trade source text', () => {
     const keys = ['@CryptoCred', '@cryptocred', ' @CryptoCred '].map(tradeSourceKey);
     expect(new Set(keys).size).toBe(1);
     expect(tradeSourceKey('')).toBeNull();
+  });
+});
+
+describe('stops and R', () => {
+  it('reads a result in multiples of the entry-to-stop distance', () => {
+    expect(computeTradeR('spot', 100, 120, 90)).toBeCloseTo(2);
+    expect(computeTradeR('long', 100, 90, 90)).toBeCloseTo(-1);
+    // A stop not honoured shows as worse than −1R.
+    expect(computeTradeR('long', 100, 80, 90)).toBeCloseTo(-2);
+    expect(computeTradeR('short', 100, 85, 105)).toBeCloseTo(3);
+    expect(computeTradeR('spot', 100, 120, null)).toBeNull();
+  });
+
+  it('puts the stop on the losing side of the entry', () => {
+    expect(stopProblem('spot', 100, 90)).toBeNull();
+    expect(stopProblem('long', 100, 100)).toMatch(/below/);
+    expect(stopProblem('short', 100, 110)).toBeNull();
+    expect(stopProblem('short', 100, 95)).toMatch(/above/);
+    expect(stopProblem('spot', 100, 0)).toMatch(/greater than zero/);
+  });
+
+  it('prices the risk at the stop only when both stop and size are known', () => {
+    expect(tradeRiskUsd(150, 140, 2)).toBe(20);
+    expect(tradeRiskUsd(150, null, 2)).toBeNull();
+    expect(tradeRiskUsd(150, 140, null)).toBeNull();
   });
 });

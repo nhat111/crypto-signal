@@ -3,6 +3,7 @@
 import type { Trade } from '@/lib/types';
 import { cx, formatDateTime, formatTokenPrice, formatUsd } from '@/lib/format';
 import { markPriceNote, unrealizedLabel } from '@/lib/openPnl';
+import { formatR, stopLabel } from '@/lib/tradeStop';
 import { DecimalInput } from './DecimalInput';
 import { useTradeActions } from './useTradeActions';
 
@@ -53,6 +54,13 @@ export function TradeRow({ trade, onChanged, nowMs }: TradeRowProps) {
               value={editDraft.entryPrice}
               onValueChange={(v) => setEditDraft((d) => ({ ...d, entryPrice: v }))}
             />
+            <DecimalInput
+              aria-label="Stop"
+              className={cx(inputClass, 'mt-1 block w-24')}
+              placeholder="stop"
+              value={editDraft.stopPrice}
+              onValueChange={(v) => setEditDraft((d) => ({ ...d, stopPrice: v }))}
+            />
           </td>
           <td className="py-2 pr-3">
             <DecimalInput
@@ -101,7 +109,10 @@ export function TradeRow({ trade, onChanged, nowMs }: TradeRowProps) {
         </>
       ) : (
         <>
-          <td className="py-2 pr-3 tabular-nums text-slate-300">{formatTokenPrice(trade.entryPrice)}</td>
+          <td className="py-2 pr-3 tabular-nums text-slate-300">
+            {formatTokenPrice(trade.entryPrice)}
+            <span className="block text-[10px] leading-tight text-slate-500">{stopLabel(trade)}</span>
+          </td>
           <td className="py-2 pr-3 tabular-nums text-slate-300">
             {trade.exitPrice === null ? (
               <>
@@ -142,6 +153,9 @@ export function TradeRow({ trade, onChanged, nowMs }: TradeRowProps) {
                     ({trade.pnlUsd >= 0 ? '+' : ''}
                     {formatUsd(trade.pnlUsd, false)})
                   </span>
+                )}
+                {trade.rMultiple !== null && trade.rMultiple !== undefined && (
+                  <span className="block text-[11px] opacity-80">{formatR(trade.rMultiple)}</span>
                 )}
               </span>
             )}

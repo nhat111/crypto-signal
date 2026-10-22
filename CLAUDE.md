@@ -102,10 +102,12 @@ Run them before pushing.
 - Intraday exit check (2026-10-22): hourly, held/⭐ coins on OKX against
   the last daily close, once per coin and kind a day (`coinWatchIntraday.ts`,
   migration 039, job `coin_watch_intraday`).
+- Journal stops (2026-10-22): `stopPrice` per trade, R stored at close,
+  `/stop`, `/trade … sl X`, hourly stop alert in `coinWatchIntraday.ts`
+  (migration 040, ASSUMPTIONS §23).
 - Open questions, from `TODO.md`: the coin-scan edge report has 0 samples
   until enough days are stored (verdicts expected ~mid-December 2026);
-  a stop on journal trades
-  (R results); token unlock data (needs a paid source).
+  token unlock data (needs a paid source).
 - Position sizing: `/risk` stores account + risk% per chat (migration 035);
   the setup alert and /setups size from it (`packages/shared/src/sizing.ts`,
   ASSUMPTIONS §23).

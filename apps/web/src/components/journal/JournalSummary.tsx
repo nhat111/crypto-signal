@@ -1,5 +1,6 @@
 import type { TradeSummary } from '@/lib/types';
 import { cx, formatUsd } from '@/lib/format';
+import { formatR } from '@/lib/tradeStop';
 
 interface JournalSummaryProps {
   summary: TradeSummary;
@@ -30,6 +31,14 @@ export function JournalSummary({ summary }: JournalSummaryProps) {
         value={avgPnlPct === null ? '—' : `${avgPnlPct >= 0 ? '+' : ''}${avgPnlPct.toFixed(2)}%`}
         tone={avgPnlPct === null ? undefined : avgPnlPct >= 0 ? 'emerald' : 'rose'}
       />
+      {summary.avgR !== null && summary.avgR !== undefined && (
+        <Stat
+          label="Avg R / trade"
+          value={formatR(summary.avgR)}
+          detail={`${summary.rCount ?? 0} closed with a stop`}
+          tone={summary.avgR >= 0 ? 'emerald' : 'rose'}
+        />
+      )}
       <Stat label="Open positions" value={String(openCount)} />
       {openCount > 0 && (
         <Stat

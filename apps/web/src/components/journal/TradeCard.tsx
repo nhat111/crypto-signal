@@ -2,6 +2,7 @@
 
 import type { Trade } from '@/lib/types';
 import { cx, formatDateTime, formatTokenPrice, formatUsd } from '@/lib/format';
+import { formatR, stopLabel } from '@/lib/tradeStop';
 import { markPriceNote, unrealizedLabel } from '@/lib/openPnl';
 import { DecimalInput } from './DecimalInput';
 import { useTradeActions } from './useTradeActions';
@@ -63,6 +64,13 @@ export function TradeCard({ trade, onChanged, nowMs }: { trade: Trade; onChanged
               onValueChange={(v) => a.setEditDraft((d) => ({ ...d, exitPrice: v }))}
             />
           </Field>
+          <Field label="Stop (blank = none)">
+            <DecimalInput
+              className={inputClass}
+              value={a.editDraft.stopPrice}
+              onValueChange={(v) => a.setEditDraft((d) => ({ ...d, stopPrice: v }))}
+            />
+          </Field>
           <Field label="Size">
             <DecimalInput
               className={inputClass}
@@ -96,7 +104,7 @@ export function TradeCard({ trade, onChanged, nowMs }: { trade: Trade; onChanged
         </div>
       ) : (
         <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-          <Cell label="Entry" value={formatTokenPrice(trade.entryPrice)} />
+          <Cell label="Entry" value={formatTokenPrice(trade.entryPrice)} sub={stopLabel(trade)} />
           <Cell
             label="Exit"
             value={trade.exitPrice === null ? 'open' : formatTokenPrice(trade.exitPrice)}
@@ -111,7 +119,9 @@ export function TradeCard({ trade, onChanged, nowMs }: { trade: Trade; onChanged
                 : `${trade.pnlPct >= 0 ? '+' : ''}${trade.pnlPct.toFixed(2)}%`
             }
             sub={
-              trade.pnlPct !== null && trade.pnlUsd !== null
+              trade.pnlPct !== null && trade.rMultiple !== null && trade.rMultiple !== undefined
+                ? `${formatR(trade.rMultiple)}${trade.pnlUsd !== null ? ` · ${trade.pnlUsd >= 0 ? '+' : ''}${formatUsd(trade.pnlUsd, false)}` : ''}`
+                : trade.pnlPct !== null && trade.pnlUsd !== null
                 ? `${trade.pnlUsd >= 0 ? '+' : ''}${formatUsd(trade.pnlUsd, false)}`
                 : trade.unrealizedPnlUsd !== null && trade.unrealizedPnlUsd !== undefined
                   ? `${trade.unrealizedPnlUsd >= 0 ? '+' : ''}${formatUsd(trade.unrealizedPnlUsd, false)}`

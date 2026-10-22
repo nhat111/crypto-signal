@@ -5,7 +5,7 @@ describe('parseTradeArgs', () => {
   it('reads the original four-argument form unchanged', () => {
     expect(parseTradeArgs('/trade BTCUSDT spot 78000 0.1')).toEqual({
       ok: true,
-      args: { symbol: 'BTCUSDT', side: 'spot', entryPrice: 78000, size: 0.1, source: null, thesis: null },
+      args: { symbol: 'BTCUSDT', side: 'spot', entryPrice: 78000, size: 0.1, stopPrice: null, source: null, thesis: null },
     });
   });
 
@@ -36,5 +36,19 @@ describe('parseTradeArgs', () => {
     expect(parseTradeArgs('/trade BTCUSDT spot')).toEqual({ ok: false });
     expect(parseTradeArgs('/trade BTCUSDT spot 0')).toEqual({ ok: false });
     expect(parseTradeArgs('/trade BTCUSDT buy 78000')).toEqual({ ok: false });
+  });
+
+  it('reads a marked stop in any of its spellings, without shifting size or source', () => {
+    expect(parseTradeArgs('/trade SOLUSDT spot 150 2 sl 140 @CryptoCred | hồi')).toMatchObject({
+      ok: true,
+      args: { size: 2, stopPrice: 140, source: '@CryptoCred', thesis: 'hồi' },
+    });
+    expect(parseTradeArgs('/trade SOLUSDT spot 150 SL=139,5')).toMatchObject({ ok: true, args: { size: null, stopPrice: 139.5, source: null } });
+    expect(parseTradeArgs('/trade SOLUSDT long 150 stop:141 tự phân tích')).toMatchObject({ ok: true, args: { stopPrice: 141, source: 'tự phân tích' } });
+  });
+
+  it('refuses a marked stop whose price does not parse, rather than logging without it', () => {
+    expect(parseTradeArgs('/trade SOLUSDT spot 150 sl abc')).toEqual({ ok: false, reason: 'stop' });
+    expect(parseTradeArgs('/trade SOLUSDT spot 150 sl')).toEqual({ ok: false, reason: 'stop' });
   });
 });
