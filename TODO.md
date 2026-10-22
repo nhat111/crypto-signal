@@ -344,8 +344,10 @@ Check items as they land; each phase's commit message references the phase.
       (under half of it), not a fixed 10%, which flagged BTC on OKX.
 - [x] 7-day OI summed across free venues (scan exchange + Bybit + Gate,
       `COIN_SCAN_OI_VENUES`), in coins per UTC day (ASSUMPTIONS §18).
-- [ ] Intraday funding/OI refresh for ⭐ and held coins, so the exit alert
-      does not wait for the next daily close.
+- [x] Intraday funding/OI refresh for ⭐ and held coins, so the exit alert
+      does not wait for the next daily close: hourly on OKX against the
+      last close, once per coin and kind a day (`coinWatchIntraday.ts`,
+      migration 039, ASSUMPTIONS §22).
 - [x] Position sizing from the user's own account and risk per trade:
       `/risk VỐN [%RỦI_RO]` per chat (migration 035), sized in the setup
       alert and /setups, capped at what spot can buy (ASSUMPTIONS §23).
@@ -379,7 +381,7 @@ Check items as they land; each phase's commit message references the phase.
 - [x] Flywheel list from DefiLlama holders revenue, per parent, with % of
       market cap per year and the price over the same month. Bot /flywheel.
 - [ ] Chart a sector's label and breadth over the stored days.
-- [ ] Show the flywheel line on /lookup for the coin looked up.
+- [x] Show the flywheel line on /lookup for the coin looked up (PR #42).
 
 ## Known limitations (carried forward, not silently hidden)
 - [x] Components now render against older API payloads in the test suite
@@ -409,5 +411,6 @@ Check items as they land; each phase's commit message references the phase.
 - [ ] Per-timeframe-specific thresholds (today one global threshold set
       applies across 5m/15m/1h/4h) — spec doesn't require per-timeframe
       tuning for MVP; noted as a future refinement once backtest data exists.
-- [ ] Multi-exchange (Bybit/OKX) — abstraction exists, no second adapter
-      implemented (explicitly out of scope for MVP per spec §34).
+- [ ] Multi-exchange for the deep pipeline (5m–4h signals): still Binance
+      only. The coin scan, lookup and exit alerts read OKX when Binance
+      refuses the server, and the 7-day OI sums OKX, Bybit and Gate.

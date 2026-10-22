@@ -14,6 +14,7 @@ const CONFIG: CoinScanConfig = {
   setups: true,
   watchlistSize: 6,
   oiVenues: [],
+  intraday: { priceMovePct: 3, oiChangePct: 5 },
 };
 
 function bars(n: number, daily: number, lastOpen = Date.UTC(2026, 9, 12)): CoinDailyBar[] {

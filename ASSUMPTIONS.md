@@ -944,8 +944,23 @@ stablecoins: 30 days).
 - **When.** Once, right after `runCoinScanCycle` stores a new day (the
   hourly ticks return early once a day is in). One message to the alert
   chats, held coins first; nothing is sent without a change. A failed
-  send is logged and never marks the scan job failed. Daily only, so it
-  can lag a fast squeeze by up to a day (intraday refresh is a TODO).
+  send is logged and never marks the scan job failed.
+- **Between closes** (`coinWatchIntraday.ts`, hourly, job
+  `coin_watch_intraday`). The same held and ⭐ coins (today's ⭐), read on
+  OKX against their own value at the last daily close: spot price
+  (`sodUtc0`), OI in coins (the `1Dutc` series, whose closed-day point is
+  that day's last hourly value) and funding. Reported: price ≤ −3% with OI
+  ≤ −5% (long unwind), price ≤ −3% with OI ≥ +5% (shorts building), price
+  ≥ +3% with OI ≤ −5% (short covering), and the funding flip when the
+  stored 7-day average was ≤ `fundingShortsPayPct` and every print settled
+  since the close is positive, the running one not negative. The running
+  estimate alone does not count: it swings within a period. Thresholds are
+  `coinScan.intraday` in config, smaller than the 7-day ones because they
+  cover hours; guesses like the rest, no verdict yet. Taker skew is not
+  read (the daily bar is still forming), and OI is OKX's alone, not the
+  multi-venue sum. Each coin and kind is claimed once per UTC day in
+  `coin_watch_intraday_sent` (migration 039) before the send, so the hourly
+  runs and a restart do not repeat it; a failed send loses that message.
 - **Framing.** The message says it describes the last 7–30 days and is
   not a sell order; the decision stays with the thesis written in the
   journal.

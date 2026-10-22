@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CoinScanRow } from '@crypto-signal/db';
 import type { CoinScanThresholds } from '@crypto-signal/shared';
-import { coinWatchChanges, formatCoinWatch, type WatchedCoin } from './coinWatch.js';
+import { coinWatchChanges, formatCoinWatch, watchedCoins, type WatchedCoin } from './coinWatch.js';
 
 const T: CoinScanThresholds = { priceMovePct: 3, takerSkew: 0.03, oiRisePct: 10, oiFallPct: -10, fundingElevatedPct: 0.03, fundingShortsPayPct: -0.005 };
 
@@ -69,5 +69,12 @@ describe('formatCoinWatch', () => {
     expect(text).toContain('<b>BAT</b> (đang giữ, ⭐)');
     expect(text).toContain('• a &lt; b');
     expect(text).toContain('không phải lệnh bán');
+  });
+});
+
+describe('watchedCoins', () => {
+  it('watches ⭐ coins and open longs, not shorts', () => {
+    const w = watchedCoins(new Set(['OPUSDT']), [{ symbol: 'op', side: 'long' }, { symbol: 'bat', side: 'spot' }, { symbol: 'TIA', side: 'short' }], (s) => `${s.toUpperCase()}USDT`);
+    expect(w).toEqual(new Map([['OPUSDT', { held: true, starred: true }], ['BATUSDT', { held: true, starred: false }]]));
   });
 });

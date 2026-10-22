@@ -76,6 +76,7 @@ export const JOB_DAILY_DIGEST = 'daily_digest';
 export const JOB_SETUP_SCAN = 'setup_scan';
 export const JOB_COIN_SCAN = 'coin_scan';
 export const JOB_COIN_SETUP_SCAN = 'coin_setup_scan';
+export const JOB_COIN_WATCH_INTRADAY = 'coin_watch_intraday';
 export const JOB_AIRDROP_SCAN = 'airdrop_scan';
 export const JOB_SECTOR_SCAN = 'sector_scan';
 export const JOB_FLYWHEEL_SCAN = 'flywheel_scan';

@@ -28,7 +28,7 @@ import { BinanceRestError, type BinanceFuturesAdapter, type BinanceSpotAdapter, 
 import type { CoinScanConfig } from '@crypto-signal/shared';
 import type { WorkerContext } from './context.js';
 import { readCoinFundamentals } from './coinFundamentals.js';
-import { coinWatchChanges, formatCoinWatch, type WatchedCoin } from './coinWatch.js';
+import { coinWatchChanges, formatCoinWatch, watchedCoins } from './coinWatch.js';
 import { readMemory } from './memory.js';
 
 const DAY_MS = 86_400_000;
@@ -370,13 +370,7 @@ async function sendCoinWatch(ctx: WorkerContext, day: string): Promise<void> {
   const starredBefore = new Set(pickWatchlist(previous, size, exclude).map((r) => r.symbol));
   const starredNow = new Set(pickWatchlist(today, size, exclude).map((r) => r.symbol));
 
-  const watched = new Map<string, WatchedCoin>();
-  for (const s of starredBefore) watched.set(s, { held: false, starred: true });
-  // Shorts are left out: a coin weakening is good news for them.
-  for (const t of open.filter((t) => t.side !== 'short')) {
-    const symbol = scanSymbol(t.symbol);
-    watched.set(symbol, { held: true, starred: starredBefore.has(symbol) });
-  }
+  const watched = watchedCoins(starredBefore, open, scanSymbol);
 
   const text = formatCoinWatch(coinWatchChanges(today, previous, watched, starredNow, ctx.config.coinScan.thresholds), day);
   if (!text) return;

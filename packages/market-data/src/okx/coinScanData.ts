@@ -50,6 +50,7 @@ const instrumentsSchema = envelope(z.array(instrumentSchema));
 const tickersSchema = envelope(z.array(tickerSchema));
 const rowsSchema = envelope(z.array(z.array(z.string())));
 const fundingSchema = envelope(z.array(z.object({ fundingRate: z.string(), fundingTime: z.string() })));
+const spotTickerSchema = envelope(z.array(z.object({ last: z.string(), sodUtc0: z.string() })));
 
 export interface OkxCoinScanDataOptions {
   logger: Logger;
@@ -115,6 +116,27 @@ export class OkxCoinScanData {
       .map((r) => ({ fundingTime: Number(r.fundingTime), fundingRate: Number(r.fundingRate) }))
       .filter((r) => r.fundingTime >= startTime && Number.isFinite(r.fundingRate))
       .sort((a, b) => a.fundingTime - b.fundingTime);
+  }
+
+  /**
+   * The spot price now and at the last UTC midnight (`sodUtc0`, the open of
+   * the forming daily bar, so the close of the one before). Null when OKX
+   * has no spot pair for it.
+   */
+  async spotSinceDailyClose(symbol: string): Promise<{ last: number; dailyClose: number } | null> {
+    const rows = await this.get(`/api/v5/market/ticker?instId=${encodeURIComponent(`${baseOf(symbol)}-USDT`)}`, spotTickerSchema);
+    const r = rows?.[0];
+    if (!r) return null;
+    const last = Number(r.last);
+    const dailyClose = Number(r.sodUtc0);
+    return Number.isFinite(last) && Number.isFinite(dailyClose) && dailyClose > 0 ? { last, dailyClose } : null;
+  }
+
+  /** The funding rate of the period now running, as OKX prints it (per settlement period). Null when there is no perpetual. */
+  async currentFunding(symbol: string): Promise<number | null> {
+    const rows = await this.get(`/api/v5/public/funding-rate?instId=${encodeURIComponent(`${baseOf(symbol)}-USDT-SWAP`)}`, fundingSchema);
+    const rate = Number(rows?.[0]?.fundingRate);
+    return Number.isFinite(rate) ? rate : null;
   }
 
   /** `data`, or null when OKX says the instrument or coin is not covered. Throws on anything else. */

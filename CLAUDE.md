@@ -84,7 +84,7 @@ Run them before pushing.
   UTC, 7–8h Vietnam). A deploy does not re-run a stored day, so label
   changes show from the next scan.
 
-## Recent state (2026-10-15)
+## Recent state (2026-10-22)
 
 - PR #29: `short_squeeze` flow ("Short bị ép"), `fundingShortsPayPct`.
 - PR #30: exit-side Telegram alert for held/⭐ coins (`coinWatch.ts`);
@@ -96,9 +96,15 @@ Run them before pushing.
   guide (migration 037).
 - Phase 22 (2026-10-21): sector read against BTC and flywheel list
   (migration 038).
+- PRs #42–45 (2026-10-21): /lookup shows the stored flow read, sectors,
+  flywheel and the 1D levels; the coin scan reads the whole day from OKX
+  when Binance futures refuses the server; guide on OI and funding.
+- Intraday exit check (2026-10-22): hourly, held/⭐ coins on OKX against
+  the last daily close, once per coin and kind a day (`coinWatchIntraday.ts`,
+  migration 039, job `coin_watch_intraday`).
 - Open questions, from `TODO.md`: the coin-scan edge report has 0 samples
   until enough days are stored (verdicts expected ~mid-December 2026);
-  intraday funding/OI refresh for ⭐/held coins; a stop on journal trades
+  a stop on journal trades
   (R results); token unlock data (needs a paid source).
 - Position sizing: `/risk` stores account + risk% per chat (migration 035);
   the setup alert and /setups size from it (`packages/shared/src/sizing.ts`,
