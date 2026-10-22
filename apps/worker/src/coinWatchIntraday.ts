@@ -7,6 +7,7 @@ import {
   recordJobFailure,
   recordJobSuccess,
   type CoinScanRow,
+  type TradeRow,
 } from '@crypto-signal/db';
 import { pickWatchlist } from '@crypto-signal/indicators';
 import type { OkxCoinScanData } from '@crypto-signal/market-data';
@@ -33,6 +34,8 @@ export type IntradayKind = 'long_unwind' | 'shorts_building' | 'short_covering' 
 
 export interface IntradayRead {
   symbol: string;
+  /** Spot, now. */
+  price: number;
   /** Percent, spot, since the last UTC midnight. */
   priceChangePct: number;
   /** Percent, coins, since the last UTC midnight. Null when the coin has no OKX perpetual or a point is missing. */
@@ -92,6 +95,62 @@ export function intradayFindings(
   return out.sort((a, b) => Number(b.watched.held) - Number(a.watched.held) || a.symbol.localeCompare(b.symbol));
 }
 
+/** How close to its stop a trade must be, as the share of the entry-to-stop distance still left, to be warned about. */
+const NEAR_STOP_SHARE = 0.25;
+
+export type StopKind = 'stop_hit' | 'stop_near';
+
+export interface StopFinding {
+  trade: Pick<TradeRow, 'id' | 'chatId' | 'symbol' | 'side' | 'entryPrice' | 'stopPrice'>;
+  kind: StopKind;
+  price: number;
+}
+
+/**
+ * Pure: open journal trades at or near the stop their owner wrote down.
+ * Hit is the price on the stop or past it; near is three quarters of the
+ * way from the entry to it. Read at the hour, so a wick through the stop
+ * between two reads is missed — this is a reminder of the plan, not an
+ * order on the exchange.
+ */
+export function stopFindings(trades: ReadonlyArray<StopFinding['trade']>, prices: ReadonlyMap<string, number>): StopFinding[] {
+  const out: StopFinding[] = [];
+  for (const t of trades) {
+    const price = prices.get(scanSymbol(t.symbol));
+    if (t.stopPrice === null || price === undefined) continue;
+    const short = t.side === 'short';
+    const left = short ? t.stopPrice - price : price - t.stopPrice;
+    const room = Math.abs(t.entryPrice - t.stopPrice);
+    if (left <= 0) out.push({ trade: t, kind: 'stop_hit', price });
+    else if (room > 0 && left / room <= NEAR_STOP_SHARE) out.push({ trade: t, kind: 'stop_near', price });
+  }
+  return out;
+}
+
+/** One message per chat for its trades' stops; null when there are none. */
+export function formatStopAlert(findings: StopFinding[]): string | null {
+  if (findings.length === 0) return null;
+  const price = (n: number): string => `$${n.toPrecision(6).replace(/\.?0+$/, '')}`;
+  const lines = ['🛑 <b>Lệnh trong Journal chạm hoặc gần stop</b>'];
+  for (const f of findings) {
+    const t = f.trade;
+    const coin = escapeHtml(t.symbol.replace(/USDT$/, ''));
+    const head = `<b>${coin}</b> ${t.side.toUpperCase()} · giá ${price(f.price)}, stop ${price(t.stopPrice as number)} (vào ${price(t.entryPrice)})`;
+    lines.push(
+      '',
+      head,
+      f.kind === 'stop_hit'
+        ? '• Đã chạm mức cắt lỗ bạn đặt.'
+        : `• Còn cách stop ${((Math.abs(f.price - (t.stopPrice as number)) / f.price) * 100).toFixed(1)}%: đã đi hơn 3/4 quãng từ giá vào tới stop.`,
+    );
+  }
+  lines.push(
+    '',
+    '<i>Giá spot OKX, đọc mỗi giờ. Đây là kế hoạch bạn đã ghi, không phải lệnh trên sàn. Thoát rồi thì /close SYMBOL GIÁ để ghi kết quả theo R; dời stop xa hơn là biến mức lỗ đã biết thành không giới hạn.</i>',
+  );
+  return lines.join('\n');
+}
+
 /** One message for the findings not sent earlier today; null when there are none. */
 export function formatCoinWatchIntraday(findings: IntradayFinding[], closedDay: string): string | null {
   if (findings.length === 0) return null;
@@ -137,16 +196,17 @@ export function okxIntradaySource(okx: OkxCoinScanData): IntradaySource {
       const hasPerp = points.length > 0;
       const fundingSettled = hasPerp ? (await okx.fundingHistory(symbol, dayStart + 1)).map((f) => f.fundingRate) : [];
       const fundingNow = hasPerp ? await okx.currentFunding(symbol) : null;
-      return { symbol, priceChangePct: (spot.last / spot.dailyClose - 1) * 100, oiChangePct, fundingSettled, fundingNow };
+      return { symbol, price: spot.last, priceChangePct: (spot.last / spot.dailyClose - 1) * 100, oiChangePct, fundingSettled, fundingNow };
     },
   };
 }
 
 /**
- * Hourly. Reads only the coins someone holds or stars (a dozen or so, ~4
- * OKX calls each through the adapter's rate gate), claims each finding for
- * the UTC day before sending, and sends one message to the alert chats.
- * Nothing changed, nothing sent.
+ * Hourly. Reads only the coins someone holds, stars or has a stop on (a
+ * dozen or so, ~4 OKX calls each through the adapter's rate gate), claims
+ * each finding for the UTC day before sending, and sends: the ⚡ message
+ * to the alert chats, each stop message to the chat that logged the trade
+ * (web trades to the alert chats). Nothing changed, nothing sent.
  */
 export async function runCoinWatchIntraday(ctx: WorkerContext, now = Date.now(), source?: IntradaySource): Promise<void> {
   if (!ctx.config.coinScan.enabled) return;
@@ -159,17 +219,19 @@ export async function runCoinWatchIntraday(ctx: WorkerContext, now = Date.now(),
     getAllAlertSubscribers(ctx.pool),
   ]);
   const chatIds = Array.from(new Set([...ctx.config.telegramAlertChatIds, ...subscribers.map((s) => s.chatId)]));
-  if (!day || chatIds.length === 0) return;
 
   // Today's ⭐, the list /coins shows right now.
   const exclude = [...ctx.config.symbols, ...ctx.config.futuresOnlySymbols];
-  const starred = new Set(pickWatchlist(rows, ctx.config.coinScan.watchlistSize, exclude).map((r) => r.symbol));
-  const watched = watchedCoins(starred, open, scanSymbol);
-  if (watched.size === 0) return;
+  const starred = day ? new Set(pickWatchlist(rows, ctx.config.coinScan.watchlistSize, exclude).map((r) => r.symbol)) : new Set<string>();
+  const watched = chatIds.length > 0 ? watchedCoins(starred, open, scanSymbol) : new Map<string, WatchedCoin>();
+  // Shorts are read too when they carry a stop: the stop protects them as much as a long.
+  const withStop = open.filter((t) => t.stopPrice !== null);
+  const symbols = new Set([...watched.keys(), ...withStop.map((t) => scanSymbol(t.symbol))]);
+  if (symbols.size === 0) return;
 
   const reads: IntradayRead[] = [];
   const failures: string[] = [];
-  for (const symbol of watched.keys()) {
+  for (const symbol of symbols) {
     try {
       const read = await src.read(symbol, now);
       if (read) reads.push(read);
@@ -191,10 +253,31 @@ export async function runCoinWatchIntraday(ctx: WorkerContext, now = Date.now(),
   const fresh: IntradayFinding[] = [];
   for (const f of findings) if (await claimCoinWatchIntraday(ctx.pool, today, f.symbol, f.kind)) fresh.push(f);
 
+  // A stop is claimed per trade, not per coin: two chats holding the same
+  // coin each get their own reminder.
+  const stops = stopFindings(withStop, new Map(reads.map((r) => [r.symbol, r.price])));
+  const freshStops: StopFinding[] = [];
+  for (const f of stops) if (await claimCoinWatchIntraday(ctx.pool, today, scanSymbol(f.trade.symbol), `${f.kind}:${f.trade.id}`)) freshStops.push(f);
+
+  ctx.logger.info(
+    { watched: watched.size, read: reads.length, failures, findings: findings.length, fresh: fresh.length, stops: stops.length, freshStops: freshStops.length },
+    'coin watch intraday checked',
+  );
+
   const text = formatCoinWatchIntraday(fresh, closedDay);
-  ctx.logger.info({ watched: watched.size, read: reads.length, failures, findings: findings.length, fresh: fresh.length }, 'coin watch intraday checked');
-  if (!text) return;
-  let delivered = 0;
-  for (const chatId of chatIds) if ((await ctx.notifier.send(chatId, text)).ok) delivered += 1;
-  ctx.logger.info({ delivered, chats: chatIds.length }, 'coin watch intraday alert sent');
+  if (text) {
+    let delivered = 0;
+    for (const chatId of chatIds) if ((await ctx.notifier.send(chatId, text)).ok) delivered += 1;
+    ctx.logger.info({ delivered, chats: chatIds.length }, 'coin watch intraday alert sent');
+  }
+
+  // The web journal has no chat of its own; its trades go to the alert chats.
+  const byChat = new Map<string, StopFinding[]>();
+  for (const f of freshStops) {
+    for (const chatId of f.trade.chatId === 'web' ? chatIds : [f.trade.chatId]) byChat.set(chatId, [...(byChat.get(chatId) ?? []), f]);
+  }
+  for (const [chatId, list] of byChat) {
+    const stopText = formatStopAlert(list);
+    if (stopText && (await ctx.notifier.send(chatId, stopText)).ok) ctx.logger.info({ chatId, trades: list.length }, 'journal stop alert sent');
+  }
 }

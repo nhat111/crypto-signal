@@ -223,6 +223,7 @@ export interface CreateTradeInput {
   note: string | null;
   source: string | null;
   thesis: string | null;
+  stopPrice?: number | null;
 }
 
 export function createTrade(input: CreateTradeInput): Promise<{ trade: Trade }> {
@@ -238,6 +239,7 @@ export interface UpdateTradeInput {
   note?: string | null;
   source?: string | null;
   thesis?: string | null;
+  stopPrice?: number | null;
 }
 
 export function updateTrade(id: string, patch: UpdateTradeInput): Promise<{ trade: Trade }> {

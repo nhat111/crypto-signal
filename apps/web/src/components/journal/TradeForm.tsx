@@ -44,6 +44,7 @@ export function TradeForm({ onCreated, prefill, knownSources = [] }: TradeFormPr
   const [side, setSide] = useState<TradeSide>(prefill?.side ?? 'spot');
   const [entryPrice, setEntryPrice] = useState(prefill?.entryPrice ?? '');
   const [size, setSize] = useState('');
+  const [stop, setStop] = useState('');
   const [note, setNote] = useState(prefill?.note ?? '');
   const [source, setSource] = useState(prefill?.source ?? '');
   const [thesis, setThesis] = useState(prefill?.thesis ?? '');
@@ -54,7 +55,20 @@ export function TradeForm({ onCreated, prefill, knownSources = [] }: TradeFormPr
   // Number(), which reads a blank field as 0 and a comma decimal as NaN.
   const parsedEntry = parsePriceInput(entryPrice);
   const sizeValid = size.trim() === '' || parseSizeInput(size) !== null;
-  const canSubmit = symbol.trim().length > 0 && parsedEntry !== null && sizeValid && !submitting;
+  const parsedStop = stop.trim() === '' ? null : parsePriceInput(stop);
+  // On the losing side of the entry, as the API checks: under it for spot
+  // and long, over it for a short.
+  const stopProblem =
+    stop.trim() === ''
+      ? null
+      : parsedStop === null
+        ? 'Stop is not a price.'
+        : parsedEntry !== null && (side === 'short' ? parsedStop <= parsedEntry : parsedStop >= parsedEntry)
+          ? side === 'short'
+            ? 'Stop phải cao hơn giá vào (short).'
+            : 'Stop phải thấp hơn giá vào.'
+          : null;
+  const canSubmit = symbol.trim().length > 0 && parsedEntry !== null && sizeValid && stopProblem === null && !submitting;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -69,6 +83,7 @@ export function TradeForm({ onCreated, prefill, knownSources = [] }: TradeFormPr
         side,
         entryPrice: parsedEntry,
         size: size.trim() === '' ? null : parseSizeInput(size),
+        stopPrice: parsedStop,
         note: note.trim() === '' ? null : note.trim(),
         source: source.trim() === '' ? null : source.trim(),
         thesis: thesis.trim() === '' ? null : thesis.trim(),
@@ -76,6 +91,7 @@ export function TradeForm({ onCreated, prefill, knownSources = [] }: TradeFormPr
       setSymbol('');
       setEntryPrice('');
       setSize('');
+      setStop('');
       setNote('');
       setSource('');
       setThesis('');
@@ -136,6 +152,15 @@ export function TradeForm({ onCreated, prefill, knownSources = [] }: TradeFormPr
           />
         </Field>
 
+        <Field label="Stop / cắt lỗ (optional)">
+          <DecimalInput
+            className={cx(inputClass, 'w-28')}
+            placeholder="72000"
+            value={stop}
+            onValueChange={setStop}
+          />
+        </Field>
+
         <Field label="Source (optional)">
           <input
             className={cx(inputClass, 'w-44')}
@@ -180,6 +205,7 @@ export function TradeForm({ onCreated, prefill, knownSources = [] }: TradeFormPr
         </button>
       </div>
 
+      {stopProblem && <p className="mt-2 text-xs text-amber-400">{stopProblem}</p>}
       {error && <p className="mt-2 text-xs text-rose-400">{error}</p>}
     </form>
   );

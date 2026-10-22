@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
 import { createTestPool, hasTestDatabase, lockTestTables } from './testPool.js';
-import { getOpenTradeForSymbol, getTradeSourceStats, getTrades, insertTrade, updateTrade } from './tradeJournal.js';
+import { getOpenTradeForSymbol, getTradeSourceStats, getTradeSummary, getTrades, insertTrade, updateTrade } from './tradeJournal.js';
 
 /** Its own key: no other suite touches trade_journal. */
 const TRADE_TABLES_LOCK = 991_002;
@@ -140,5 +140,24 @@ describe.skipIf(!hasTestDatabase)('trade sources against real Postgres', () => {
     const cleared = await updateTrade(pool, t.id, { source: '  ', thesis: null });
     expect(cleared?.source).toBeNull();
     expect(cleared?.thesis).toBeNull();
+  });
+
+  it('stores a stop, reads the risk from size, and the result in R at close', async () => {
+    const t = await insertTrade(pool, { chatId: CHAT, symbol: 'RRR', side: 'spot', entryPrice: 100, size: 2, note: null, stopPrice: 90 });
+    expect(t.stopPrice).toBe(90);
+    expect(t.riskUsd).toBe(20);
+    expect(t.rMultiple).toBeNull();
+    const closed = await updateTrade(pool, t.id, { exitPrice: 125 });
+    expect(closed?.rMultiple).toBeCloseTo(2.5);
+    const noStop = await insertTrade(pool, { chatId: CHAT, symbol: 'NNN', side: 'spot', entryPrice: 100, size: null, note: null });
+    await updateTrade(pool, noStop.id, { exitPrice: 50 });
+    const summary = await getTradeSummary(pool, CHAT);
+    // The trade without a stop counts in the % figures, not in R.
+    expect(summary.rCount).toBe(1);
+    expect(summary.avgR).toBeCloseTo(2.5);
+    // Moving the stop on an open trade, then clearing it.
+    const other = await insertTrade(pool, { chatId: CHAT, symbol: 'MMM', side: 'long', entryPrice: 10, size: null, note: null, stopPrice: 9 });
+    expect((await updateTrade(pool, other.id, { stopPrice: 9.5 }))?.stopPrice).toBe(9.5);
+    expect((await updateTrade(pool, other.id, { stopPrice: null }))?.stopPrice).toBeNull();
   });
 });

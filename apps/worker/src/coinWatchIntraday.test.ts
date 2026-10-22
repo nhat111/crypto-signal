@@ -3,7 +3,7 @@ import type { CoinScanRow } from '@crypto-signal/db';
 import type { OkxCoinScanData } from '@crypto-signal/market-data';
 import type { CoinScanThresholds } from '@crypto-signal/shared';
 import type { WatchedCoin } from './coinWatch.js';
-import { formatCoinWatchIntraday, intradayFindings, okxIntradaySource, type IntradayRead } from './coinWatchIntraday.js';
+import { formatCoinWatchIntraday, formatStopAlert, intradayFindings, okxIntradaySource, stopFindings, type IntradayRead } from './coinWatchIntraday.js';
 
 const SCAN: CoinScanThresholds = { priceMovePct: 3, takerSkew: 0.03, oiRisePct: 10, oiFallPct: -10, fundingElevatedPct: 0.03, fundingShortsPayPct: -0.005 };
 const T = { priceMovePct: 3, oiChangePct: 5 };
@@ -12,6 +12,7 @@ const star: WatchedCoin = { held: false, starred: true };
 
 const read = (symbol: string, over: Partial<IntradayRead> = {}): IntradayRead => ({
   symbol,
+  price: 1,
   priceChangePct: 0,
   oiChangePct: 0,
   fundingSettled: [],
@@ -135,5 +136,35 @@ describe('okxIntradaySource', () => {
     const noPerp = await okxIntradaySource(okx({ dailyOpenInterest: async () => [], currentFunding: async () => 1 })).read('XUSDT', NOW);
     expect(noPerp).toMatchObject({ oiChangePct: null, fundingSettled: [], fundingNow: null });
     expect(await okxIntradaySource(okx({ spotSinceDailyClose: async () => null })).read('XUSDT', NOW)).toBeNull();
+  });
+});
+
+describe('stopFindings', () => {
+  const t = (id: string, side: 'spot' | 'long' | 'short', entryPrice: number, stopPrice: number | null, symbol = 'sol') => ({ id, chatId: 'c', symbol, side, entryPrice, stopPrice });
+
+  it('reports a stop hit and a trade three quarters of the way to it, for longs and shorts', () => {
+    const prices = new Map([['SOLUSDT', 141], ['OPUSDT', 2.5], ['BTCUSDT', 99]]);
+    const found = stopFindings(
+      [t('1', 'spot', 150, 142), t('2', 'short', 2, 2.4, 'OP'), t('3', 'long', 100, 90, 'BTCUSDT'), t('4', 'spot', 150, 130)],
+      prices,
+    );
+    expect(found.map((f) => [f.trade.id, f.kind])).toEqual([
+      ['1', 'stop_hit'],
+      ['2', 'stop_hit'],
+    ]);
+    const near = stopFindings([t('5', 'spot', 150, 140)], new Map([['SOLUSDT', 142]]));
+    expect(near.map((f) => f.kind)).toEqual(['stop_near']);
+  });
+
+  it('skips trades without a stop or without a price', () => {
+    expect(stopFindings([t('1', 'spot', 150, null), t('2', 'spot', 150, 140, 'XYZ')], new Map([['SOLUSDT', 100]]))).toEqual([]);
+  });
+
+  it('formats one message with each trade and how to record the exit', () => {
+    const text = formatStopAlert([{ trade: t('1', 'spot', 150, 142), kind: 'stop_hit', price: 141 }]);
+    expect(text).toContain('<b>sol</b> SPOT');
+    expect(text).toContain('Đã chạm mức cắt lỗ');
+    expect(text).toContain('/close');
+    expect(formatStopAlert([])).toBeNull();
   });
 });

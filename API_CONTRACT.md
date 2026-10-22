@@ -401,7 +401,13 @@ signal engine and the gem scanner, which never write here. `chatId` scopes
 entries to whoever logged them (a Telegram chat id, or the fixed string
 `"web"` for entries made on the dashboard, which has no login).
 
-`POST /api/journal` body: `{ chatId, symbol, side: "spot"|"long"|"short", entryPrice, size?, note?, source?, thesis? }`
+`POST /api/journal` body: `{ chatId, symbol, side: "spot"|"long"|"short", entryPrice, size?, note?, source?, thesis?, stopPrice? }`
+
+`stopPrice` is the cut-loss price. It must sit on the losing side of the
+entry (below it for spot/long, above it for a short), else 400. Every
+trade row carries `stopPrice` (null when none), `riskUsd` (`size ×
+|entry − stop|`, null without both) and `rMultiple` (the result in R,
+stored at close, null while open or without a stop).
 
 `source` (≤80 chars) is where the idea came from — an account, a group,
 "tự phân tích"; `thesis` (≤2000) is why it was taken. Both are trimmed and
@@ -469,7 +475,9 @@ dashboard does). Returns `{ trades: [...] }`, most recent first.
 stored, not derived on read.
 
 `PATCH /api/journal/:id` body: any subset of `{ symbol, side, entryPrice,
-exitPrice, size, note, source, thesis }`. Setting `exitPrice` to a number is how a trade
+exitPrice, size, note, source, thesis, stopPrice }`. `stopPrice: null`
+clears the stop; a stop is checked against the trade as patched (a new
+side or entry can put an old stop on the wrong side: 400). Setting `exitPrice` to a number is how a trade
 gets closed (recomputes `pnlPct`/`pnlUsd`, sets `status: "closed"`);
 setting it to `null` reopens the trade. 404 if the id doesn't exist.
 
@@ -479,9 +487,12 @@ setting it to `null` reopens the trade. 404 if the id doesn't exist.
 ```json
 {
   "openCount": 2, "closedCount": 14, "wins": 9, "losses": 5,
-  "winRatePct": 64.3, "totalPnlUsd": 812.40, "avgPnlPct": 3.1
+  "winRatePct": 64.3, "totalPnlUsd": 812.40, "avgPnlPct": 3.1,
+  "avgR": 0.8, "rCount": 6
 }
 ```
+`avgR` averages `rMultiple` over the closed trades that had a stop
+(`rCount` of them); `null` when none did.
 `winRatePct`/`avgPnlPct` are `null` when `closedCount` is 0, and
 `totalPnlUsd` is `null` when no closed trade recorded a `size` — render
 those as "—"/"not enough data" rather than a misleading `0%`/`$0.00`, same

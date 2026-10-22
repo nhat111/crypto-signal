@@ -20,6 +20,7 @@ import {
   formatStoredDigest,
   formatTrends,
   riskProfileOf,
+  formatTradeStop,
 } from './formatting.js';
 import { coinArg, formatCoinDetail, formatCoins } from './coinsFormat.js';
 import { botBuildLine } from './botBuildLine.js';
@@ -302,17 +303,28 @@ async function main(): Promise<void> {
     const parsed = parseTradeArgs(ctx.message.text);
     if (!parsed.ok) {
       await ctx.reply(
-        'Usage: /trade SYMBOL spot|long|short ENTRY [SIZE] [NGUỒN] [| LÝ DO]\n' +
-          'e.g. /trade BTCUSDT spot 78000 0.1\n' +
-          '     /trade SOLUSDT spot 150 2 @CryptoCred | hồi về hỗ trợ 1D',
+        (parsed.reason === 'stop' ? 'Không đọc được giá stop sau "sl".\n\n' : '') +
+          'Usage: /trade SYMBOL spot|long|short ENTRY [SIZE] [sl STOP] [NGUỒN] [| LÝ DO]\n' +
+          'e.g. /trade BTCUSDT spot 78000 0.1 sl 75000\n' +
+          '     /trade SOLUSDT spot 150 2 sl 140 @CryptoCred | hồi về hỗ trợ 1D',
       );
       return;
     }
-    const { symbol, side, entryPrice, size, source, thesis } = parsed.args;
+    const { symbol, side, entryPrice, size, stopPrice, source, thesis } = parsed.args;
+    // Said before the API's English refusal would be: the stop on the wrong
+    // side is the one mistake here that reads as a typo of the side.
+    if (stopPrice !== null && (side === 'short' ? stopPrice <= entryPrice : stopPrice >= entryPrice)) {
+      await ctx.reply(side === 'short' ? 'Stop của lệnh short phải cao hơn giá vào.' : 'Stop phải thấp hơn giá vào (lệnh spot/long).');
+      return;
+    }
 
     try {
-      const { trade } = await api.openTrade(chatId, symbol, side, entryPrice, size, source, thesis);
-      await ctx.reply(formatTradeOpened(trade), { parse_mode: 'HTML' });
+      const [{ trade }, settings] = await Promise.all([
+        api.openTrade(chatId, symbol, side, entryPrice, size, source, thesis, stopPrice),
+        // The /risk check is extra: a failed settings read still logs the trade.
+        api.getSettings(chatId).then((r) => r.settings, () => undefined),
+      ]);
+      await ctx.reply(formatTradeOpened(trade, riskProfileOf(settings)), { parse_mode: 'HTML' });
     } catch (err) {
       logger.error({ err, symbol }, '/trade failed');
       await ctx.reply('Could not log that trade right now — try again shortly.');
@@ -378,6 +390,47 @@ async function main(): Promise<void> {
     } catch (err) {
       logger.error({ err, symbol }, '/close failed');
       await ctx.reply('Could not close that trade right now — try again shortly.');
+    }
+  });
+
+  bot.command('stop', async (ctx) => {
+    const chatId = String(ctx.chat.id);
+    const parts = ctx.message.text.split(/\s+/).slice(1);
+    const symbol = parts[0];
+    const raw = parts[1];
+    const clear = raw?.toLowerCase() === 'off';
+    const stopPrice = raw === undefined || clear ? null : Number(raw.replace(',', '.'));
+    if (!symbol || raw === undefined || (!clear && !(Number.isFinite(stopPrice) && (stopPrice as number) > 0))) {
+      await ctx.reply('Usage: /stop SYMBOL GIÁ — đặt hoặc dời stop cho lệnh đang mở\n/stop SYMBOL off — bỏ stop\ne.g. /stop SOLUSDT 140');
+      return;
+    }
+    try {
+      // Tickers are stored upper-cased, addresses as typed (normalizeTradeSymbol).
+      const open = await api.getOpenTrade(chatId, /^[A-Za-z0-9]{1,12}$/.test(symbol) ? symbol.toUpperCase() : symbol);
+      if (!open) {
+        await ctx.reply(`Không có lệnh ${symbol} đang mở. Xem /journal.`);
+        return;
+      }
+      if (stopPrice !== null && (open.side === 'short' ? stopPrice <= open.entryPrice : stopPrice >= open.entryPrice)) {
+        await ctx.reply(open.side === 'short' ? 'Stop của lệnh short phải cao hơn giá vào.' : 'Stop phải thấp hơn giá vào (lệnh spot/long).');
+        return;
+      }
+      const [{ trade }, settings] = await Promise.all([
+        api.setStop(open.id, stopPrice),
+        api.getSettings(chatId).then((r) => r.settings, () => undefined),
+      ]);
+      const moved = open.stopPrice !== null && open.stopPrice !== undefined && stopPrice !== null;
+      // Moving a stop further from the entry is the one change that turns a
+      // known loss into an open-ended one; it is allowed, and said.
+      const widened = moved && Math.abs(open.entryPrice - (stopPrice as number)) > Math.abs(open.entryPrice - (open.stopPrice as number));
+      const head = stopPrice === null ? `Đã bỏ stop cho <b>${trade.symbol}</b>.` : `${moved ? 'Đã dời' : 'Đã đặt'} stop cho <b>${trade.symbol}</b>.`;
+      await ctx.reply(
+        [head, ...formatTradeStop(trade, riskProfileOf(settings)), ...(widened ? ['⚠️ Stop vừa dời xa giá vào hơn: mức lỗ tối đa đã tăng so với kế hoạch ban đầu.'] : [])].join('\n'),
+        { parse_mode: 'HTML' },
+      );
+    } catch (err) {
+      logger.error({ err, symbol }, '/stop failed');
+      await ctx.reply('Không cập nhật được stop lúc này — thử lại sau ít phút.');
     }
   });
 
@@ -528,6 +581,7 @@ async function main(): Promise<void> {
         { command: 'unwatch', description: 'Stop tracking a position' },
         { command: 'trade', description: 'Log a trade you took' },
         { command: 'close', description: 'Close a logged trade' },
+        { command: 'stop', description: 'Đặt/dời stop cho lệnh đang mở' },
         { command: 'journal', description: 'Your trade log + P&L summary' },
         { command: 'risk', description: 'Vốn + % rủi ro: tính cỡ lệnh cho setup' },
         { command: 'sectors', description: 'Dòng tiền theo mảng: mảng nào đang thắng BTC' },

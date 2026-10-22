@@ -355,8 +355,10 @@ Check items as they land; each phase's commit message references the phase.
       trades at the daily close, open setups sized for `/risk`), and
       `/digest` shows the stored message again (migration 036,
       ASSUMPTIONS §24).
-- [ ] Optional stop on journal trades, so results read in R and the size
-      a trade was opened with can be checked against the rule.
+- [x] Optional stop on journal trades, so results read in R and the size
+      a trade was opened with can be checked against the rule: `sl` on
+      /trade, /stop, the web form; R stored at close; hourly stop alert
+      (migration 040, ASSUMPTIONS §23).
 - [ ] Read the comparison once both sides clear the floor; drop or keep
       the watchlist alerts on what it says.
 

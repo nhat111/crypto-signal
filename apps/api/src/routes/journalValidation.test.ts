@@ -108,3 +108,46 @@ describe('source and thesis validation', () => {
     expect(query).not.toHaveBeenCalled();
   });
 });
+
+describe('stop validation', () => {
+  const base = { chatId: '1', symbol: 'SOLUSDT', entryPrice: 150 };
+
+  it('refuses a stop above the entry of a long or spot trade', async () => {
+    const { app, query } = buildApp();
+    for (const side of ['spot', 'long'] as const) {
+      const res = await app.inject({ method: 'POST', url: '/api/journal', payload: { ...base, side, stopPrice: 160 } });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toMatch(/below entryPrice/);
+    }
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('refuses a stop under the entry of a short, and a stop of zero', async () => {
+    const { app, query } = buildApp();
+    const short = await app.inject({ method: 'POST', url: '/api/journal', payload: { ...base, side: 'short', stopPrice: 140 } });
+    expect(short.json().error).toMatch(/above entryPrice/);
+    const zero = await app.inject({ method: 'POST', url: '/api/journal', payload: { ...base, side: 'spot', stopPrice: 0 } });
+    expect(zero.statusCode).toBe(400);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('lets a stop on the losing side through to the database', async () => {
+    const { app, query } = buildApp();
+    const res = await app.inject({ method: 'POST', url: '/api/journal', payload: { ...base, side: 'spot', stopPrice: 140 } });
+    expect(res.statusCode).toBe(500);
+    expect(query).toHaveBeenCalled();
+  });
+
+  it('checks a patched stop against the stored trade', async () => {
+    const query = vi.fn(async () => ({
+      rows: [{ id: 7, chat_id: '1', symbol: 'SOLUSDT', side: 'long', entry_price: 150, exit_price: null, size: null, pnl_pct: null, pnl_usd: null, status: 'open', note: null, source: null, thesis: null, stop_price: null, r_multiple: null, opened_at_ms: 0, closed_at_ms: null }],
+    }));
+    const app = Fastify();
+    registerJournalRoutes(app, { pool: { query } } as unknown as ApiDeps);
+    const res = await app.inject({ method: 'PATCH', url: '/api/journal/7', payload: { stopPrice: 155 } });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toMatch(/below entryPrice/);
+    // Only the read of the existing trade, no write.
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+});

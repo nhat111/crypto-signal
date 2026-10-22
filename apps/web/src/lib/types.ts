@@ -312,6 +312,12 @@ export interface Trade {
   /** Optional: an API deployed before these columns sends neither. */
   source?: string | null;
   thesis?: string | null;
+  /** Optional: an API deployed before stops sends none of these. */
+  stopPrice?: number | null;
+  /** The result in R, stored at close; null while open or without a stop. */
+  rMultiple?: number | null;
+  /** What hitting the stop costs in $, from size. */
+  riskUsd?: number | null;
   openedAt: number;
   closedAt: number | null;
 
@@ -349,6 +355,9 @@ export interface TradeSummary {
   unrealizedPnlUsd?: number | null;
   /** How many open positions that total actually covers — a total over some of them is not a total. */
   unrealizedPricedCount?: number;
+  /** Average result in R over closed trades that had a stop; optional on an API that predates stops. */
+  avgR?: number | null;
+  rCount?: number;
 }
 
 /** One row of the journal grouped by where each idea came from. `source: null` is the "not recorded" group. */
