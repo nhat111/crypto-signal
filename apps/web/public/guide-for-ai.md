@@ -103,6 +103,12 @@ Cách tính:
 - Setup được xem là "thắng" khi chạm chốt lời trước cắt lỗ. Hết hạn sau
   14 ngày.
 
+Dòng **"Giá giờ …"** trên thẻ là giá OKX lúc xem: cách giá vào bao nhiêu %,
+còn bao nhiêu % tới cắt lỗ và R:R nếu vào ngay lúc đó (cùng cắt lỗ, chốt
+lời). Chữ vàng "đã chạy xa" = R:R lúc đó dưới 1:1.5; "sát cắt lỗ" = còn
+dưới 1/4 khoảng rủi ro; "đã qua cắt lỗ / chốt lời" = setup không còn dùng
+được. Dòng vàng "Lúc phát hiện, BTC 1D đang giảm" cho biết bối cảnh BTC.
+
 Những gì setup **không** kiểm tra:
 
 - **Xu hướng BTC.** Nếu BTC/ETH đang "Giảm" trên 1D, altcoin đi ngược sẽ
@@ -111,13 +117,19 @@ Những gì setup **không** kiểm tra:
 - Tin tức, lịch mở khóa token (unlock), thanh khoản sổ lệnh.
 - Giá **hiện tại**: "5h ago" nghĩa là giá có thể đã đi xa mức vào.
   Nếu giá đã chạy lên xa thì R:R thực tế xấu đi; nếu giá đã về gần cắt lỗ
-  thì setup gần như hỏng.
+  thì setup gần như hỏng. (Dòng "Giá giờ" giải quyết phần này nếu có.)
 
 **Khung "Kiểm chứng: setup trên coin mạnh có tốt hơn không?"**: so tỉ lệ
 thắng của setup trên coin ⭐ với setup trên các coin khác (cùng bộ dò,
 cùng thời gian). Cần ít nhất 20 setup đã kết thúc mỗi bên mới có kết luận.
 "Chưa có setup nào kết thúc" / "Chưa đủ dữ liệu" = **chưa có bằng chứng
 setup có lợi thế**. Bot cũng dặn đừng dùng tiền thật cho tới khi có kết luận.
+
+**Khung "Kiểm chứng: setup lúc BTC 1D giảm có tệ hơn không?"**: so tỉ lệ
+chạm chốt lời của setup tìm thấy khi BTC 1D đang giảm với lúc BTC tăng hoặc
+đi ngang (mọi coin trừ BTC, tính từ 23/10/2026). Cũng cần 20 setup kết thúc
+mỗi bên. "Tệ hơn rõ" = nên bỏ qua setup altcoin khi BTC giảm; "chưa đủ
+mẫu" = chưa biết, lời dặn "xem xu hướng BTC" vẫn chỉ là kinh nghiệm.
 
 ## 5. Watchlist ⭐ "coin mạnh"
 

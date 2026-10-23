@@ -559,6 +559,8 @@ export interface TradeSetup {
   /** Absent from APIs older than coin setups, when every setup was core. */
   cohort?: SetupCohort;
   context?: { scanDay: string; rs30d: number | null; flow: string } | null;
+  /** BTC's daily trend when the setup was found. Absent from older APIs; null for setups found before it was recorded. */
+  btcTrend?: TrendLabel | null;
 }
 
 /** core: BTC/ETH/SOL · watchlist: a strong scanned coin (alerted) · scan: any other scanned coin (the baseline). */
@@ -574,6 +576,15 @@ export interface SetupCohortGroup {
 export interface SetupCohortComparison {
   watchlist: SetupCohortGroup;
   scan: SetupCohortGroup;
+  verdict: 'beats' | 'worse' | 'indistinguishable' | null;
+  deltaPp: number | null;
+  marginPp: number | null;
+}
+
+export interface SetupBtcTrendComparison {
+  btcDown: SetupCohortGroup;
+  btcNotDown: SetupCohortGroup;
+  /** "worse": setups found while BTC was down hit the target less often. */
   verdict: 'beats' | 'worse' | 'indistinguishable' | null;
   deltaPp: number | null;
   marginPp: number | null;
@@ -597,6 +608,8 @@ export interface SetupsResponse {
   stats: TradeSetupStats[];
   /** Absent from APIs older than coin setups. */
   cohortComparison?: SetupCohortComparison;
+  /** Setups found while BTC's daily trend was down against the rest (BTC's own left out). Absent from older APIs. */
+  btcTrendComparison?: SetupBtcTrendComparison;
   minResolved: number;
   fetch: { lastAttemptAt: number | null; lastSuccessAt: number | null; consecutiveFailures: number; lastError: string | null } | null;
 }

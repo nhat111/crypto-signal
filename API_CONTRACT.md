@@ -601,7 +601,7 @@ not be read. No composite score. Empty
 
 ## `GET /api/coins/live`
 
-The latest scan's coins at their price now, read from OKX on request
+The latest scan's coins, and every open setup's symbol, at their price now, read from OKX on request
 (whichever exchange the scan day used; Binance refuses the server).
 Cached 30 s server-side; nothing is stored.
 
@@ -658,12 +658,18 @@ Anything else is a 400.
     "resolvedAt": null, "rMultiple": null,
     "exchange": "binance" | "okx",
     "cohort": "core" | "watchlist" | "scan",
-    "context": { "scanDay": "2026-10-13", "rs30d": 54.5, "flow": "leverage_led" } | null
+    "context": { "scanDay": "2026-10-13", "rs30d": 54.5, "flow": "leverage_led" } | null,
+    "btcTrend": "up" | "down" | "sideways" | null
   }],
   "stats": [{ "cohort": "core", "kind": "pullback", "total": 3, "open": 1, "resolved": 2, "targets": 1, "stops": 1, "expired": 0, "avgR": 1.05 }],
   "cohortComparison": {
     "watchlist": { "resolved": 4, "targets": 2, "hitPct": 50, "avgR": 0.8 },
     "scan": { "resolved": 30, "targets": 9, "hitPct": 30, "avgR": -0.1 },
+    "verdict": null, "deltaPp": null, "marginPp": null
+  },
+  "btcTrendComparison": {
+    "btcDown": { "resolved": 3, "targets": 0, "hitPct": 0, "avgR": -1 },
+    "btcNotDown": { "resolved": 25, "targets": 10, "hitPct": 40, "avgR": 0.3 },
     "verdict": null, "deltaPp": null, "marginPp": null
   },
   "minResolved": 20,
@@ -677,6 +683,11 @@ alerted; the baseline). `context` is what put a scanned coin in its cohort
 at detection. `cohortComparison` pools both kinds and judges watchlist hit
 rate (target reached) against the baseline with the same test as signals;
 `verdict` is null until each side has `minResolved` resolved setups.
+`btcTrend` is BTC's daily trend when the setup was found (null before
+migration 041 or when it could not be read). `btcTrendComparison` pools
+every cohort except BTC's own setups and judges the hit rate of setups
+found while BTC was down against the rest; `verdict: "worse"` means they
+hit the target less often. Null rows are left out; same floor and test.
 `fetch` is the core setup job, `coinFetch` the scanned coins' one.
 `exchange`: whose bars found the setup (`okx` when Binance refused the
 server); a setup is resolved only on that exchange's bars.

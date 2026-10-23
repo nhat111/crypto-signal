@@ -359,8 +359,14 @@ Check items as they land; each phase's commit message references the phase.
       a trade was opened with can be checked against the rule: `sl` on
       /trade, /stop, the web form; R stored at close; hourly stop alert
       (migration 040, ASSUMPTIONS §23).
+- [x] BTC's daily trend stored on each setup at detection (migration
+      041) and setups split by "BTC down" vs not; the setup card shows
+      the live OKX price and flags a setup the price ran away from or
+      that sits near its stop (ASSUMPTIONS §21).
 - [ ] Read the comparison once both sides clear the floor; drop or keep
       the watchlist alerts on what it says.
+- [ ] Read the BTC-down comparison once both sides clear the floor; if
+      "worse", stop alerting altcoin setups while BTC is down.
 
 ## Phase 21 — Airdrop research
 - [x] Gem scanner on by default (`GEM_SCAN_ENABLED` unset = on); it had
