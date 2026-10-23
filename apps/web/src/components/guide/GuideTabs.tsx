@@ -17,6 +17,7 @@ const TABS = [
   { href: '/guide/methodology', label: 'Phương pháp' },
   { href: '/guide/narrative', label: 'Đọc Narrative' },
   { href: '/guide/airdrop', label: 'Chiến thuật airdrop' },
+  { href: '/guide/ai', label: 'Hỏi AI' },
 ];
 
 export function GuideTabs() {

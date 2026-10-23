@@ -1,5 +1,7 @@
 import Link from 'next/link';
-import type { SetupCohortComparison, SetupCohortGroup, SetupsResponse, TradeSetup } from '@/lib/types';
+import type { SetupCohortComparison, SetupCohortGroup, SetupsResponse, TradeSetup, TrendState } from '@/lib/types';
+import { CopyButton } from '@/components/CopyButton';
+import { setupAiPrompt } from '@/lib/aiPrompt';
 import { cx, formatRelativeTime, formatUsd } from '@/lib/format';
 import { setupPrefillHref } from '@/lib/journalPrefill';
 
@@ -19,7 +21,7 @@ const STATUS: Record<TradeSetup['status'], { label: string; tone: string }> = {
  * the next one being offered. The hit rate is withheld under
  * `minResolved` — the panel's own prominence must not outrun its evidence.
  */
-export function SetupsPanel({ data }: { data: SetupsResponse }) {
+export function SetupsPanel({ data, btcTrend }: { data: SetupsResponse; btcTrend?: TrendState }) {
   const open = data.setups.filter((s) => s.status === 'open');
   const resolved = data.setups.filter((s) => s.status !== 'open').slice(0, 8);
   // The headline counts the setups this panel lists; the baseline cohort
@@ -78,9 +80,23 @@ export function SetupsPanel({ data }: { data: SetupsResponse }) {
                   <li key={r}>• {r}</li>
                 ))}
               </ul>
-              <Link href={setupPrefillHref(s)} className="mt-2 inline-flex min-h-[36px] items-center text-xs font-medium text-sky-300 hover:text-sky-200">
-                Log in journal →
-              </Link>
+              <div className="mt-2 flex flex-wrap gap-x-4">
+                <Link href={setupPrefillHref(s)} className="inline-flex min-h-[36px] items-center text-xs font-medium text-sky-300 hover:text-sky-200">
+                  Log in journal →
+                </Link>
+                <CopyButton
+                  label="Sao chép cho AI"
+                  text={() =>
+                    setupAiPrompt(s, {
+                      btcTrend,
+                      comparison: data.cohortComparison,
+                      minResolved: data.minResolved,
+                      nowMs: Date.now(),
+                      origin: window.location.origin,
+                    })
+                  }
+                />
+              </div>
             </article>
           ))}
         </div>
