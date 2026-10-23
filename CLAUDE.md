@@ -17,9 +17,11 @@ score, no "buy/sell" wording.
 - `TODO.md`: phase-by-phase status. Tick items as they ship.
 - `API_CONTRACT.md`: the HTTP API that web and Telegram consume. Update it
   with any payload change.
-- `GUIDE_FOR_AI.md`: Vietnamese reading guide the user pastes into a chat
-  AI with dashboard screenshots. Update it when a label, signal or rule
-  shown on screen changes.
+- `apps/web/public/guide-for-ai.md`: Vietnamese reading guide the user
+  gives a chat AI with dashboard screenshots (served at `/guide-for-ai.md`,
+  copy button on `/guide/ai`; setup cards copy their own text via
+  `apps/web/src/lib/aiPrompt.ts`). Update it when a label, signal or rule
+  shown on screen changes; a test fails on a missing flow or signal label.
 - `DEPLOY.md`: Render (worker + api + telegram in one container,
   `Dockerfile.allinone`) and Vercel (web).
 

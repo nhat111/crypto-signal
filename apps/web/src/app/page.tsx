@@ -115,7 +115,7 @@ export default function OverviewPage() {
         )}
       </section>
 
-      {setups.data && <SetupsPanel data={setups.data} />}
+      {setups.data && <SetupsPanel data={setups.data} btcTrend={trend.data?.trends.find((t) => t.symbol === 'BTCUSDT')} />}
 
       {overview.data && overview.data.rows.length > 0 && (
         <section>

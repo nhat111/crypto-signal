@@ -5,6 +5,10 @@ Dán toàn bộ file này vào đầu cuộc trò chuyện, hoặc vào "Custom 
 (`trackingticker.vercel.app`) hoặc bot Telegram. File mô tả đúng quy tắc
 trong code (cập nhật 2026-10-23); con số trên ảnh mới là dữ liệu.
 
+Bản mới nhất luôn ở `https://trackingticker.vercel.app/guide-for-ai.md`
+(trang `/guide/ai` có nút sao chép). Mỗi thẻ setup có nút "Sao chép cho AI":
+nó chép sẵn số liệu của setup dưới dạng chữ, đọc chính xác hơn ảnh.
+
 ---
 
 ## 0. Vai trò của bạn (AI) khi đọc ảnh
@@ -67,9 +71,12 @@ Mỗi tín hiệu đi kèm câu "không có nghĩa là…". Đó là phần quan
 | SHORT COVERING POSSIBLE | Giá tăng, OI giảm: short mua lại để thoát. | Lực mua hết khi short thoát xong. |
 | SELLING ABSORPTION POSSIBLE | Có bán thật nhưng giá không rơi tương ứng, như có người đỡ. | Mới là khả năng, cần vài nến sau xác nhận. |
 | BULLISH SPOT DIVERGENCE | Giá giảm nhưng spot vẫn mua ròng. | Không phải đảo chiều chắc chắn, có thể lệch rất lâu. |
-| LONG / SHORT LIQUIDATION | Loạt long/short vừa bị thanh lý. | Chuyện đã xảy ra, không dự báo. |
-| LONG / SHORT CROWDING | Quá đông long/short, funding cao bất thường. | Đám đông không chắc sai; nếu giá quay đầu thì cú quét mạnh hơn. |
-| PRICE SPIKE UP / DOWN | Nến biến động ≥3 lần biên độ trung bình 14 nến trước của chính coin. | Không nói giá đi tiếp; mua đuổi sau nến này dễ mất tiền nhất. |
+| LONG LIQUIDATION | Loạt long vừa bị thanh lý, kéo theo bán tháo. | Chuyện đã xảy ra, không dự báo. |
+| SHORT LIQUIDATION | Loạt short vừa bị thanh lý, kéo theo mua dồn dập. | Chuyện đã xảy ra, không dự báo. |
+| LONG CROWDING | Quá đông long, funding dương cao bất thường. | Đám đông không chắc sai; nếu giá quay đầu thì cú rơi mạnh hơn. |
+| SHORT CROWDING | Quá đông short, funding âm bất thường. | Đám đông không chắc sai; nếu giá bật lên thì cú bật mạnh hơn. |
+| PRICE SPIKE UP | Nến tăng ≥3 lần biên độ trung bình 14 nến trước của chính coin. | Không nói giá đi tiếp; mua đuổi sau nến này dễ mất tiền nhất. |
+| PRICE SPIKE DOWN | Nến giảm ≥3 lần biên độ trung bình 14 nến trước của chính coin. | Không nói giá đi tiếp. |
 
 Cảnh báo Telegram chỉ bật cho khung 1h và 4h. Độ tin cậy (confidence) gồm
 một phần "lịch sử": dưới 30 kết quả ghi nhận thì phần đó để trung tính 50.
