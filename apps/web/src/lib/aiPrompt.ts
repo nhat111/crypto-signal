@@ -1,5 +1,6 @@
 import { FLOW_META } from './coinFlow';
-import type { CoinFlow, SetupCohortComparison, TradeSetup, TrendState } from './types';
+import { setupLiveRead, setupLiveText } from './setupLive';
+import type { CoinFlow, SetupBtcTrendComparison, SetupCohortComparison, TradeSetup, TrendState } from './types';
 
 /** Where the reading guide is served (apps/web/public), so a chat AI with browsing can fetch it itself. */
 export const AI_GUIDE_PATH = '/guide-for-ai.md';
@@ -31,6 +32,9 @@ export interface SetupPromptContext {
   /** BTC's daily read; the setup detector never looks at it, which is the point of including it. */
   btcTrend?: TrendState;
   comparison?: SetupCohortComparison;
+  btcComparison?: SetupBtcTrendComparison;
+  /** OKX's last price, when it could be read. */
+  livePrice?: number;
   minResolved: number;
   nowMs: number;
   /** Absolute origin for the guide link, e.g. https://trackingticker.vercel.app. */
@@ -58,6 +62,10 @@ export function setupAiPrompt(s: TradeSetup, ctx: SetupPromptContext): string {
     `Phát hiện cách đây ${hoursAgo(s.detectedAt, ctx.nowMs)}, trên nến 4H đã đóng. Giá vào là giá đóng nến đó, không phải giá hiện tại.`,
     `Vào ${fmt(s.entry)} · Cắt lỗ ${fmt(s.stop)} (${pct(s.entry, s.stop)}) · Chốt lời ${fmt(s.target)} (${pct(s.entry, s.target)}) · R:R 1:${s.rr.toFixed(1)}`,
     `Khối lượng theo rủi ro: số coin = vốn × %rủi ro ÷ ${fmt(risk)}.`,
+    (() => {
+      const live = setupLiveRead(s, ctx.livePrice);
+      return live ? `${setupLiveText(live)} (OKX, lúc chép)` : 'Giá hiện tại: không đọc được lúc chép, tự kiểm tra trên sàn.';
+    })(),
     '',
     'Lý do bộ dò đưa ra:',
     // The last reason is the plan line, already printed above as numbers.
@@ -71,7 +79,18 @@ export function setupAiPrompt(s: TradeSetup, ctx: SetupPromptContext): string {
 
   lines.push('', 'Bộ dò KHÔNG xét:');
   lines.push(ctx.btcTrend ? `- Xu hướng 1D của BTC, hiện là: ${trendLine(ctx.btcTrend)}.` : '- Xu hướng 1D của BTC (không đọc được lúc chép).');
-  lines.push('- Tin tức, lịch unlock token, giá hiện tại.');
+  if (s.btcTrend) lines.push(`- (Lúc phát hiện setup, BTC 1D là: ${TREND[s.btcTrend]}.)`);
+  lines.push('- Tin tức, lịch unlock token.');
+
+  const b = ctx.btcComparison;
+  if (b && s.symbol !== 'BTCUSDT') {
+    const n = Math.min(b.btcDown.resolved, b.btcNotDown.resolved);
+    lines.push(
+      b.verdict === null
+        ? `Thống kê setup lúc BTC giảm so với lúc BTC không giảm: chưa đủ mẫu (${n}/${ctx.minResolved} mỗi bên).`
+        : `Thống kê setup lúc BTC giảm: ${b.verdict === 'worse' ? 'tệ hơn rõ' : b.verdict === 'beats' ? 'tốt hơn' : 'chưa phân biệt được'} so với lúc BTC không giảm (${b.btcDown.targets}/${b.btcDown.resolved} so với ${b.btcNotDown.targets}/${b.btcNotDown.resolved} chạm chốt lời).`,
+    );
+  }
 
   const c = ctx.comparison;
   if (c && s.cohort !== 'core') {

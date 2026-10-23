@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { COIN_EDGE_HORIZONS, COIN_EDGE_MIN_SAMPLES, getCoinScanEdge, getJobHealth, getLatestCoinScan, JOB_COIN_SCAN } from '@crypto-signal/db';
+import { COIN_EDGE_HORIZONS, COIN_EDGE_MIN_SAMPLES, getCoinScanEdge, getJobHealth, getLatestCoinScan, getOpenTradeSetups, JOB_COIN_SCAN } from '@crypto-signal/db';
 import { pickWatchlist } from '@crypto-signal/indicators';
 import { OkxCoinScanData, type Ticker24hRow } from '@crypto-signal/market-data';
 import { createLogger } from '@crypto-signal/shared';
@@ -12,7 +12,7 @@ export interface LivePrices {
   source: 'okx';
   /** When OKX was read (ms). */
   at: number;
-  /** Last trade price per scanned symbol; a coin OKX does not list is absent. */
+  /** Last trade price per scanned symbol and per open setup's symbol; a coin OKX does not list is absent. */
   prices: Record<string, number>;
 }
 
@@ -71,6 +71,10 @@ export function registerCoinsRoute(app: FastifyInstance, deps: ApiDeps): void {
    * Always OKX, whichever exchange the scan day used: Binance refuses the
    * production server's IP, and the two differ by about 0.1% on these
    * coins. Same on-demand pattern as /api/lookup; nothing is stored.
+   *
+   * Open setups' symbols are priced too, so a setup card can say how far
+   * the price has moved since its 4H close — including a coin that has
+   * since left the top 30 while its setup is still open.
    */
   const logger = createLogger('coins-live', deps.config.logLevel);
   const okx = new OkxCoinScanData({ logger });
@@ -89,10 +93,11 @@ export function registerCoinsRoute(app: FastifyInstance, deps: ApiDeps): void {
   };
 
   app.get('/api/coins/live', async (_req, reply) => {
-    const scan = await getLatestCoinScan(deps.pool);
+    const [scan, open] = await Promise.all([getLatestCoinScan(deps.pool), getOpenTradeSetups(deps.pool)]);
     try {
       const { at, tickers: rows } = await tickers(Date.now());
-      const body: LivePrices = { source: 'okx', at, prices: pickLivePrices(rows, scan.rows.map((r) => r.symbol)) };
+      const symbols = [...scan.rows.map((r) => r.symbol), ...open.map((s) => s.symbol)];
+      const body: LivePrices = { source: 'okx', at, prices: pickLivePrices(rows, symbols) };
       return body;
     } catch (err) {
       logger.warn({ err }, 'coins live prices failed');

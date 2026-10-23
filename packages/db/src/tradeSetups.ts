@@ -19,6 +19,9 @@ export interface SetupContext {
   flow: string;
 }
 
+/** BTC's daily structure read when the setup was found. */
+export type BtcTrend = 'up' | 'down' | 'sideways';
+
 export interface TradeSetupRow {
   id: string;
   symbol: string;
@@ -38,6 +41,8 @@ export interface TradeSetupRow {
   exchange: SetupExchange;
   cohort: SetupCohort;
   context: SetupContext | null;
+  /** Null for setups found before it was recorded, or when BTC's trend could not be read. */
+  btcTrend: BtcTrend | null;
 }
 
 export interface NewTradeSetup {
@@ -56,9 +61,10 @@ export interface NewTradeSetup {
   /** Defaults to core: every setup before the coin scan fed the detector. */
   cohort?: SetupCohort;
   context?: SetupContext | null;
+  btcTrend?: BtcTrend | null;
 }
 
-const COLUMNS = `id, symbol, kind, level, entry, stop, target, rr, atr, reasons, status, r_multiple, exchange, cohort, context,
+const COLUMNS = `id, symbol, kind, level, entry, stop, target, rr, atr, reasons, status, r_multiple, exchange, cohort, context, btc_trend,
   extract(epoch from bar_open_time)*1000 AS bar_open_ms,
   extract(epoch from detected_at)*1000 AS detected_ms,
   extract(epoch from resolved_at)*1000 AS resolved_ms`;
@@ -83,17 +89,18 @@ function toRow(r: Record<string, unknown>): TradeSetupRow {
     exchange: (r['exchange'] as SetupExchange | undefined) ?? 'binance',
     cohort: (r['cohort'] as SetupCohort | undefined) ?? 'core',
     context: (r['context'] as SetupContext | null | undefined) ?? null,
+    btcTrend: (r['btc_trend'] as BtcTrend | null | undefined) ?? null,
   };
 }
 
 /** Inserts a setup unless this symbol/kind/bar is already recorded. Returns the row only when it is new — that is the alert trigger. */
 export async function insertTradeSetup(pool: Pool, s: NewTradeSetup): Promise<TradeSetupRow | null> {
   const { rows } = await pool.query(
-    `INSERT INTO trade_setups (symbol, kind, bar_open_time, level, entry, stop, target, rr, atr, reasons, exchange, cohort, context)
-     VALUES ($1, $2, to_timestamp($3/1000.0), $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    `INSERT INTO trade_setups (symbol, kind, bar_open_time, level, entry, stop, target, rr, atr, reasons, exchange, cohort, context, btc_trend)
+     VALUES ($1, $2, to_timestamp($3/1000.0), $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
      ON CONFLICT (symbol, kind, bar_open_time) DO NOTHING
      RETURNING ${COLUMNS}`,
-    [s.symbol, s.kind, s.barOpenTime, s.level, s.entry, s.stop, s.target, s.rr, s.atr, JSON.stringify(s.reasons), s.exchange ?? 'binance', s.cohort ?? 'core', s.context ? JSON.stringify(s.context) : null],
+    [s.symbol, s.kind, s.barOpenTime, s.level, s.entry, s.stop, s.target, s.rr, s.atr, JSON.stringify(s.reasons), s.exchange ?? 'binance', s.cohort ?? 'core', s.context ? JSON.stringify(s.context) : null, s.btcTrend ?? null],
   );
   return rows[0] ? toRow(rows[0]) : null;
 }
@@ -202,4 +209,58 @@ export function compareSetupCohorts(stats: TradeSetupStats[], minResolved: numbe
   }
   const { verdict, deltaPp, marginPp } = compareToBaseline(watchlist.hitPct, watchlist.resolved, scan.hitPct, scan.resolved);
   return { watchlist, scan, verdict, deltaPp, marginPp };
+}
+
+/** Resolved setups by whether BTC's daily trend was down when each was found. */
+export interface SetupBtcTrendStats {
+  btcDown: SetupCohortGroup;
+  btcNotDown: SetupCohortGroup;
+}
+
+function group(resolved: number, targets: number, avgR: number | null): SetupCohortGroup {
+  return { resolved, targets, hitPct: resolved > 0 ? (targets / resolved) * 100 : null, avgR: resolved > 0 ? avgR : null };
+}
+
+/**
+ * Every cohort pooled, BTC's own setups left out: the detector never
+ * offers one while BTC is down (a pullback needs an uptrend, a retest
+ * anything but a downtrend), so they would only pad the other side.
+ * Rows without a recorded trend are left out rather than guessed.
+ */
+export async function getSetupBtcTrendStats(pool: Pool): Promise<SetupBtcTrendStats> {
+  const { rows } = await pool.query(
+    `SELECT btc_trend = 'down' AS down,
+            count(*) AS resolved,
+            count(*) FILTER (WHERE status = 'target') AS targets,
+            avg(r_multiple) AS avg_r
+     FROM trade_setups
+     WHERE status <> 'open' AND btc_trend IS NOT NULL AND symbol <> 'BTCUSDT'
+     GROUP BY 1`,
+  );
+  const pick = (down: boolean): SetupCohortGroup => {
+    const r = rows.find((x) => x.down === down);
+    return r ? group(Number(r.resolved), Number(r.targets), r.avg_r === null ? null : Number(r.avg_r)) : group(0, 0, null);
+  };
+  return { btcDown: pick(true), btcNotDown: pick(false) };
+}
+
+export interface SetupBtcTrendComparison extends SetupBtcTrendStats {
+  /** "worse" means setups found while BTC was down hit the target less often. Null until both sides have `minResolved`. */
+  verdict: EdgeVerdict | null;
+  deltaPp: number | null;
+  marginPp: number | null;
+}
+
+/**
+ * Should an altcoin setup be skipped while BTC is in a daily downtrend?
+ * The setups found then, judged against the ones found otherwise, with the
+ * same test as the watchlist comparison.
+ */
+export function compareSetupBtcTrend(stats: SetupBtcTrendStats, minResolved: number): SetupBtcTrendComparison {
+  const { btcDown, btcNotDown } = stats;
+  if (btcDown.resolved < minResolved || btcNotDown.resolved < minResolved || btcDown.hitPct === null || btcNotDown.hitPct === null) {
+    return { ...stats, verdict: null, deltaPp: null, marginPp: null };
+  }
+  const { verdict, deltaPp, marginPp } = compareToBaseline(btcDown.hitPct, btcDown.resolved, btcNotDown.hitPct, btcNotDown.resolved);
+  return { ...stats, verdict, deltaPp, marginPp };
 }

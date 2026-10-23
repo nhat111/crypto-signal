@@ -110,6 +110,10 @@ Run them before pushing.
 - Journal stops (2026-10-22): `stopPrice` per trade, R stored at close,
   `/stop`, `/trade … sl X`, hourly stop alert in `coinWatchIntraday.ts`
   (migration 040, ASSUMPTIONS §23).
+- Setup context (2026-10-23): BTC's 1D trend stored per setup (migration
+  041), "BTC down vs not" comparison on `/api/setups`; setup cards show
+  the live OKX price and flag chased / near-stop setups (`setupLive.ts`);
+  "Sao chép cho AI" on setup cards and `/guide/ai` (PR #48).
 - Open questions, from `TODO.md`: the coin-scan edge report has 0 samples
   until enough days are stored (verdicts expected ~mid-December 2026);
   token unlock data (needs a paid source).

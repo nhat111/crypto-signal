@@ -2,8 +2,10 @@ import {
   getAllAlertSubscribers,
   getBotSettings,
   getOpenTradeSetups,
+  getTrendStates,
   insertTradeSetup,
   resolveTradeSetup,
+  type BtcTrend,
   type SetupCohort,
   type SetupContext,
   type TradeSetupRow,
@@ -72,11 +74,27 @@ export async function scanSetups(
   }
 
   if (opts.detect === false) return;
-  for (const candidate of detectSetups({ structure, dailyBars, bars4h })) {
-    const row = await insertTradeSetup(ctx.pool, { symbol, ...candidate, exchange, cohort: opts.cohort, context: opts.context });
+  const candidates = detectSetups({ structure, dailyBars, bars4h });
+  if (candidates.length === 0) return;
+  // BTC's daily trend goes on the row because the detector never reads it
+  // and the stored trend is overwritten daily: written now or never. The
+  // trend cycle upserts BTC before scanning any core symbol's setups.
+  const btcTrend = await readBtcTrend(ctx);
+  for (const candidate of candidates) {
+    const row = await insertTradeSetup(ctx.pool, { symbol, ...candidate, exchange, cohort: opts.cohort, context: opts.context, btcTrend });
     if (!row) continue; // already found on an earlier hourly run of this bar
     ctx.logger.info({ symbol, cohort: row.cohort, kind: row.kind, entry: row.entry, stop: row.stop, target: row.target, rr: row.rr }, 'setup found');
     if (opts.alert) await alertSetup(ctx, row);
+  }
+}
+
+/** Null when the trend cycle has not stored BTC yet or the read fails: the setup is still recorded, just left out of the BTC comparison. */
+async function readBtcTrend(ctx: WorkerContext): Promise<BtcTrend | null> {
+  try {
+    return (await getTrendStates(ctx.pool)).find((t) => t.symbol === 'BTCUSDT')?.trend ?? null;
+  } catch (err) {
+    ctx.logger.warn({ err }, 'could not read BTC trend for a setup');
+    return null;
   }
 }
 
@@ -140,6 +158,9 @@ export function formatSetupAlert(setup: TradeSetupRow, profile: RiskProfile | nu
     ...(profile ? [] : ['<i>/risk VỐN %RỦI_RO để tính theo tài khoản của bro.</i>']),
     '',
     ...setup.reasons.slice(0, -1).map((r) => `• ${escapeHtml(r)}`),
+    ...(setup.btcTrend === 'down' && setup.symbol !== 'BTCUSDT'
+      ? ['• <b>BTC 1D đang giảm</b> — bộ tìm setup không xét BTC; setup lúc BTC giảm đang được thống kê riêng trên trang Setup 4H.']
+      : []),
     '',
     ...(setup.exchange === 'okx' ? ['<i>Nến 4H/1D lấy từ OKX vì Binance đang chặn IP máy chủ — giá trên Binance có thể lệch rất ít.</i>'] : []),
     ...(setup.cohort === 'watchlist'

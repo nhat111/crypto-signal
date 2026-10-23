@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareSetupCohorts, type TradeSetupStats } from './tradeSetups.js';
+import { compareSetupBtcTrend, compareSetupCohorts, type SetupCohortGroup, type TradeSetupStats } from './tradeSetups.js';
 
 const stats = (cohort: TradeSetupStats['cohort'], kind: TradeSetupStats['kind'], resolved: number, targets: number, avgR: number | null): TradeSetupStats => ({
   cohort,
@@ -34,5 +34,19 @@ describe('compareSetupCohorts', () => {
 
   it('reports empty groups as unknown, not zero', () => {
     expect(compareSetupCohorts([], 20).watchlist).toEqual({ resolved: 0, targets: 0, hitPct: null, avgR: null });
+  });
+});
+
+describe('compareSetupBtcTrend', () => {
+  const g = (resolved: number, targets: number): SetupCohortGroup => ({ resolved, targets, hitPct: resolved ? (targets / resolved) * 100 : null, avgR: 0 });
+
+  it('withholds a verdict until both sides clear the floor', () => {
+    expect(compareSetupBtcTrend({ btcDown: g(5, 0), btcNotDown: g(100, 50) }, 20).verdict).toBeNull();
+  });
+
+  it('calls setups found while BTC was down worse when they hit the target clearly less often', () => {
+    const c = compareSetupBtcTrend({ btcDown: g(80, 12), btcNotDown: g(200, 100) }, 20);
+    expect(c.verdict).toBe('worse');
+    expect(c.deltaPp).toBeCloseTo(15 - 50, 1);
   });
 });

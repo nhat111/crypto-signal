@@ -1,7 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import {
+  compareSetupBtcTrend,
   compareSetupCohorts,
   getJobHealth,
+  getSetupBtcTrendStats,
   getRecentTradeSetups,
   getTradeSetupStats,
   JOB_COIN_SETUP_SCAN,
@@ -34,9 +36,10 @@ export function registerSetupsRoute(app: FastifyInstance, deps: ApiDeps): void {
     const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 30) || 30));
     const cohorts = parseCohorts(req.query.cohort);
     if (!cohorts) return reply.code(400).send({ error: `cohort must be "all" or a comma list of ${SETUP_COHORTS.join(', ')}` });
-    const [setups, stats, health, coinHealth] = await Promise.all([
+    const [setups, stats, btcStats, health, coinHealth] = await Promise.all([
       getRecentTradeSetups(deps.pool, limit, cohorts),
       getTradeSetupStats(deps.pool),
+      getSetupBtcTrendStats(deps.pool),
       getJobHealth(deps.pool, JOB_SETUP_SCAN),
       getJobHealth(deps.pool, JOB_COIN_SETUP_SCAN),
     ]);
@@ -44,6 +47,7 @@ export function registerSetupsRoute(app: FastifyInstance, deps: ApiDeps): void {
       setups,
       stats,
       cohortComparison: compareSetupCohorts(stats, MIN_RESOLVED),
+      btcTrendComparison: compareSetupBtcTrend(btcStats, MIN_RESOLVED),
       minResolved: MIN_RESOLVED,
       coinFetch: coinHealth
         ? {

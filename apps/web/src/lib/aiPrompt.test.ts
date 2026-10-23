@@ -83,6 +83,31 @@ describe('setupAiPrompt', () => {
     expect(text).toContain('Đừng chỉ xác nhận');
   });
 
+  it('gives the live price when it was read, and says so when it was not', () => {
+    const withPrice = setupAiPrompt(setup, { minResolved: 20, nowMs: NOW, livePrice: 5.4 });
+    expect(withPrice).toContain('Giá giờ 5.4 (+9.6% so với giá vào): đã chạy xa');
+    expect(text).toContain('Giá hiện tại: không đọc được lúc chép');
+  });
+
+  it("carries BTC's trend at detection and the BTC-down comparison", () => {
+    const t = setupAiPrompt(
+      { ...setup, btcTrend: 'down' },
+      {
+        minResolved: 20,
+        nowMs: NOW,
+        btcComparison: {
+          btcDown: { resolved: 3, targets: 0, hitPct: 0, avgR: -1 },
+          btcNotDown: { resolved: 25, targets: 10, hitPct: 40, avgR: 0.3 },
+          verdict: null,
+          deltaPp: null,
+          marginPp: null,
+        },
+      },
+    );
+    expect(t).toContain('Lúc phát hiện setup, BTC 1D là: Giảm.');
+    expect(t).toContain('chưa đủ mẫu (3/20 mỗi bên)');
+  });
+
   it('says when BTC could not be read rather than leaving it out', () => {
     expect(setupAiPrompt(setup, { minResolved: 20, nowMs: NOW })).toContain('không đọc được lúc chép');
   });

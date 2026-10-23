@@ -95,6 +95,7 @@ describe('formatSetupAlert', () => {
       exchange: 'binance',
       cohort: 'core',
       context: null,
+      btcTrend: 'up',
     });
     expect(text).toContain('SOLUSDT 4H — Hồi về hỗ trợ');
     expect(text).toContain('Vào ~114 · Cắt lỗ 110.8 · Chốt lời 124.95');
@@ -102,6 +103,7 @@ describe('formatSetupAlert', () => {
     expect(text).toMatch(/3\.1[23] SOL/);
     expect(text).not.toContain('Kế hoạch:');
     expect(text).not.toContain('OKX');
+    expect(text).not.toContain('BTC 1D đang giảm');
   });
 
   it('sizes for the chat\'s own account when it has set one, and drops the /risk hint', async () => {
@@ -109,7 +111,7 @@ describe('formatSetupAlert', () => {
     const setup = {
       id: '4', symbol: 'SOLUSDT', kind: 'pullback' as const, barOpenTime: 0, detectedAt: 0, level: 112.5, entry: 114,
       stop: 110.8, target: 124.95, rr: 3.4, atr: 2, reasons: ['Kế hoạch: …'], status: 'open' as const, resolvedAt: null,
-      rMultiple: null, exchange: 'binance' as const, cohort: 'core' as const, context: null,
+      rMultiple: null, exchange: 'binance' as const, cohort: 'core' as const, context: null, btcTrend: null,
     };
     const own = formatSetupAlert(setup, { accountUsd: 5000, riskPct: 0.5 });
     expect(own).toContain('Cỡ lệnh (TK 5,000$, rủi ro 0.5%)');
@@ -125,7 +127,7 @@ describe('formatSetupAlert', () => {
     const text = formatSetupAlert({
       id: '2', symbol: 'ETHUSDT', kind: 'breakout_retest', barOpenTime: 0, detectedAt: 0, level: 2600, entry: 2610,
       stop: 2550, target: 2800, rr: 3.2, atr: 40, reasons: ['Kế hoạch: …'], status: 'open', resolvedAt: null, rMultiple: null,
-      exchange: 'okx', cohort: 'core', context: null,
+      exchange: 'okx', cohort: 'core', context: null, btcTrend: null,
     });
     expect(text).toContain('lấy từ OKX');
     expect(text).not.toContain('coin mạnh');
@@ -136,8 +138,9 @@ describe('formatSetupAlert', () => {
     const text = formatSetupAlert({
       id: '3', symbol: 'OPUSDT', kind: 'pullback', barOpenTime: 0, detectedAt: 0, level: 0.5, entry: 0.52,
       stop: 0.5, target: 0.6, rr: 4, atr: 0.01, reasons: ['Kế hoạch: …'], status: 'open', resolvedAt: null, rMultiple: null,
-      exchange: 'okx', cohort: 'watchlist', context: { scanDay: '2026-10-13', rs30d: 54.5, flow: 'leverage_led' },
+      exchange: 'okx', cohort: 'watchlist', context: { scanDay: '2026-10-13', rs30d: 54.5, flow: 'leverage_led' }, btcTrend: 'down',
     });
+    expect(text).toContain('BTC 1D đang giảm');
     expect(text).toContain('OPUSDT 4H — Hồi về hỗ trợ</b> · ⭐ coin mạnh');
     expect(text).toContain('Trong danh sách theo dõi (quét 2026-10-13): +55% so với BTC trong 30 ngày, dòng tiền 7N: Đòn bẩy kéo');
     expect(text).toContain('chưa nên vào tiền thật');

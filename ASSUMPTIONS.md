@@ -926,6 +926,25 @@ stablecoins: 30 days).
   A scan older than 3 days stops new detections (its watchlist is stale).
 - **Context** (scan day, 30-day RS, flow label) is stored with each setup,
   because the next day's scan may list the coin differently.
+- **BTC's daily trend** (migration 041). The detector reads only the coin's
+  own structure, so a NEAR pullback was offered on 23/10 with BTC's 1D
+  in a downtrend, and the card could only say "check BTC first". Whether
+  that matters is now measured instead of assumed: BTC's stored trend is
+  written on each setup at detection (it is overwritten daily, so it
+  cannot be recovered later; older rows stay null and are left out), and
+  resolved setups are split into "BTC down" against the rest, every
+  cohort pooled, BTC's own left out (the detector never offers one while
+  BTC is down). Same test and 20-per-side floor as the watchlist
+  comparison. The detector and the alerts are unchanged until it has a
+  verdict; the alert and card only say when BTC was down.
+- **Live price on the card.** The entry is a closed 4H bar's close, often
+  hours old by the time anyone reads it. The card now reads OKX's last
+  price (`/api/coins/live`, which also prices open setups' symbols) and
+  says how far it is from the entry, the R:R if entered now with the same
+  stop and target, and flags under 1:1.5 ("đã chạy xa"), within a quarter
+  of the risk from the stop (the journal's "near" line), or already past
+  either level. OKX for a Binance-found setup differs by basis points.
+  Nothing is stored; the setup is still resolved on its own exchange's bars.
 
 ## 22. Exit-side alert for held and ⭐ coins (`coinWatch.ts`)
 

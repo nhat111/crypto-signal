@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
 import { createTestPool, hasTestDatabase, lockTestTables } from './testPool.js';
-import { getOpenTradeSetups, getRecentTradeSetups, getTradeSetupStats, insertTradeSetup, resolveTradeSetup, type NewTradeSetup } from './tradeSetups.js';
+import { getOpenTradeSetups, getRecentTradeSetups, getSetupBtcTrendStats, getTradeSetupStats, insertTradeSetup, resolveTradeSetup, type NewTradeSetup } from './tradeSetups.js';
 
 const LOCK = 991_027;
 
@@ -58,5 +58,23 @@ describe.skipIf(!hasTestDatabase)('trade setups against real Postgres', () => {
     expect((await getRecentTradeSetups(pool, 10)).map((s) => s.cohort).sort()).toEqual(['core', 'scan', 'watchlist']);
     expect((await getRecentTradeSetups(pool, 10, ['core', 'watchlist'])).map((s) => s.symbol).sort()).toEqual(['OPUSDT', 'SOLUSDT']);
     expect((await getTradeSetupStats(pool)).map((s) => `${s.cohort}/${s.kind}/${s.total}`)).toEqual(['core/pullback/1', 'scan/pullback/1', 'watchlist/pullback/1']);
+  });
+
+  it("stores BTC's trend and splits resolved setups by it, leaving out BTC itself, open setups and unknown trends", async () => {
+    expect(await insertTradeSetup(pool, setup(1))).toMatchObject({ btcTrend: null });
+    const down = (await insertTradeSetup(pool, { ...setup(2), symbol: 'OPUSDT', btcTrend: 'down' }))!;
+    const up = (await insertTradeSetup(pool, { ...setup(3), symbol: 'LTCUSDT', btcTrend: 'up' }))!;
+    const side = (await insertTradeSetup(pool, { ...setup(4), symbol: 'LTCUSDT', btcTrend: 'sideways' }))!;
+    const btc = (await insertTradeSetup(pool, { ...setup(5), symbol: 'BTCUSDT', btcTrend: 'up' }))!;
+    await insertTradeSetup(pool, { ...setup(6), symbol: 'ADAUSDT', btcTrend: 'down' }); // still open
+    expect(down.btcTrend).toBe('down');
+    await resolveTradeSetup(pool, down.id, 'stop', 10_000, -1);
+    await resolveTradeSetup(pool, up.id, 'target', 10_000, 2);
+    await resolveTradeSetup(pool, side.id, 'stop', 10_000, -1);
+    await resolveTradeSetup(pool, btc.id, 'target', 10_000, 2);
+    const stats = await getSetupBtcTrendStats(pool);
+    expect(stats.btcDown).toEqual({ resolved: 1, targets: 0, hitPct: 0, avgR: -1 });
+    expect(stats.btcNotDown).toMatchObject({ resolved: 2, targets: 1, hitPct: 50 });
+    expect(stats.btcNotDown.avgR).toBeCloseTo(0.5);
   });
 });
