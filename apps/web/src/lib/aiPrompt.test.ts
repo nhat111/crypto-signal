@@ -60,6 +60,12 @@ describe('setupAiPrompt', () => {
     expect(text).toContain('Vào 4.925 · Cắt lỗ 4.42 (-10.3%) · Chốt lời 6.03 (+22.4%) · R:R 1:2.2');
   });
 
+  it('says the NEAR setup of 23/10 came from the old detector, and a newer one does not', () => {
+    expect(text).toContain('bộ dò cũ (trước 24/10)');
+    const later = setupAiPrompt({ ...setup, detectedAt: Date.UTC(2026, 9, 25) }, { btcTrend: btcDown, comparison: noVerdict, minResolved: 20, nowMs: Date.UTC(2026, 9, 25, 5), origin: 'https://x.app' });
+    expect(later).not.toContain('bộ dò cũ (trước 24/10)');
+  });
+
   it('says how old the setup is and that the entry is not the live price', () => {
     expect(text).toContain('cách đây 5 giờ');
     expect(text).toContain('không phải giá hiện tại');

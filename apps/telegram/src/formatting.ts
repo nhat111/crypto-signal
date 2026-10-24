@@ -1,4 +1,4 @@
-import { SETUP_REPLAY_NOTE, formatPositionSize, positionSize, type RiskProfile } from '@crypto-signal/shared';
+import { SETUP_OLD_DETECTOR_NOTE, SETUP_REPLAY_NOTE, isOldDetectorSetup, formatPositionSize, positionSize, type RiskProfile } from '@crypto-signal/shared';
 import type { BotSettings, GemRow, GemWatchDTO, LatestSymbolState, OverviewRow, PriceLevels, SignalRow, StablecoinFlowDTO, StablecoinFlowWindowDTO, StoredDigestDTO, TradeDTO, TradeSummaryDTO, TrendDTO, SetupDTO } from './apiClient.js';
 
 function healthLine(row: OverviewRow): string {
@@ -454,6 +454,7 @@ export function formatSetups(setups: SetupDTO[], profile: RiskProfile | null = n
   for (const s of open) {
     lines.push(`🎯 <b>${escapeHtml(s.symbol)}</b> — ${SETUP_KIND[s.kind]}${s.cohort === 'watchlist' ? ' ⭐' : ''}${s.exchange === 'okx' ? ' <i>(nến OKX)</i>' : ''}`);
     lines.push(`  Vào ~${formatPrice(s.entry)} · SL ${formatPrice(s.stop)} · TP ${formatPrice(s.target)} · R:R 1:${s.rr.toFixed(1)}`);
+    if (isOldDetectorSetup(s.detectedAt)) lines.push(`  <i>${SETUP_OLD_DETECTOR_NOTE}</i>`);
     if (profile) {
       const asset = escapeHtml(s.symbol.replace(/USDT$/, ''));
       for (const line of formatPositionSize(positionSize(profile, 'long', s.entry, s.stop), profile, asset)) lines.push(`  ${line}`);

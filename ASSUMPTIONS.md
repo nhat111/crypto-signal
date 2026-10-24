@@ -974,6 +974,10 @@ stablecoins: 30 days).
   was the worst slice (12 setups, −0.73R) but too few to judge alone.
   A falling market is the hardest test for a long-only scanner; turning
   alerts back on wants a replay that is positive, not just less negative.
+  Setups stored before the new detector ran in production (worker boot
+  with PR #50, 24/10/2026 11:09:50 UTC, `SETUP_FILTER_SINCE_MS`) are kept
+  and resolved as before, never re-judged, but every screen labels them
+  "bộ dò cũ" so an open one is not read as passing the new filters.
 
 ## 22. Exit-side alert for held and ⭐ coins (`coinWatch.ts`)
 

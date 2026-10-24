@@ -5,7 +5,7 @@ import { CopyButton } from '@/components/CopyButton';
 import { setupAiPrompt } from '@/lib/aiPrompt';
 import { cx, formatRelativeTime, formatUsd } from '@/lib/format';
 import { setupPrefillHref } from '@/lib/journalPrefill';
-import { SETUP_REPLAY_NOTE } from '@/lib/setupReplay';
+import { SETUP_OLD_DETECTOR_NOTE, SETUP_REPLAY_NOTE, isOldDetectorSetup } from '@/lib/setupReplay';
 
 const KIND: Record<TradeSetup['kind'], string> = { pullback: 'Hồi về hỗ trợ', breakout_retest: 'Phá vùng rồi test lại' };
 const STATUS: Record<TradeSetup['status'], { label: string; tone: string }> = {
@@ -94,6 +94,7 @@ export function SetupsPanel({ data, btcTrend, livePrices }: { data: SetupsRespon
                 {s.reasons.slice(0, -1).map((r) => (
                   <li key={r}>• {r}</li>
                 ))}
+                {isOldDetectorSetup(s.detectedAt) && <li className="text-amber-300">• {SETUP_OLD_DETECTOR_NOTE}</li>}
                 {s.btcTrend === 'down' && s.symbol !== 'BTCUSDT' && (
                   <li className="text-amber-300">• Lúc phát hiện, BTC 1D đang giảm — bộ tìm setup không xét BTC.</li>
                 )}
