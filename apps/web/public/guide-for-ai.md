@@ -85,11 +85,19 @@ một phần "lịch sử": dưới 30 kết quả ghi nhận thì phần đó �
 
 Thẻ cho **vào / cắt lỗ / chốt lời / R:R**. Đây là **ứng viên, không phải lệnh**.
 
+**Kết quả chạy lại (24/10/2026):** bộ dò được chạy lại trên 57 coin OKX,
+khoảng 18 tháng (5/2025–10/2026, phần lớn là thị trường giảm). Bản cũ trung
+bình **−0.39R mỗi lệnh**, thua cả vào lệnh ngẫu nhiên khi 1D tăng (−0.13R).
+Bản lọc mới (chạm thật sát hỗ trợ, coin không yếu hơn BTC) còn **−0.27R**:
+**chưa có lợi thế**. Vì vậy setup **không còn báo Telegram**, thẻ chỉ để theo
+dõi. Nếu ai hỏi "có nên vào setup này không", câu trả lời trung thực là: dữ
+liệu hiện chưa ủng hộ việc vào tiền thật theo setup.
+
 Hai kiểu:
 
 - **Hồi về hỗ trợ (pullback)**. Điều kiện: cấu trúc 1D của **chính coin đó**
-  là Tăng, giá trên EMA200, nến 4H chạm vùng đáy 1D gần nhất rồi bị đẩy lên
-  (râu dưới ≥30% thân nến, đóng ở nửa trên).
+  là Tăng, giá trên EMA200, nến 4H chạm trong vòng 1 ATR 4H quanh đáy 1D gần
+  nhất rồi bị đẩy lên (râu dưới ≥30% thân nến, đóng ở nửa trên).
 - **Phá vùng rồi test lại (breakout retest)**. Điều kiện: 1D không Giảm,
   trên EMA200, nến 4H đóng trên đỉnh 1D với khối lượng lớn, các nến sau giữ
   trên đỉnh đó và nến cuối quay lại test và đóng trên.
@@ -100,6 +108,8 @@ Cách tính:
 - **Cắt lỗ** = dưới vùng hỗ trợ khoảng nửa ATR 4H.
 - **Chốt lời** = đỉnh 1D kế tiếp phía trên.
 - Chỉ báo khi R:R ≥ 1:2.
+- Bỏ setup khi 3 ngày qua coin tăng kém hơn BTC (thẻ ghi "3 ngày qua mạnh
+  hơn BTC … điểm %").
 - Setup được xem là "thắng" khi chạm chốt lời trước cắt lỗ. Hết hạn sau
   14 ngày.
 
@@ -111,9 +121,9 @@ dưới 1/4 khoảng rủi ro; "đã qua cắt lỗ / chốt lời" = setup khô
 
 Những gì setup **không** kiểm tra:
 
-- **Xu hướng BTC.** Nếu BTC/ETH đang "Giảm" trên 1D, altcoin đi ngược sẽ
-  khó hơn. Thẻ có dòng "tự xem chart và xu hướng BTC trước khi vào" vì lý
-  do này.
+- **Xu hướng 1D của BTC.** Nếu BTC/ETH đang "Giảm" trên 1D, altcoin đi
+  ngược sẽ khó hơn. (Setup chỉ so sức mạnh 3 ngày với BTC, không xem xu
+  hướng 1D của BTC.)
 - Tin tức, lịch mở khóa token (unlock), thanh khoản sổ lệnh.
 - Giá **hiện tại**: "5h ago" nghĩa là giá có thể đã đi xa mức vào.
   Nếu giá đã chạy lên xa thì R:R thực tế xấu đi; nếu giá đã về gần cắt lỗ

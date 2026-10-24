@@ -195,8 +195,11 @@ spot symbol and looks for the two setups the TA guide teaches — a pullback
 rejected at the latest 1D swing low, and a high-volume break above the latest
 1D swing high that is then retested — only while the 1D structure is not
 down and price is above its EMA200, and only when the plan's R:R is at least
-1:2. A new setup is stored once (per symbol, kind and 4H bar) and pushed to
-the alert chats; `SETUP_ALERTS=off` stops the push but not the record. Every
+1:2, the touch is within one 4H ATR of the level and the coin has not done
+worse than BTC over the last three days. A new setup is stored once (per
+symbol, kind and 4H bar); it is pushed to the alert chats only with
+`SETUP_ALERTS=on` (off by default since the 18-month replay in ASSUMPTIONS
+§21 found no edge). Every
 open setup is then followed until it touches its target or its stop (a bar
 touching both counts as the stop), or expires after 14 days at the last
 close, so `/setups` and the Overview panel show how they actually ended.

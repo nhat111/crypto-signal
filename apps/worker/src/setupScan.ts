@@ -11,7 +11,7 @@ import {
   type TradeSetupRow,
 } from '@crypto-signal/db';
 import { detectSetups, resolveSetupOutcome, type MarketStructure, type OhlcvBar } from '@crypto-signal/indicators';
-import { DEFAULT_RISK_PCT, formatPositionSize, positionSize, type RiskProfile } from '@crypto-signal/shared';
+import { DEFAULT_RISK_PCT, SETUP_REPLAY_NOTE, formatPositionSize, positionSize, type RiskProfile } from '@crypto-signal/shared';
 import type { WorkerContext } from './context.js';
 import type { DailyBarSource } from './dailyBars.js';
 import { COIN_FLOW_LABEL } from './coinDigest.js';
@@ -74,7 +74,9 @@ export async function scanSetups(
   }
 
   if (opts.detect === false) return;
-  const candidates = detectSetups({ structure, dailyBars, bars4h });
+  // BTC against itself is always 0: no gate, and no "stronger than BTC" line on its card.
+  const benchmark4h = symbol === BENCHMARK ? undefined : await benchmarkBars(ctx, exchange, fetch4h, now);
+  const candidates = detectSetups({ structure, dailyBars, bars4h, benchmark4h });
   if (candidates.length === 0) return;
   // BTC's daily trend goes on the row because the detector never reads it
   // and the stored trend is overwritten daily: written now or never. The
@@ -85,6 +87,35 @@ export async function scanSetups(
     if (!row) continue; // already found on an earlier hourly run of this bar
     ctx.logger.info({ symbol, cohort: row.cohort, kind: row.kind, entry: row.entry, stop: row.stop, target: row.target, rr: row.rr }, 'setup found');
     if (opts.alert) await alertSetup(ctx, row);
+  }
+}
+
+const BENCHMARK = 'BTCUSDT';
+const H4_MS = 4 * 3_600_000;
+/**
+ * BTC's 4H bars for the detector's relative-strength gate, read once per
+ * exchange per 4H bar instead of once per coin: the hourly runs cover ~30
+ * coins and the bars only change when a 4H bar closes. Same exchange as
+ * the coin, so the bar times line up. Undefined on a failed read, which
+ * skips the gate for this run rather than dropping every setup.
+ */
+const benchmarkCache = new Map<DailyBarSource, { slot: number; bars: OhlcvBar[] }>();
+async function benchmarkBars(
+  ctx: WorkerContext,
+  exchange: DailyBarSource,
+  fetch4h: (symbol: string, limit: number, now: number) => Promise<OhlcvBar[]>,
+  now: number,
+): Promise<OhlcvBar[] | undefined> {
+  const slot = Math.floor(now / H4_MS);
+  const hit = benchmarkCache.get(exchange);
+  if (hit && hit.slot === slot) return hit.bars;
+  try {
+    const bars = await fetch4h(BENCHMARK, SETUP_BARS_4H, now);
+    benchmarkCache.set(exchange, { slot, bars });
+    return bars;
+  } catch (err) {
+    ctx.logger.warn({ err, exchange }, 'could not read BTC 4H bars for the setup relative-strength gate');
+    return undefined;
   }
 }
 
@@ -166,6 +197,7 @@ export function formatSetupAlert(setup: TradeSetupRow, profile: RiskProfile | nu
     ...(setup.cohort === 'watchlist'
       ? ['<i>Setup trên coin mạnh đang được kiểm chứng (so với cùng loại setup trên các coin khác trong top). Chỉ theo dõi, chưa nên vào tiền thật cho đến khi trang Setup 4H đủ mẫu để kết luận.</i>']
       : []),
+    `<i>${SETUP_REPLAY_NOTE}</i>`,
     '<i>Ứng viên, không phải lệnh: tự xem chart và xu hướng BTC trước khi vào. Đặt cắt lỗ lên sàn ngay khi vào.</i>',
   ];
   return lines.join('\n');

@@ -945,6 +945,35 @@ stablecoins: 30 days).
   of the risk from the stop (the journal's "near" line), or already past
   either level. OKX for a Binance-found setup differs by basis points.
   Nothing is stored; the setup is still resolved on its own exchange's bars.
+- **Replay, 24/10/2026: no edge; filters tightened and alerts off.** The
+  NEAR pullback of 23/10 stopped out (−1R, a reader's real 10.5$), so the
+  production detector was replayed walk-forward on OKX spot: 57 liquid
+  coins, ~950 daily and 3,300 4H bars each (May 2025 – Oct 2026, BTC
+  102k → 81k), the worker's own rules (daily bars closed before each 4H
+  close, outcome by `resolveSetupOutcome`, 14-day expiry), scored one
+  position per coin at a time:
+  | Variant | Setups | Target hit | Avg R |
+  |---|---|---|---|
+  | Detector as it was | 155 | 13% | −0.39 |
+  | Touch within one 4H ATR (not ½ daily ATR) | 137 | 13% | −0.34 |
+  | Stop ≤ 7% of entry | 150 | 13% | −0.34 |
+  | Coin ≥ BTC over the last 3 days | 60 | 18% | −0.28 |
+  | Wider stop (1–3 × ATR under the level) | 42–129 | 10–14% | −0.32 … −0.43 |
+  | 4H-ATR touch + coin ≥ BTC (shipped) | 48 | 19% | −0.27 |
+  | Random long whenever 1D is up (4.5% stop, 2R) | 814 | 28% | −0.13 |
+  The losses were stops, not expiries: 128 of 155, median 1.3 days, at a
+  median 4.5% stop — price takes the swing low before any bounce. The
+  NEAR card's "sát đáy 1D" was a wick 6.6% above the level, let in by the
+  half-daily-ATR zone, which is why the touch is now one 4H ATR. Both
+  shipped filters cut the loss and both halves of the sample agree on the
+  direction, but nothing replayed positive, and the detector did worse
+  than a random entry in the same regime. So `SETUP_ALERTS` now defaults
+  to off (setups are still recorded and scored, so the cohort and BTC
+  comparisons keep filling), and every card, `/setups` and the AI prompt
+  carry the replay result (`SETUP_REPLAY_NOTE`). The breakout-retest kind
+  was the worst slice (12 setups, −0.73R) but too few to judge alone.
+  A falling market is the hardest test for a long-only scanner; turning
+  alerts back on wants a replay that is positive, not just less negative.
 
 ## 22. Exit-side alert for held and ⭐ coins (`coinWatch.ts`)
 

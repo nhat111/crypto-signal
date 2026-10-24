@@ -7,3 +7,4 @@ export * from './httpJson.js';
 export * from './baselineReport.js';
 export * from './sizing.js';
 export * from './sectorBreadth.js';
+export * from './setupReplay.js';

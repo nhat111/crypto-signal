@@ -7,7 +7,7 @@ import type { OhlcvBar } from './technicals.js';
  * (entry, stop, target) before anyone is told about them.
  *
  * - **pullback**: 1D up and above its EMA, the last 4H bar dipped to within
- *   one ATR of the latest 1D swing low, and was rejected there — a long
+ *   one 4H ATR of the latest 1D swing low, and was rejected there — a long
  *   lower wick, closed in the upper part of its range, back above the level.
  * - **breakout_retest**: 1D not down and above its EMA, a 4H close above
  *   the latest 1D swing high on at least 1.5× the prior 20-bar average
@@ -19,8 +19,13 @@ import type { OhlcvBar } from './technicals.js';
  * made-up target would make up the R:R too. Anything under the minimum
  * R:R is dropped, which is the guide's Ví dụ 3.
  *
- * A candidate, not an instruction: nothing here knows the news, the
- * user's account, or BTC.
+ * Both kinds are also dropped when the coin did worse than BTC over the
+ * last three days (given BTC's bars): a replay of the detector on 57 OKX
+ * coins over 18 months (ASSUMPTIONS §21) lost on average, and buying a
+ * coin that is bleeding against BTC was the worst slice of it.
+ *
+ * A candidate, not an instruction: nothing here knows the news or the
+ * user's account.
  */
 
 export type SetupKind = 'pullback' | 'breakout_retest';
@@ -46,6 +51,13 @@ export interface DetectSetupsInput {
   /** Closed 4H bars, oldest first. */
   bars4h: OhlcvBar[];
   minRr?: number;
+  /**
+   * BTC's closed 4H bars on the same exchange clock, for the relative
+   * strength gate. Without them (or without the matching bars) the gate is
+   * skipped rather than failing every setup: a missing BTC read is a fetch
+   * problem, not evidence about the coin.
+   */
+  benchmark4h?: OhlcvBar[];
 }
 
 const ATR_PERIOD = 14;
@@ -53,6 +65,8 @@ const VOLUME_LOOKBACK = 20;
 const VOLUME_MULT = 1.5;
 /** How far back a breakout may be and still be "retested" now: 18 × 4H = 3 days. */
 const BREAKOUT_WINDOW = 18;
+/** Relative strength is measured over 18 × 4H = 3 days, the same window a breakout may be retested in. */
+const RS_BARS = 18;
 
 export function averageTrueRange(bars: OhlcvBar[], period = ATR_PERIOD): number | null {
   if (bars.length < period + 1) return null;
@@ -93,12 +107,29 @@ function nextResistanceAbove(dailyBars: OhlcvBar[], structuralHigh: number | und
   return above[0] ?? null;
 }
 
+/**
+ * The coin's return over the last `n` closed 4H bars minus BTC's over the
+ * same bars, in percentage points. Null when either side lacks the bars.
+ */
+export function relativeStrengthPct(bars4h: OhlcvBar[], benchmark4h: OhlcvBar[] | undefined, n = RS_BARS): number | null {
+  if (!benchmark4h || bars4h.length <= n) return null;
+  const last = bars4h[bars4h.length - 1] as OhlcvBar;
+  const base = bars4h[bars4h.length - 1 - n] as OhlcvBar;
+  const bLast = benchmark4h.find((b) => b.openTime === last.openTime);
+  const bBase = benchmark4h.find((b) => b.openTime === base.openTime);
+  if (!bLast || !bBase) return null;
+  return (last.close / base.close - bLast.close / bBase.close) * 100;
+}
+
 export function detectSetups(input: DetectSetupsInput): SetupCandidate[] {
   const { structure, dailyBars, bars4h } = input;
   const minRr = input.minRr ?? 2;
   const last = bars4h[bars4h.length - 1];
   const atr = averageTrueRange(bars4h);
   if (!last || atr === null || atr <= 0 || structure.aboveEma !== true) return [];
+  const rs = relativeStrengthPct(bars4h, input.benchmark4h);
+  if (rs !== null && rs < 0) return [];
+  const rsReason = rs === null ? [] : [`3 ngày qua mạnh hơn BTC ${rs.toFixed(1)} điểm %.`];
 
   const out: SetupCandidate[] = [];
   const support = structure.swingLows[structure.swingLows.length - 1]?.price;
@@ -122,18 +153,20 @@ export function detectSetups(input: DetectSetupsInput): SetupCandidate[] {
       atr,
       reasons: [
         ...reasons,
+        ...rsReason,
         `Kế hoạch: vào ~${fmt(entry)}, cắt lỗ ${fmt(stop)} (dưới vùng), chốt lời ${fmt(target)} (đỉnh 1D kế tiếp) — R:R 1:${rr.toFixed(1)}.`,
       ],
     });
   };
 
-  // Pullback to the latest 1D swing low. The zone is the wider of one 4H
-  // ATR and half a daily ATR: a 1D level is a daily-sized thing, and a
-  // 4H-sized band around it missed most real touches when replayed on
-  // five months of BTC/ETH/SOL. The touch may be the last bar or the one
+  // Pullback to the latest 1D swing low, within one 4H ATR of it. The zone
+  // used to be the wider of that and half a daily ATR, which on BTC/ETH/SOL
+  // caught more touches; on volatile alts it let a wick 6–7% above the
+  // level count as "at support" (NEAR, 23/10), so the entry sat far above
+  // the level and the stop under it was wide. Replayed on 57 coins the
+  // tighter zone lost less. The touch may be the last bar or the one
   // before — the rejection often finishes on the bar after the wick.
-  const dailyAtr = averageTrueRange(dailyBars) ?? 0;
-  const zone = Math.max(atr, 0.5 * dailyAtr);
+  const zone = atr;
   const prevBar = bars4h[bars4h.length - 2];
   if (structure.trend === 'up' && support !== undefined) {
     const touchedLow = Math.min(last.low, prevBar?.low ?? last.low);
