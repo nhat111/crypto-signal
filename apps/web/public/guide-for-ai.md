@@ -113,6 +113,10 @@ Cách tính:
 - Setup được xem là "thắng" khi chạm chốt lời trước cắt lỗ. Hết hạn sau
   14 ngày.
 
+Dòng vàng **"Tìm bằng bộ dò cũ (trước 24/10)"** = setup tìm ra trước khi
+bản lọc mới chạy (24/10/2026 11:09 UTC). Setup đã lưu không bị chấm lại,
+nên vẫn hiện tới khi kết thúc; bản lọc mới sẽ không báo nó.
+
 Dòng **"Giá giờ …"** trên thẻ là giá OKX lúc xem: cách giá vào bao nhiêu %,
 còn bao nhiêu % tới cắt lỗ và R:R nếu vào ngay lúc đó (cùng cắt lỗ, chốt
 lời). Chữ vàng "đã chạy xa" = R:R lúc đó dưới 1:1.5; "sát cắt lỗ" = còn

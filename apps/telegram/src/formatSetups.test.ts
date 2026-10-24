@@ -14,6 +14,13 @@ describe('formatSetups', () => {
   });
 });
 
+describe('formatSetups old detector', () => {
+  it('labels setups stored before the tightened detector ran, and only those', () => {
+    expect(formatSetups([setup({ detectedAt: Date.UTC(2026, 9, 23) })])).toContain('bộ dò cũ (trước 24/10)');
+    expect(formatSetups([setup({ detectedAt: Date.UTC(2026, 9, 25) })])).not.toContain('bộ dò cũ (trước 24/10)');
+  });
+});
+
 describe('formatSetups sizing', () => {
   it('sizes each open setup for the chat\'s account', () => {
     const text = formatSetups([setup(), setup({ status: 'stop', rMultiple: -1 })], { accountUsd: 2000, riskPct: 1 });
