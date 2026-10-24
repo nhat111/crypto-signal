@@ -20,7 +20,7 @@ import type { OhlcvBar } from './technicals.js';
  * R:R is dropped, which is the guide's Ví dụ 3.
  *
  * Both kinds are also dropped when the coin did worse than BTC over the
- * last three days (given BTC's bars): a replay of the detector on 57 OKX
+ * last three days (given BTC's bars): a replay of the detector on 41 OKX
  * coins over 18 months (ASSUMPTIONS §21) lost on average, and buying a
  * coin that is bleeding against BTC was the worst slice of it.
  *
@@ -163,7 +163,7 @@ export function detectSetups(input: DetectSetupsInput): SetupCandidate[] {
   // used to be the wider of that and half a daily ATR, which on BTC/ETH/SOL
   // caught more touches; on volatile alts it let a wick 6–7% above the
   // level count as "at support" (NEAR, 23/10), so the entry sat far above
-  // the level and the stop under it was wide. Replayed on 57 coins the
+  // the level and the stop under it was wide. Replayed on 41 coins the
   // tighter zone lost less. The touch may be the last bar or the one
   // before — the rejection often finishes on the bar after the wick.
   const zone = atr;

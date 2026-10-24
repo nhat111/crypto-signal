@@ -85,7 +85,7 @@ một phần "lịch sử": dưới 30 kết quả ghi nhận thì phần đó �
 
 Thẻ cho **vào / cắt lỗ / chốt lời / R:R**. Đây là **ứng viên, không phải lệnh**.
 
-**Kết quả chạy lại (24/10/2026):** bộ dò được chạy lại trên 57 coin OKX,
+**Kết quả chạy lại (24/10/2026):** bộ dò được chạy lại trên 41 coin OKX,
 khoảng 18 tháng (5/2025–10/2026, phần lớn là thị trường giảm). Bản cũ trung
 bình **−0.39R mỗi lệnh**, thua cả vào lệnh ngẫu nhiên khi 1D tăng (−0.13R).
 Bản lọc mới (chạm thật sát hỗ trợ, coin không yếu hơn BTC) còn **−0.27R**:

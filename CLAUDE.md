@@ -114,7 +114,7 @@ Run them before pushing.
   041), "BTC down vs not" comparison on `/api/setups`; setup cards show
   the live OKX price and flag chased / near-stop setups (`setupLive.ts`);
   "Sao chép cho AI" on setup cards and `/guide/ai` (PR #48).
-- Setup replay (2026-10-24): 18 months × 57 OKX coins, the 4H detector
+- Setup replay (2026-10-24): 18 months × 41 OKX coins, the 4H detector
   lost −0.39R per setup (worse than random). Touch now within one 4H ATR,
   coin not weaker than BTC over 3 days (−0.27R, still negative);
   `SETUP_ALERTS` defaults to off; `SETUP_REPLAY_NOTE` on cards, `/setups`

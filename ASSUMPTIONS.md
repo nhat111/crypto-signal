@@ -947,7 +947,7 @@ stablecoins: 30 days).
   Nothing is stored; the setup is still resolved on its own exchange's bars.
 - **Replay, 24/10/2026: no edge; filters tightened and alerts off.** The
   NEAR pullback of 23/10 stopped out (−1R, a reader's real 10.5$), so the
-  production detector was replayed walk-forward on OKX spot: 57 liquid
+  production detector was replayed walk-forward on OKX spot: 41 liquid
   coins, ~950 daily and 3,300 4H bars each (May 2025 – Oct 2026, BTC
   102k → 81k), the worker's own rules (daily bars closed before each 4H
   close, outcome by `resolveSetupOutcome`, 14-day expiry), scored one
