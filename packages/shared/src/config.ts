@@ -66,6 +66,10 @@ const envSchema = z.object({
   AIRDROP_MAX_CANDIDATES: numeric(150),
   // Sector read (/sectors): CoinGecko categories against BTC, once a day. On unless off/0/false.
   SECTOR_SCAN: z.string().default('on'),
+  // Daily spot breakout list (/breakouts): 20-day high while BTC is up, paper-tracked. On unless off/0/false.
+  SPOT_BREAKOUTS: z.string().default('on'),
+  // Spot pairs read, comma-separated. Empty = the replayed list (DEFAULT_BREAKOUT_SYMBOLS).
+  SPOT_BREAKOUT_SYMBOLS: z.string().default(''),
   // CoinGecko category ids, comma-separated. Empty = the default list (DEFAULT_SECTOR_CATEGORIES).
   SECTOR_CATEGORIES: z.string().default(''),
   // Largest coins read per category.
@@ -241,6 +245,30 @@ export const DEFAULT_SECTOR_CATEGORIES = [
   'hyperliquid-ecosystem',
 ] as const;
 
+export interface SpotBreakoutConfig {
+  enabled: boolean;
+  symbols: string[];
+}
+
+/**
+ * The 41 OKX spot pairs the breakout rule was replayed on (ASSUMPTIONS
+ * §27). The live record is only comparable with the replay on the same
+ * kind of coins: liquid, long-listed majors. All are today's survivors,
+ * which flatters the replay a little.
+ */
+export const DEFAULT_BREAKOUT_SYMBOLS: readonly string[] = [
+  'BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'DOGE', 'ADA', 'TRX', 'LINK', 'AVAX', 'DOT', 'LTC', 'BCH', 'ETC',
+  'NEAR', 'SUI', 'APT', 'ARB', 'OP', 'INJ', 'TIA', 'SEI', 'ATOM', 'AAVE', 'UNI', 'FIL', 'HBAR', 'RENDER',
+  'FET', 'WLD', 'ENA', 'ICP', 'STX', 'ONDO', 'JUP', 'PYTH', 'LDO', 'CRV', 'GALA', 'POL', 'ALGO',
+].map((s) => `${s}USDT`);
+
+export function parseBreakoutSymbols(raw: string): string[] {
+  const picked = [...new Set(raw.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean))]
+    .map((s) => (s.endsWith('USDT') ? s : `${s}USDT`))
+    .slice(0, 100);
+  return picked.length > 0 ? picked : [...DEFAULT_BREAKOUT_SYMBOLS];
+}
+
 export interface SectorScanConfig {
   enabled: boolean;
   categories: string[];
@@ -323,6 +351,7 @@ export interface AppConfig {
   coinScan: CoinScanConfig;
   airdrop: AirdropScanConfig;
   sectors: SectorScanConfig;
+  spotBreakouts: SpotBreakoutConfig;
   flywheel: FlywheelConfig;
   symbols: string[];
   /** Symbols tracked in reduced (Futures-only, no Spot) mode — disjoint from `symbols`. */
@@ -495,6 +524,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       // Clamped: 250 is CoinGecko's page size, and under 10 a median says little.
       coinsPerCategory: Math.min(100, Math.max(10, Math.round(parsed.SECTOR_COINS_PER_CATEGORY) || 30)),
       coingeckoApiKey: parsed.COINGECKO_API_KEY.trim(),
+    },
+    spotBreakouts: {
+      enabled: isEnabledFlag(parsed.SPOT_BREAKOUTS),
+      symbols: parseBreakoutSymbols(parsed.SPOT_BREAKOUT_SYMBOLS),
     },
     flywheel: {
       enabled: isEnabledFlag(parsed.FLYWHEEL_SCAN),

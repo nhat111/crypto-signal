@@ -17,6 +17,7 @@ import { registerSetupsRoute } from './setups.js';
 import { registerCoinsRoute } from './coins.js';
 import { registerAirdropRoutes } from './airdrops.js';
 import { registerSectorFlywheelRoutes } from './sectorsFlywheel.js';
+import { registerBreakoutsRoute } from './breakouts.js';
 
 export function registerRoutes(app: FastifyInstance, deps: ApiDeps): void {
   registerHealthRoute(app, deps);
@@ -36,4 +37,5 @@ export function registerRoutes(app: FastifyInstance, deps: ApiDeps): void {
   registerCoinsRoute(app, deps);
   registerAirdropRoutes(app, deps);
   registerSectorFlywheelRoutes(app, deps);
+  registerBreakoutsRoute(app, deps);
 }

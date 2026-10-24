@@ -80,6 +80,7 @@ export const JOB_COIN_WATCH_INTRADAY = 'coin_watch_intraday';
 export const JOB_AIRDROP_SCAN = 'airdrop_scan';
 export const JOB_SECTOR_SCAN = 'sector_scan';
 export const JOB_FLYWHEEL_SCAN = 'flywheel_scan';
+export const JOB_SPOT_BREAKOUTS = 'spot_breakouts';
 
 /** Every recorded job, for the operator status page. Ordered by name so the page does not reshuffle between polls. */
 export async function getAllJobHealth(pool: Pool): Promise<JobHealth[]> {

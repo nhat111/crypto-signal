@@ -32,6 +32,7 @@ import { parseRiskArgs } from './riskArgs.js';
 import { parseTradeArgs } from './tradeArgs.js';
 import { formatAirdrops, formatFarmLogged, formatFarms, parseFarmArgs } from './airdrop.js';
 import { formatFlywheel, formatSectors } from './sectorsFormat.js';
+import { formatBreakouts } from './breakoutsFormat.js';
 import { formatLookup } from './lookupFormat.js';
 
 async function main(): Promise<void> {
@@ -345,6 +346,20 @@ async function main(): Promise<void> {
     }
   });
 
+  bot.command('breakouts', async (ctx) => {
+    try {
+      // The size is extra, as on /setups: a failed settings read still answers with the list.
+      const [data, settings] = await Promise.all([
+        api.getBreakouts(10),
+        api.getSettings(String(ctx.chat.id)).then((r) => r.settings, () => undefined),
+      ]);
+      await ctx.reply(formatBreakouts(data, riskProfileOf(settings)), { parse_mode: 'HTML' });
+    } catch (err) {
+      logger.error({ err }, '/breakouts failed');
+      await ctx.reply('Không đọc được danh sách phá đỉnh lúc này — thử lại sau ít phút.');
+    }
+  });
+
   bot.command('trend', async (ctx) => {
     try {
       const { trends } = await api.getTrend();
@@ -569,6 +584,7 @@ async function main(): Promise<void> {
         { command: 'status', description: `Sức khỏe thị trường (mặc định ${config.telegramDefaultTimeframe})` },
         { command: 'trend', description: 'Xu hướng 1D: tăng / giảm / đi ngang' },
         { command: 'setups', description: 'Setup 4H: vào / cắt lỗ / chốt lời' },
+        { command: 'breakouts', description: 'Phá đỉnh 20 ngày (spot), khi BTC tăng' },
         { command: 'coins', description: 'Top coin: mạnh/yếu so với BTC, ai kéo giá' },
         { command: 'market', description: 'Heatmap across timeframes' },
         ...symbols.map((symbol) => ({ command: commandNameFor(symbol), description: `${symbol} detail` })),

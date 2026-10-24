@@ -862,6 +862,38 @@ holders, largest 30-day amount first. `limit` 1–200, default 100.
 cap. `holdersRevenueChangePct` null when the prior 30 days are unknown or
 zero. `mechanism` is DefiLlama's text, in English.
 
+## Spot breakouts — `GET /api/breakouts?limit=`
+The daily spot breakout list (ASSUMPTIONS §27): open positions, the most
+recent exits (`limit` 1–100, default 20), the live record and the replay
+it is compared with.
+```json
+{
+  "enabled": true,
+  "run": {
+    "day": "2026-10-23", "regimeUp": false, "btcClose": 81188.2, "btcEma50": 84210.5, "btcEma200": 76903.0,
+    "coinsRead": 41, "found": 0, "closed": 0, "ranAt": 0
+  },
+  "open": [
+    {
+      "id": "1", "symbol": "NEARUSDT", "exchange": "okx", "barOpenTime": 0, "detectedAt": 0,
+      "entry": 5.26, "stop": 4.63, "high20": 5.13, "trail": 4.63, "status": "open",
+      "exitPrice": null, "exitTime": null, "returnPct": null, "rMultiple": null
+    }
+  ],
+  "closed": [],
+  "stats": { "closed": 0, "wins": 0, "avgR": null, "sumR": 0, "avgReturnPct": null },
+  "minClosed": 30,
+  "replay": { "trades": 175, "winPct": 36, "avgR": 0.17, "from": "2024-08-27", "to": "2026-10-23", "coins": 41 },
+  "fetch": null
+}
+```
+`run` is the latest daily run (null before the first); `regimeUp` false
+means no new position is entered. `stop` is fixed (the order on the
+exchange); `trail` is the exit line, out on a daily close below it, only
+ever raised. `status` `stop` | `trail` once closed; `returnPct` and
+`rMultiple` are after 0.1% fee per side. Clients withhold a verdict on
+`stats` below `minClosed`.
+
 ## Bot settings — `POST /api/bot/register`, `GET /api/bot/settings/:chatId`, `POST /api/bot/settings/:chatId`
 
 Telegram only. `settings`:

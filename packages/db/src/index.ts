@@ -29,3 +29,4 @@ export * from './workerRuntime.js';
 export * from './coinScanEdge.js';
 export * from './airdrop.js';
 export * from './sectorsFlywheel.js';
+export * from './spotBreakouts.js';

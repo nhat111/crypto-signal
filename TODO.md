@@ -363,7 +363,7 @@ Check items as they land; each phase's commit message references the phase.
       041) and setups split by "BTC down" vs not; the setup card shows
       the live OKX price and flags a setup the price ran away from or
       that sits near its stop (ASSUMPTIONS §21).
-- [x] Replay of the setup detector, 18 months × 57 OKX coins: −0.39R per
+- [x] Replay of the setup detector, 18 months × 41 OKX coins: −0.39R per
       setup, worse than a random entry. Touch within one 4H ATR, coin not
       weaker than BTC over 3 days (−0.27R); `SETUP_ALERTS` off by default;
       the replay result on every card (ASSUMPTIONS §21).
@@ -395,6 +395,17 @@ Check items as they land; each phase's commit message references the phase.
       market cap per year and the price over the same month. Bot /flywheel.
 - [ ] Chart a sector's label and breadth over the stored days.
 - [x] Show the flywheel line on /lookup for the coin looked up (PR #42).
+
+## Phase 23 — Spot breakouts
+- [x] Spot strategies replayed on 41 OKX coins from 08/2024: 20-day
+      high with a 10-day trailing low while BTC is up was the only one
+      clearly positive (+0.17–0.20R), all of it from late 2024
+      (ASSUMPTIONS §27).
+- [x] Daily paper-tracked list (migration 042, job `spot_breakouts`),
+      `/api/breakouts`, Overview panel, bot `/breakouts` sized from `/risk`.
+      No alert.
+- [ ] Read the live record at 30 closed trades against the replay; only
+      then consider an alert.
 
 ## Known limitations (carried forward, not silently hidden)
 - [x] Components now render against older API payloads in the test suite

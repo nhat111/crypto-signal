@@ -47,6 +47,10 @@ score, no "buy/sell" wording.
   `defillama/holdersRevenue.ts`, `packages/db/src/sectorsFlywheel.ts`,
   worker `sectorScan.ts` + `flywheelScan.ts`, web `/narratives`, bot
   `/sectors` + `/flywheel`. ASSUMPTIONS §26.
+- Spot breakouts: `packages/indicators/src/breakouts.ts`,
+  `packages/db/src/spotBreakouts.ts`, worker `spotBreakouts.ts`,
+  `apps/api/src/routes/breakouts.ts`, web `BreakoutsPanel`, bot
+  `/breakouts` (`apps/telegram/src/breakoutsFormat.ts`). ASSUMPTIONS §27.
 - `db/migrations/NNN_*.sql`: forward-only, numbered.
 
 ## Conventions
@@ -114,11 +118,14 @@ Run them before pushing.
   041), "BTC down vs not" comparison on `/api/setups`; setup cards show
   the live OKX price and flag chased / near-stop setups (`setupLive.ts`);
   "Sao chép cho AI" on setup cards and `/guide/ai` (PR #48).
-- Setup replay (2026-10-24): 18 months × 57 OKX coins, the 4H detector
+- Setup replay (2026-10-24): 18 months × 41 OKX coins, the 4H detector
   lost −0.39R per setup (worse than random). Touch now within one 4H ATR,
   coin not weaker than BTC over 3 days (−0.27R, still negative);
   `SETUP_ALERTS` defaults to off; `SETUP_REPLAY_NOTE` on cards, `/setups`
   and the AI prompt (ASSUMPTIONS §21).
+- Spot breakouts (2026-10-24): daily 20-day-high list while BTC is up,
+  paper-tracked, no alert (migration 042). Replay +0.17R but all from
+  late 2024; read the live record at 30 closed trades.
 - Open questions, from `TODO.md`: the coin-scan edge report has 0 samples
   until enough days are stored (verdicts expected ~mid-December 2026);
   token unlock data (needs a paid source).

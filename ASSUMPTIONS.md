@@ -947,7 +947,7 @@ stablecoins: 30 days).
   Nothing is stored; the setup is still resolved on its own exchange's bars.
 - **Replay, 24/10/2026: no edge; filters tightened and alerts off.** The
   NEAR pullback of 23/10 stopped out (−1R, a reader's real 10.5$), so the
-  production detector was replayed walk-forward on OKX spot: 57 liquid
+  production detector was replayed walk-forward on OKX spot: 41 liquid
   coins, ~950 daily and 3,300 4H bars each (May 2025 – Oct 2026, BTC
   102k → 81k), the worker's own rules (daily bars closed before each 4H
   close, outcome by `resolveSetupOutcome`, 14-day expiry), scored one
@@ -1127,6 +1127,52 @@ stablecoins: 30 days).
 - **Strategy guide** (`/guide/airdrop`): choosing projects, a monthly gas
   budget, steady activity over bursts, sybil patterns, wallet security,
   what to record when the airdrop lands. It does not say to sell or hold.
+
+## 27. Spot breakouts on the daily chart (`/breakouts`, Overview)
+
+- **Why.** After the 4H setups replayed negative (§21) and the user gave
+  up futures, the question was whether any simple spot rule on these
+  coins had held up. Replayed on OKX daily bars of 41 liquid coins,
+  27/08/2024 – 23/10/2026 (the first 200 days of data go to EMA200), spot
+  only, 0.1% fee per side, one position per coin:
+  | Rule | Trades | Win | Avg R | 1,000$ at 1% risk | Max drawdown |
+  |---|---|---|---|---|---|
+  | **20-day high, trail 10-day low, BTC up** (shipped) | 172 | 38% | +0.20 | 1,259$ | 13% |
+  | 20-day high, trail 10-day low, no BTC gate | 225 | 36% | +0.17 | 1,227$ | 22% |
+  | 50-day high, trail 20-day low, BTC up | 117 | 31% | +0.15 | 1,039$ | 14% |
+  | EMA50 crosses above EMA200, exit under EMA50 | 83 | 25% | +0.05 | 1,026$ | 8% |
+  | Hold BTC | | | | 1,367$ | 53% |
+  | Weekly DCA into BTC | | | | 972$ | |
+- **Why it is only a list.** Replaying the shipped module itself (400-bar
+  windows, as the worker sees them) gives 175 trades, 36%, +0.17R, and by
+  year: 2024 +1.53R (41 trades), 2025 −0.26R (100), 2026 −0.22R (34).
+  All of the gain came from the rise of late 2024, one trade alone made
+  +20.6R (without it the average is about +0.05R), the coins are today's
+  survivors, and the rule was the best of six tried. So: no alert, the
+  replay result on every screen that shows it, and the live record
+  withheld until 30 closed trades.
+- **Rule** (`packages/indicators/src/breakouts.ts`). BTC's daily close
+  above its EMA200 and EMA50 above EMA200, or nothing is entered. A coin
+  closing above the highest high of the 20 days before, and above its own
+  EMA200, is entered at that close. Stop: the lowest low of the last 10
+  days, entry day included, fixed — the order on the exchange. Exit: a
+  daily close under the trail, the lowest low of the 10 days before that
+  day, only raised. The stop is checked first each day, filled at the
+  worse of the open and the stop. No target: the replay's winners were the
+  ones left to run.
+- **Worker** (`apps/worker/src/spotBreakouts.ts`, job `spot_breakouts`).
+  Hourly tick, one run per UTC day after the close. OKX daily bars, 400
+  per coin, for the 41 replayed pairs (`SPOT_BREAKOUT_SYMBOLS`,
+  `DEFAULT_BREAKOUT_SYMBOLS`) plus any coin still open. Positions are
+  walked forward from their entry bar every day, statelessly, so a missed
+  day cannot leave the trail behind. A new breakout is taken only on the
+  day BTC's regime was read on; a missed day's breakouts are lost rather
+  than entered late. A coin that exited today is not re-entered today.
+  Each run writes BTC's regime to `spot_breakout_runs` so the read-only
+  API can say why the list is empty (migration 042).
+- **Sizing.** Stops sit 10–15% away on these coins, so 1% risk on a small
+  account is a few dollars per position; the bot sizes from `/risk` and
+  says when spot cannot hold the size.
 
 ## 26. Sectors and flywheel (`/narratives`, `/sectors`, `/flywheel`)
 
