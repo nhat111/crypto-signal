@@ -344,6 +344,7 @@ export function buildHelpText(symbols: string[]): string {
     '/stop SYMBOL GIÁ — đặt hoặc dời stop (mức cắt lỗ) cho lệnh đang mở; /stop SYMBOL off để bỏ',
     '/trend — xu hướng 1D của từng coin (đỉnh/đáy, EMA200)',
     '/setups — setup 4H đang mở (vào / cắt lỗ / chốt lời) và kết quả các setup trước',
+    '/breakouts — coin phá đỉnh 20 ngày (spot, chỉ khi BTC tăng): vào / cắt lỗ / đường thoát, đang theo dõi trên giấy',
     '/coins [COIN] — top coin theo volume: mạnh/yếu so với BTC, spot hay đòn bẩy kéo giá (vd: /coins SOL)',
     '/close SYMBOL EXIT_PRICE — close your most recent open trade on that symbol',
     '/journal — your trade log + win rate / P&L summary',

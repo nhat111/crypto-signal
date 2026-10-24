@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useSyncExternalStore } from 'react';
-import { getCoinsLive, getFlow, getOverview, getSetups, getSignals, getTrend } from '@/lib/api';
+import { getBreakouts, getCoinsLive, getFlow, getOverview, getSetups, getSignals, getTrend } from '@/lib/api';
 import { usePolling } from '@/lib/usePolling';
 import { useSymbolSnapshots } from '@/lib/useSymbolSnapshots';
 import type { Signal } from '@/lib/types';
@@ -17,6 +17,7 @@ import {
 import { Heatmap } from '@/components/overview/Heatmap';
 import { MacroFlowBar } from '@/components/overview/MacroFlowBar';
 import { SetupsPanel } from '@/components/overview/SetupsPanel';
+import { BreakoutsPanel } from '@/components/overview/BreakoutsPanel';
 import { SignalList } from '@/components/signals/SignalList';
 import { LoadingPanel, StatePanel } from '@/components/StatePanel';
 
@@ -34,6 +35,7 @@ export default function OverviewPage() {
   const trend = usePolling(getTrend, FLOW_POLL_MS, []);
   // Setups are found on the hourly scan of closed 4H bars; a minute's poll is plenty.
   const setups = usePolling(() => getSetups(30), 60_000, []);
+  const breakouts = usePolling(() => getBreakouts(20), 5 * 60_000, []);
   // The setup cards' entry is a 4H close, often hours old; this is where the
   // price is now. Cached 30 s server-side, and a failure only hides the line.
   const live = usePolling(getCoinsLive, 60_000, []);
@@ -117,6 +119,8 @@ export default function OverviewPage() {
           </div>
         )}
       </section>
+
+      {breakouts.data && <BreakoutsPanel data={breakouts.data} />}
 
       {setups.data && <SetupsPanel data={setups.data} btcTrend={trend.data?.trends.find((t) => t.symbol === 'BTCUSDT')} livePrices={live.data?.prices} />}
 

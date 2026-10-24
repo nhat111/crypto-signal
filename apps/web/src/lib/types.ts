@@ -614,6 +614,52 @@ export interface SetupsResponse {
   fetch: { lastAttemptAt: number | null; lastSuccessAt: number | null; consecutiveFailures: number; lastError: string | null } | null;
 }
 
+/* ---------- Spot breakouts (20-day high, daily) ---------- */
+
+export type SpotBreakoutStatus = 'open' | 'stop' | 'trail';
+
+export interface SpotBreakout {
+  id: string;
+  symbol: string;
+  exchange: 'binance' | 'okx';
+  barOpenTime: number;
+  detectedAt: number;
+  entry: number;
+  /** Fixed stop, the 10-day low at entry: the order that sits on the exchange. */
+  stop: number;
+  high20: number;
+  /** Exit line: out on a daily close below it. Only ever raised. */
+  trail: number;
+  status: SpotBreakoutStatus;
+  exitPrice: number | null;
+  exitTime: number | null;
+  returnPct: number | null;
+  rMultiple: number | null;
+}
+
+export interface SpotBreakoutRun {
+  day: string;
+  regimeUp: boolean;
+  btcClose: number;
+  btcEma50: number;
+  btcEma200: number;
+  coinsRead: number;
+  found: number;
+  closed: number;
+  ranAt: number;
+}
+
+export interface SpotBreakoutsResponse {
+  enabled: boolean;
+  run: SpotBreakoutRun | null;
+  open: SpotBreakout[];
+  closed: SpotBreakout[];
+  stats: { closed: number; wins: number; avgR: number | null; sumR: number; avgReturnPct: number | null };
+  minClosed: number;
+  replay: { trades: number; winPct: number; avgR: number; from: string; to: string; coins: number };
+  fetch: { lastAttemptAt: number | null; lastSuccessAt: number | null; consecutiveFailures: number; lastError: string | null } | null;
+}
+
 /* ---------- Small-cap discovery (gem scanner) ---------- */
 
 export type SafetyVerdict = 'safe' | 'caution' | 'danger' | 'unknown';

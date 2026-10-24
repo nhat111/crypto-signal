@@ -188,6 +188,15 @@ With the digest on, most people want `ALERT_TIMEFRAMES=4h` (or nothing
 pushed at all besides the digest): the 5m and 15m signal alerts are what
 makes the bot noisy.
 
+### Spot breakouts
+
+Once a UTC day after the daily close, the worker reads OKX daily bars for
+41 liquid pairs (`SPOT_BREAKOUT_SYMBOLS` to change) and, only while BTC's
+close and EMA50 are above its EMA200, records coins closing above their
+20-day high; open positions are followed to their stop or trailing exit
+(ASSUMPTIONS §27). Nothing is pushed: the list is on the Overview and
+`/breakouts`. `SPOT_BREAKOUTS=off` disables it. Migration 042.
+
 ### 4H entry setups
 
 On the same hourly run the worker reads the last 120 closed 4H bars of each

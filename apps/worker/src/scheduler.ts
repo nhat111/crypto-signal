@@ -25,6 +25,7 @@ import { runSectorScanCycle } from './sectorScan.js';
 import { runFlywheelCycle } from './flywheelScan.js';
 import { runTrendCycle } from './trendCycle.js';
 import { runCoinSetupCycle } from './coinSetups.js';
+import { runSpotBreakoutCycle } from './spotBreakouts.js';
 import { runCoinScanCycle } from './coinScan.js';
 import { runCoinWatchIntraday } from './coinWatchIntraday.js';
 import { readMemory } from './memory.js';
@@ -257,6 +258,15 @@ export function startSchedulers(ctx: WorkerContext): () => void {
   if (ctx.config.coinScan.setups) {
     timers.push(setInterval(() => void runCoinSetupCycle(ctx).catch((err) => ctx.logger.error({ err }, 'coin setup scan failed')), 60 * 60_000));
     timers.push(setTimeout(() => void runCoinSetupCycle(ctx).catch((err) => ctx.logger.error({ err }, 'initial coin setup scan failed')), 10 * 60_000));
+  }
+
+  // The daily spot breakout list: one real run per UTC day after the
+  // close, the hourly ticks after it return at once. The first run waits
+  // fifteen minutes so a fresh boot's trend read and coin scan go first.
+  if (ctx.config.spotBreakouts.enabled) {
+    const runBreakouts = () => void runSpotBreakoutCycle(ctx).catch((err) => ctx.logger.error({ err }, 'spot breakout cycle failed'));
+    timers.push(setInterval(runBreakouts, 60 * 60_000));
+    timers.push(setTimeout(runBreakouts, 15 * 60_000));
   }
 
   timers.push(setInterval(() => void runOutcomeTracker(ctx).catch((err) => ctx.logger.error({ err }, 'outcome tracker failed')), 5 * 60_000));

@@ -396,6 +396,17 @@ Check items as they land; each phase's commit message references the phase.
 - [ ] Chart a sector's label and breadth over the stored days.
 - [x] Show the flywheel line on /lookup for the coin looked up (PR #42).
 
+## Phase 23 — Spot breakouts
+- [x] Spot strategies replayed on 41 OKX coins from 08/2024: 20-day
+      high with a 10-day trailing low while BTC is up was the only one
+      clearly positive (+0.17–0.20R), all of it from late 2024
+      (ASSUMPTIONS §27).
+- [x] Daily paper-tracked list (migration 042, job `spot_breakouts`),
+      `/api/breakouts`, Overview panel, bot `/breakouts` sized from `/risk`.
+      No alert.
+- [ ] Read the live record at 30 closed trades against the replay; only
+      then consider an alert.
+
 ## Known limitations (carried forward, not silently hidden)
 - [x] Components now render against older API payloads in the test suite
       (`apps/web/src/lib/legacyPayload.test.ts`). The optional fields are

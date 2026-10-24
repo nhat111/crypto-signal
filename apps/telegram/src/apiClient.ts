@@ -162,6 +162,29 @@ export interface TradeDTO {
   closedAt: number | null;
 }
 
+/** Mirrors /api/breakouts (API_CONTRACT.md); only the fields read here. */
+export interface SpotBreakoutDTO {
+  symbol: string;
+  barOpenTime: number;
+  entry: number;
+  stop: number;
+  trail: number;
+  status: 'open' | 'stop' | 'trail';
+  exitTime: number | null;
+  returnPct: number | null;
+  rMultiple: number | null;
+}
+
+export interface SpotBreakoutsDTO {
+  enabled: boolean;
+  run: { day: string; regimeUp: boolean; btcClose: number; btcEma50: number; btcEma200: number } | null;
+  open: SpotBreakoutDTO[];
+  closed: SpotBreakoutDTO[];
+  stats: { closed: number; wins: number; avgR: number | null };
+  minClosed: number;
+  replay: { trades: number; winPct: number; avgR: number };
+}
+
 export interface SetupDTO {
   symbol: string;
   kind: 'pullback' | 'breakout_retest';
@@ -495,6 +518,10 @@ export class ApiClient {
 
   getCoins(): Promise<CoinsResponseDTO> {
     return this.get('/api/coins');
+  }
+
+  getBreakouts(limit = 10): Promise<SpotBreakoutsDTO> {
+    return this.get(`/api/breakouts?limit=${limit}`);
   }
 
   getSetups(limit = 10): Promise<{ setups: SetupDTO[]; minResolved: number }> {

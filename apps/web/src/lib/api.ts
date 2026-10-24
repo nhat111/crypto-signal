@@ -1,4 +1,5 @@
 import type {
+  SpotBreakoutsResponse,
   FlywheelResponse,
   SectorsResponse,
   AirdropsResponse,
@@ -167,6 +168,10 @@ export function getOutcomeDiagnostics(): Promise<StatusOutcomeDiagnostics> {
 
 export function getSetups(limit = 30): Promise<SetupsResponse> {
   return fetchJson<SetupsResponse>(`/api/setups?limit=${limit}`);
+}
+
+export function getBreakouts(limit = 20): Promise<SpotBreakoutsResponse> {
+  return fetchJson<SpotBreakoutsResponse>(`/api/breakouts?limit=${limit}`);
 }
 
 export function getCoins(): Promise<CoinsResponse> {

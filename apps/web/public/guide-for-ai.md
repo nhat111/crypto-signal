@@ -141,6 +141,29 @@ chạm chốt lời của setup tìm thấy khi BTC 1D đang giảm với lúc B
 mỗi bên. "Tệ hơn rõ" = nên bỏ qua setup altcoin khi BTC giảm; "chưa đủ
 mẫu" = chưa biết, lời dặn "xem xu hướng BTC" vẫn chỉ là kinh nghiệm.
 
+## 4b. Phá đỉnh 20 ngày (spot) — thẻ trên Overview, `/breakouts`
+
+Danh sách theo dõi **trên giấy**, không báo Telegram, chỉ cho mua spot.
+
+- **Chỉ tìm khi xu hướng dài của BTC tăng**: giá BTC và EMA50 cùng trên
+  EMA200 (nến ngày). Đây **khác** nhãn cấu trúc Tăng/Giảm/Đi ngang trên thẻ
+  BTC: BTC có thể "Giảm" theo đỉnh đáy gần đây mà xu hướng dài vẫn tăng.
+  "Chưa tăng — không vào lệnh mới" = quy tắc đang đứng ngoài, không phải
+  tool hỏng.
+- **Vào**: nến ngày đóng trên đỉnh cao nhất 20 ngày trước, coin trên EMA200
+  của nó. Giá vào = giá đóng nến đó.
+- **Cắt lỗ** = đáy thấp nhất 10 ngày, **cố định**, đặt lên sàn ngay.
+- **"Thoát nếu đóng dưới"** = đường thoát: đáy 10 ngày trước đó, mỗi ngày
+  chỉ dời lên. Nến ngày đóng dưới đường này thì bán. Không có chốt lời cố
+  định.
+- Cỡ lệnh: vốn × 1% ÷ % khoảng cách cắt lỗ (thường 10–15%, nên lệnh nhỏ).
+
+**Kết quả chạy lại** (41 coin, 8/2024–10/2026): 175 lệnh, 36% lãi, trung
+bình +0.17R — nhưng toàn bộ phần lãi đến từ đợt tăng cuối 2024 (+1.53R);
+2025 −0.26R, 2026 −0.22R dù đã lọc BTC; một lệnh +20.6R gánh phần lớn kết
+quả. Nếu được hỏi "có nên mua theo danh sách này không", câu trả lời trung
+thực: chưa có bằng chứng; chỉ spot, rủi ro nhỏ, chờ kết quả thật đủ 30 lệnh.
+
 ## 5. Watchlist ⭐ "coin mạnh"
 
 Chọn từ bảng Coins mỗi ngày, tối đa 6 coin, theo các cổng (không có điểm):
