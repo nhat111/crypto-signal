@@ -1,4 +1,4 @@
-import { formatPositionSize, positionSize, type RiskProfile } from '@crypto-signal/shared';
+import { SETUP_REPLAY_NOTE, formatPositionSize, positionSize, type RiskProfile } from '@crypto-signal/shared';
 import type { BotSettings, GemRow, GemWatchDTO, LatestSymbolState, OverviewRow, PriceLevels, SignalRow, StablecoinFlowDTO, StablecoinFlowWindowDTO, StoredDigestDTO, TradeDTO, TradeSummaryDTO, TrendDTO, SetupDTO } from './apiClient.js';
 
 function healthLine(row: OverviewRow): string {
@@ -467,6 +467,6 @@ export function formatSetups(setups: SetupDTO[], profile: RiskProfile | null = n
   }
   if (setups.some((s) => s.cohort === 'watchlist')) lines.push('', '⭐ = coin trong danh sách theo dõi từ /coins — đang kiểm chứng, chưa nên vào tiền thật.');
   if (!profile && open.length > 0) lines.push('', '<i>/risk VỐN %RỦI_RO để thấy cỡ lệnh cho tài khoản của bro.</i>');
-  lines.push('', '<i>Ứng viên, không phải lệnh. Tự xem chart và BTC trước khi vào.</i>');
+  lines.push('', `<i>${SETUP_REPLAY_NOTE}</i>`, '<i>Ứng viên, không phải lệnh. Tự xem chart và BTC trước khi vào.</i>');
   return lines.join('\n');
 }

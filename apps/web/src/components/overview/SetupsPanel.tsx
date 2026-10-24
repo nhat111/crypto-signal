@@ -5,6 +5,7 @@ import { CopyButton } from '@/components/CopyButton';
 import { setupAiPrompt } from '@/lib/aiPrompt';
 import { cx, formatRelativeTime, formatUsd } from '@/lib/format';
 import { setupPrefillHref } from '@/lib/journalPrefill';
+import { SETUP_REPLAY_NOTE } from '@/lib/setupReplay';
 
 const KIND: Record<TradeSetup['kind'], string> = { pullback: 'Hồi về hỗ trợ', breakout_retest: 'Phá vùng rồi test lại' };
 const STATUS: Record<TradeSetup['status'], { label: string; tone: string }> = {
@@ -55,8 +56,11 @@ export function SetupsPanel({ data, btcTrend, livePrices }: { data: SetupsRespon
         </span>
       </div>
       <p className="mt-1 max-w-2xl text-xs text-slate-500">
-        Hồi về hỗ trợ hoặc phá vùng rồi test lại, chỉ khi 1D không giảm và giá trên EMA200, chỉ báo khi R:R từ 1:2.
+        Hồi về hỗ trợ hoặc phá vùng rồi test lại, chỉ khi 1D không giảm và giá trên EMA200, coin không yếu hơn BTC 3 ngày qua, R:R từ 1:2.
         Ứng viên, không phải lệnh — tự xem chart và xu hướng BTC trước khi vào.
+      </p>
+      <p className="mt-2 max-w-2xl rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5 text-xs text-amber-200">
+        {SETUP_REPLAY_NOTE}
       </p>
 
       {open.length === 0 ? (

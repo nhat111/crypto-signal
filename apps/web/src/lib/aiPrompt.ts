@@ -1,4 +1,5 @@
 import { FLOW_META } from './coinFlow';
+import { SETUP_REPLAY_NOTE } from './setupReplay';
 import { setupLiveRead, setupLiveText } from './setupLive';
 import type { CoinFlow, SetupBtcTrendComparison, SetupCohortComparison, TradeSetup, TrendState } from './types';
 
@@ -56,6 +57,7 @@ export function setupAiPrompt(s: TradeSetup, ctx: SetupPromptContext): string {
   const risk = s.entry - s.stop;
   const lines: string[] = [
     `Setup 4H từ tool cá nhân (Crypto Market Health Monitor). Ứng viên, không phải lệnh.`,
+    SETUP_REPLAY_NOTE,
     `Cách đọc tool: ${ctx.origin ?? ''}${AI_GUIDE_PATH}`,
     '',
     `Coin: ${s.symbol} · ${KIND[s.kind]}${s.cohort === 'watchlist' ? ' · ⭐ coin mạnh (watchlist)' : ''} · nến ${s.exchange === 'okx' ? 'OKX' : 'Binance'}`,

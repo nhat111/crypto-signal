@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { averageTrueRange, detectSetups, isRejection, resolveSetupOutcome } from './setups.js';
+import { averageTrueRange, detectSetups, isRejection, relativeStrengthPct, resolveSetupOutcome } from './setups.js';
 import type { MarketStructure } from './structure.js';
 import type { OhlcvBar } from './technicals.js';
 
@@ -65,6 +65,22 @@ describe('detectSetups — pullback', () => {
     expect(detectSetups({ structure: under, dailyBars: dailyWithPeak(102), bars4h: bars })).toEqual([]);
   });
 
+  it('counts a touch only within one 4H ATR of the level, not half a daily ATR', () => {
+    // ATR ~2; a wick to 103 is 3 above the 100 level. A wide daily ATR (here ~20) used to let it count.
+    const far = [...calm(106), bar(20, 105, 105.5, 103, 105.3)];
+    const wideDaily = dailyWithPeak(130).map((d) => ({ ...d, high: d.high + 10, low: d.low - 10 }));
+    expect(detectSetups({ structure: structure(), dailyBars: wideDaily, bars4h: far })).toEqual([]);
+  });
+
+  it('drops it when the coin did worse than BTC over the last three days', () => {
+    const btcUp = bars.map((b, i) => ({ ...b, close: 100 + i }));
+    expect(detectSetups({ structure: structure(), dailyBars: dailyWithPeak(130), bars4h: bars, benchmark4h: btcUp })).toEqual([]);
+    const btcDown = bars.map((b, i) => ({ ...b, close: 200 - i }));
+    const [s] = detectSetups({ structure: structure(), dailyBars: dailyWithPeak(130), bars4h: bars, benchmark4h: btcDown });
+    expect(s?.kind).toBe('pullback');
+    expect(s?.reasons.join(' ')).toMatch(/mạnh hơn BTC/);
+  });
+
   it('needs the 1D trend up and price above the EMA', () => {
     expect(detectSetups({ structure: structure({ trend: 'sideways' }), dailyBars: dailyWithPeak(130), bars4h: bars })).toEqual([]);
     expect(detectSetups({ structure: structure({ aboveEma: false }), dailyBars: dailyWithPeak(130), bars4h: bars })).toEqual([]);
@@ -101,6 +117,16 @@ describe('detectSetups — breakout and retest', () => {
     expect(
       detectSetups({ structure: structure(), dailyBars: dailyWithPeak(150), bars4h: [...base, breakout, ...failed, retest] }),
     ).toEqual([]);
+  });
+});
+
+describe('relativeStrengthPct', () => {
+  it('is the coin return minus BTC return over the window, null without matching bars', () => {
+    const coin = Array.from({ length: 19 }, (_, i) => bar(i, 1, 1, 1, i === 18 ? 110 : 100));
+    const btc = Array.from({ length: 19 }, (_, i) => bar(i, 1, 1, 1, i === 18 ? 105 : 100));
+    expect(relativeStrengthPct(coin, btc)).toBeCloseTo(5);
+    expect(relativeStrengthPct(coin, undefined)).toBeNull();
+    expect(relativeStrengthPct(coin, btc.slice(1))).toBeNull();
   });
 });
 

@@ -363,6 +363,11 @@ Check items as they land; each phase's commit message references the phase.
       041) and setups split by "BTC down" vs not; the setup card shows
       the live OKX price and flags a setup the price ran away from or
       that sits near its stop (ASSUMPTIONS §21).
+- [x] Replay of the setup detector, 18 months × 57 OKX coins: −0.39R per
+      setup, worse than a random entry. Touch within one 4H ATR, coin not
+      weaker than BTC over 3 days (−0.27R); `SETUP_ALERTS` off by default;
+      the replay result on every card (ASSUMPTIONS §21).
+- [ ] A setup rule that replays positive before alerts go back on.
 - [ ] Read the comparison once both sides clear the floor; drop or keep
       the watchlist alerts on what it says.
 - [ ] Read the BTC-down comparison once both sides clear the floor; if
