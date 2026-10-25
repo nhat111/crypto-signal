@@ -135,61 +135,105 @@ def load_kronos(kronos_dir: str, model_name: str, tokenizer_name: str, max_conte
     return KronosPredictor(model, tokenizer, device='cpu', max_context=max_context)
 
 
-def forecast_all(predictor, data, dates, args, cache_path: Path) -> pd.DataFrame:
-    """One row per (date, coin, sample): forecast close at the horizon and
-    the forecast high/low over it. Resumes from cache_path if present."""
+def load_timesfm(checkpoint: str):
+    from timesfm3 import ModelConfig, TimesFM3Evaluator  # type: ignore
+
+    return TimesFM3Evaluator(ModelConfig(checkpoint_path=checkpoint, per_core_batch_size=64, device='cpu'))
+
+
+def windows_at(data, t: int, args) -> list[tuple[str, pd.DataFrame]]:
+    """The last `lookback` bars up to and including t, per coin that has them."""
+    step = BAR_MS[args.bar]
+    out = []
+    for coin, df in data.items():
+        if t not in df.index:
+            continue
+        i = df.index.get_loc(t)
+        if i + 1 < args.lookback:
+            continue
+        hist = df.iloc[i + 1 - args.lookback : i + 1]
+        # A gap (delisting pause, missing bars) would hand the model a
+        # series that is not what it looks like; skip that coin-date.
+        if (hist.index[-1] - hist.index[0]) != (args.lookback - 1) * step:
+            continue
+        out.append((coin, hist))
+    return out
+
+
+def kronos_rows(predictor, t: int, wins, args) -> list[dict]:
+    """Kronos reads full OHLCV; one sampled path per batch entry."""
     import torch
 
+    # Same seed per date: a rerun gives the same paths.
+    torch.manual_seed(int(t // 1000) % (2**31))
+    step = BAR_MS[args.bar]
+    cols = ['open', 'high', 'low', 'close', 'volume', 'amount']
+    future_ts = pd.Series(pd.to_datetime([t + step * k for k in range(1, args.horizon + 1)], unit='ms'))
+    dfs, xs, ys, keys = [], [], [], []
+    for coin, hist in wins:
+        for s in range(args.samples):
+            dfs.append(hist[cols].reset_index(drop=True))
+            xs.append(hist.timestamps.reset_index(drop=True))
+            ys.append(future_ts)
+            keys.append((coin, s))
+    preds = []
+    for b in range(0, len(dfs), args.batch):
+        preds += predictor.predict_batch(
+            dfs[b : b + args.batch], xs[b : b + args.batch], ys[b : b + args.batch],
+            pred_len=args.horizon, T=args.temperature, top_p=args.top_p,
+            sample_count=1, verbose=False,
+        )
+    return [
+        {
+            'ts': t, 'coin': coin, 'sample': s,
+            'pred_close': float(p.close.iloc[-1]),
+            'pred_high': float(p.high.max()),
+            'pred_low': float(p.low.min()),
+        }
+        for (coin, s), p in zip(keys, preds)
+    ]
+
+
+def timesfm_rows(forecaster, t: int, wins, args) -> list[dict]:
+    """TimesFM reads the close series only and is deterministic: its nine
+    quantile paths (0.1 … 0.9) stand in for Kronos's sampled paths, so the
+    mean, share-above-entry and spread read the same way downstream. The
+    high/low of a quantile path is not a forecast intraday range, so
+    pred_high/pred_low are left empty and the range test uses the spread."""
+    contexts = [hist.close.to_numpy(dtype=np.float32) for _, hist in wins]
+    # Benchmark defaults (symmetric averaging, positive, sorted quantiles):
+    # the settings Google reports its own scores with.
+    outs = list(forecaster.predict_batch(contexts, horizon=args.horizon, return_quantiles=True))
+    rows = []
+    for (coin, _), out in zip(wins, outs):
+        q = np.asarray(out.quantiles)[: args.horizon]  # (horizon, 9)
+        for s in range(q.shape[1]):
+            rows.append({
+                'ts': t, 'coin': coin, 'sample': s,
+                'pred_close': float(q[-1, s]),
+                'pred_high': np.nan,
+                'pred_low': np.nan,
+            })
+    return rows
+
+
+def forecast_all(make_rows, data, dates, args, cache_path: Path) -> pd.DataFrame:
+    """One row per (date, coin, sample): forecast close at the horizon and
+    the forecast high/low over it. Resumes from cache_path if present."""
     done = pd.read_csv(cache_path) if cache_path.exists() else pd.DataFrame()
     done_dates = set(done.ts.unique()) if not done.empty else set()
-    cols = ['open', 'high', 'low', 'close', 'volume', 'amount']
-    step = BAR_MS[args.bar]
     started = time.time()
     todo = [t for t in dates if t not in done_dates]
     for n, t in enumerate(todo, 1):
-        # Same seed per date: a rerun gives the same paths.
-        torch.manual_seed(int(t // 1000) % (2**31))
-        dfs, xs, ys, keys = [], [], [], []
-        for coin, df in data.items():
-            if t not in df.index:
-                continue
-            i = df.index.get_loc(t)
-            if i + 1 < args.lookback:
-                continue
-            hist = df.iloc[i + 1 - args.lookback : i + 1]
-            # A gap (delisting pause, missing bars) would hand the model a
-            # series that is not what it looks like; skip that coin-date.
-            if (hist.index[-1] - hist.index[0]) != (args.lookback - 1) * step:
-                continue
-            future_ts = pd.to_datetime([t + step * k for k in range(1, args.horizon + 1)], unit='ms')
-            for s in range(args.samples):
-                dfs.append(hist[cols].reset_index(drop=True))
-                xs.append(hist.timestamps.reset_index(drop=True))
-                ys.append(pd.Series(future_ts))
-                keys.append((t, coin, s))
-        if not dfs:
+        wins = windows_at(data, t, args)
+        if not wins:
             continue
-        preds = []
-        for b in range(0, len(dfs), args.batch):
-            preds += predictor.predict_batch(
-                dfs[b : b + args.batch], xs[b : b + args.batch], ys[b : b + args.batch],
-                pred_len=args.horizon, T=args.temperature, top_p=args.top_p,
-                sample_count=1, verbose=False,
-            )
-        rows = [
-            {
-                'ts': k[0], 'coin': k[1], 'sample': k[2],
-                'pred_close': float(p.close.iloc[-1]),
-                'pred_high': float(p.high.max()),
-                'pred_low': float(p.low.min()),
-            }
-            for k, p in zip(keys, preds)
-        ]
+        rows = make_rows(t, wins)
         pd.DataFrame(rows).to_csv(cache_path, mode='a', header=not cache_path.exists(), index=False)
         elapsed = time.time() - started
         eta = elapsed / n * (len(todo) - n)
         print(
-            f'  {pd.Timestamp(t, unit="ms"):%Y-%m-%d %H:%M}  {len(dfs) // args.samples} coins'
+            f'  {pd.Timestamp(t, unit="ms"):%Y-%m-%d %H:%M}  {len(wins)} coins'
             f'  [{n}/{len(todo)}, ~{eta / 60:.0f} min left]',
             file=sys.stderr,
         )
@@ -225,7 +269,8 @@ def build_panel(data, preds: pd.DataFrame, args) -> pd.DataFrame:
             'coin': coin,
             'k_ret': math.log(closes.mean() / c0),
             'k_prob_up': float(np.mean(closes > c0)),
-            'k_range': math.log(g.pred_high.mean() / g.pred_low.mean()),
+            # NaN for TimesFM, whose quantile paths carry no intraday high/low.
+            'k_range': math.log(g.pred_high.mean() / g.pred_low.mean()) if g.pred_high.notna().all() else np.nan,
             'k_spread': closes.std(ddof=1) / c0 if len(closes) > 1 else np.nan,
             'mom20': math.log(c0 / df.close.iloc[i - 20]) if i >= 20 else np.nan,
             'rev5': -math.log(c0 / df.close.iloc[i - 5]) if i >= 5 else np.nan,
@@ -288,10 +333,15 @@ def evaluate(panel: pd.DataFrame, args) -> str:
         f'# Kronos on OKX spot: {args.model}, {args.bar} bars, horizon {h}',
         '',
         f'Test window: {pd.Timestamp(panel.ts.min(), unit="ms"):%Y-%m-%d} to '
-        f'{pd.Timestamp(panel.ts.max(), unit="ms"):%Y-%m-%d} (pretraining ends {PRETRAIN_END[:7]}), '
+        f'{pd.Timestamp(panel.ts.max(), unit="ms"):%Y-%m-%d} (Kronos\'s pretraining ends {PRETRAIN_END[:7]}), '
         f'{panel.ts.nunique()} decision dates, {panel.coin.nunique()} coins, '
-        f'{len(panel)} coin-dates. Lookback {args.lookback} bars, {args.samples} sampled paths, '
-        f'T={args.temperature}, top_p={args.top_p}. Fee {fee * 100:.2f}% per side.',
+        f'{len(panel)} coin-dates. Lookback {args.lookback} bars, '
+        + (
+            'close only, 9 quantile paths. '
+            if args.family == 'timesfm'
+            else f'{args.samples} sampled paths, T={args.temperature}, top_p={args.top_p}. '
+        )
+        + f'Fee {fee * 100:.2f}% per side.',
         '',
         '## Direction: rank IC against the realised return',
         '',
@@ -330,22 +380,25 @@ def evaluate(panel: pd.DataFrame, args) -> str:
         ('k_spread', 'Kronos spread of path closes'),
         ('atr_pct', 'ATR14 / close'),
     ]:
+        if panel[sig].isna().all():
+            continue
         pooled = panel[sig].rank().corr(panel['range'].rank())
         pooled_abs = panel[sig].rank().corr(panel['abs_ret'].rank())
         ic, t, _ = rank_ic(panel, sig, 'range')
         lines.append(f'| {label} | {pooled:.3f} | {ic:+.3f} | {t:+.1f} | {pooled_abs:.3f} |')
     # Does Kronos add anything once ATR is known? Rank-regress the realised
     # range on both; a Kronos coefficient near 0 means it only restates ATR.
+    vol_sig = 'k_range' if panel.k_range.notna().all() else 'k_spread'
     x = np.column_stack([
         np.ones(len(panel)),
         panel.atr_pct.rank(pct=True),
-        panel.k_range.rank(pct=True),
+        panel[vol_sig].rank(pct=True),
     ])
     beta, *_ = np.linalg.lstsq(x, panel.range.rank(pct=True), rcond=None)
     lines += [
         '',
         f'Rank regression of realised range on both: ATR {beta[1]:+.3f}, Kronos {beta[2]:+.3f} '
-        '(Kronos near 0 = it adds nothing over ATR).',
+        f'(`{vol_sig}`; Kronos near 0 = it adds nothing over ATR).',
         '',
         f'## Portfolio: top {k} long-only spot, held {h} bars, fees in',
         '',
@@ -398,7 +451,12 @@ def evaluate(panel: pd.DataFrame, args) -> str:
         '- The coins are today\'s survivors (picked in 2026), which flatters every long '
         'strategy here equally; compare rows, not absolute returns.',
     ]
-    return '\n'.join(lines) + '\n'
+    report = '\n'.join(lines) + '\n'
+    if args.family == 'timesfm':
+        # Every "Kronos " in the text names the model under test; "Kronos's
+        # pretraining" is the test window's cutoff and stays.
+        report = report.replace('Kronos ', 'TimesFM ')
+    return report
 
 
 # --------------------------------------------------------------------------
@@ -406,9 +464,11 @@ def evaluate(panel: pd.DataFrame, args) -> str:
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('--kronos-dir', required=True, help='a clone of github.com/shiyu-coder/Kronos')
+    p.add_argument('--family', choices=['kronos', 'timesfm'], default='kronos')
+    p.add_argument('--kronos-dir', help='a clone of github.com/shiyu-coder/Kronos (family kronos)')
     p.add_argument('--out', default='kronos-out', help='output folder (data cache, forecasts, report)')
-    p.add_argument('--model', default='NeoQuasar/Kronos-small')
+    p.add_argument('--model', default=None,
+                   help='default NeoQuasar/Kronos-small, or google/timesfm-3.0-pytorch')
     p.add_argument('--tokenizer', default='NeoQuasar/Kronos-Tokenizer-base')
     p.add_argument('--max-context', type=int, default=512, help='2048 for Kronos-mini')
     p.add_argument('--coins', default=','.join(DEFAULT_COINS))
@@ -429,6 +489,15 @@ def main() -> None:
     p.add_argument('--eval-only', action='store_true', help='report from cached forecasts')
     args = p.parse_args()
 
+    if args.model is None:
+        args.model = 'NeoQuasar/Kronos-small' if args.family == 'kronos' else 'google/timesfm-3.0-pytorch'
+    if args.family == 'kronos' and not args.kronos_dir:
+        sys.exit('--kronos-dir is required for --family kronos.')
+    if args.family == 'timesfm':
+        args.samples = 9  # its nine quantiles, not samples
+    # TimesFM 3.0's training data hold no crypto prices from 2024 on
+    # (GiftEval, Wikipedia to 11/2023, Google Trends to 2022, synthetic), so
+    # the same window as Kronos is out of sample for both and they compare.
     if pd.Timestamp(args.test_start) < pd.Timestamp(PRETRAIN_END):
         sys.exit(f'--test-start before {PRETRAIN_END} would test on Kronos\'s own training data.')
 
@@ -450,7 +519,8 @@ def main() -> None:
     all_ts = [t for t in btc.index if t >= start_ms and (end_ms is None or t <= end_ms)]
     dates = all_ts[:: args.horizon]
 
-    tag = f'{args.model.split("/")[-1]}_{args.bar}_L{args.lookback}_H{args.horizon}_S{args.samples}'
+    samples = 'Q9' if args.family == 'timesfm' else f'S{args.samples}'
+    tag = f'{args.model.split("/")[-1]}_{args.bar}_L{args.lookback}_H{args.horizon}_{samples}'
     cache_path = out / f'forecasts_{tag}.csv'
     if args.eval_only:
         preds = pd.read_csv(cache_path)
@@ -459,9 +529,14 @@ def main() -> None:
 
         if args.threads:
             torch.set_num_threads(args.threads)
-        predictor = load_kronos(args.kronos_dir, args.model, args.tokenizer, args.max_context)
+        if args.family == 'kronos':
+            predictor = load_kronos(args.kronos_dir, args.model, args.tokenizer, args.max_context)
+            make_rows = lambda t, wins: kronos_rows(predictor, t, wins, args)  # noqa: E731
+        else:
+            forecaster = load_timesfm(args.model)
+            make_rows = lambda t, wins: timesfm_rows(forecaster, t, wins, args)  # noqa: E731
         print(f'Forecasting {len(dates)} decision dates -> {cache_path}', file=sys.stderr)
-        preds = forecast_all(predictor, data, dates, args, cache_path)
+        preds = forecast_all(make_rows, data, dates, args, cache_path)
 
     panel = build_panel(data, preds, args)
     panel.to_csv(out / f'panel_{tag}.csv', index=False)
