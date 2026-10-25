@@ -3,8 +3,8 @@
 Tests [Kronos](https://github.com/shiyu-coder/Kronos), a pretrained
 candlestick forecasting model, and Google's
 [TimesFM 3.0](https://github.com/google-research/timesfm) (`--family
-timesfm`, close series only, its nine quantiles in place of sampled paths) on the 41 OKX spot coins the setup and
-breakout replays used (ASSUMPTIONS §21, §27). Nothing here is imported by
+timesfm`, close series only, its nine quantiles in place of sampled
+paths) on the 41 OKX spot coins the setup and breakout replays used (ASSUMPTIONS §21, §27). Nothing here is imported by
 the worker, API or web; it writes CSVs and a Markdown report to a folder.
 
 Kronos's pretraining data ends in June 2024 (arXiv 2508.02739), so only
