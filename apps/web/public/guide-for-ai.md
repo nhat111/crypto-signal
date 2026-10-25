@@ -193,7 +193,7 @@ Chọn từ bảng Coins mỗi ngày, tối đa 6 coin, theo các cổng (không
 | Spot mua dẫn | Giá tăng, spot mua chủ động nhiều hơn, đòn bẩy không tăng mạnh. |
 | Spot + đòn bẩy | Giá tăng, spot mua ròng nhưng OI/funding cũng nóng lên. |
 | Đòn bẩy kéo | Giá tăng nhờ OI tăng hoặc long trả funding cao, spot không mua ròng rõ. |
-| Short bị ép | Giá tăng, OI tăng, funding âm: vị thế mới chủ yếu là short chặn đà. Short đóng có thể đẩy thêm, hết short thì đà thường hụt. |
+| Short bị ép | Giá tăng, OI tăng, funding âm: vị thế mới chủ yếu là short chặn đà. Short đóng có thể đẩy thêm, hết short thì đà thường hụt. Replay 2024–2026: giữ nhãn từ 2 ngày trở lên thì 14 ngày sau kém coin trung bình ~2,6%; là lý do cân nhắc chốt, không phải lý do mua. |
 | Short đóng lệnh | Giá tăng, OI giảm: phần lớn short mua lại. |
 | Tăng, chưa xác nhận | Giá tăng nhưng không thấy spot mua hay đòn bẩy rõ. |
 | Spot bán ròng | Giá giảm, spot bán chủ động nhiều hơn. |

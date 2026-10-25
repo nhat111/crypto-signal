@@ -126,6 +126,12 @@ Run them before pushing.
 - Spot breakouts (2026-10-24): daily 20-day-high list while BTC is up,
   paper-tracked, no alert (migration 042). Replay +0.17R but all from
   late 2024; read the live record at 30 closed trades.
+- Research (2026-10-25): Kronos and TimesFM 3.0 found no direction on the
+  41 coins (`scripts/kronos/`); a replay of the flow labels over Apr 2024 –
+  Oct 2026 (`scripts/flow-replay/`) found only `short_squeeze` leading
+  (−2.6% vs the average coin over 14 days), now an exit reason in
+  `coinWatch.ts` (ASSUMPTIONS §28). The user buys spot and farms airdrops;
+  no futures.
 - Open questions, from `TODO.md`: the coin-scan edge report has 0 samples
   until enough days are stored (verdicts expected ~mid-December 2026);
   token unlock data (needs a paid source).

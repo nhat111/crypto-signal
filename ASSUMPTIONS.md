@@ -990,8 +990,10 @@ stablecoins: 30 days).
   before, both from the same exchange: a turn into `short_covering`,
   `long_unwind`, `spot_selling`, `shorts_building` or `distribution`;
   funding from ≤ `fundingShortsPayPct` to positive (a squeeze ending); the
-  RS line falling under its 20-day average; losing the ⭐; or dropping out
-  of the scanned universe entirely (found in a dry run: BAT, S and TIA
+  RS line falling under its 20-day average; `short_squeeze` read on a
+  second day running (§28, the one label the replay found to lead
+  anything; it repeats daily while the squeeze lasts); losing the ⭐; or
+  dropping out of the scanned universe entirely (found in a dry run: BAT, S and TIA
   left the top 30 on 14/10 and would otherwise have been silent).
 - **When.** Once, right after `runCoinScanCycle` stores a new day (the
   hourly ticks return early once a day is in). One message to the alert
@@ -1224,3 +1226,27 @@ stablecoins: 30 days).
 - Both kept 120 days, one row per item per UTC day (migration 038).
 - **Not done.** Sector history is stored but not yet charted; flywheel is
   not yet shown on `/lookup` for the coin being looked up.
+
+## 28. Replaying the flow labels (`scripts/flow-replay/`)
+
+- **Why.** The coin-scan edge report needs months of stored scans (TODO),
+  and after Kronos and TimesFM 3.0 found no direction in price alone
+  (`scripts/kronos/`), the labels built on spot taker flow, OI and funding
+  were the remaining candidate. The history was rebuilt instead of waited
+  for: Binance's archive for daily spot bars with the taker split and for
+  funding, OKX for OI in coins (from about April 2024), the production
+  `readCoin` over every coin-day, timed like the 00:45 UTC scan. Not the
+  stored labels: production mixes venues.
+- **Result.** 41 coins, 2/4/2024 – 5/10/2026, 35,588 coin-days. Each
+  label's 3/7/14-day return against the day's average coin, by year, with
+  a within-day label shuffle as the test (42 tests, so ~2 at p < 0.05 by
+  chance). Only `short_squeeze` holds: 14 days on −2.6% (p 0.001, 394
+  coin-days, 30 coins; 7 days −1.3%, p 0.002), 2024 −5.1%, 2025 −4.6%,
+  2026 −2.4% on the median (+2.2% on the mean, Q2 2026 the exception).
+  The first day of a squeeze is only −0.6%; the weakness is in coins that
+  stay labelled. No buy-side label clears the bar: `spot_led` +0.3–0.4%
+  at 3–7 days (p 0.09–0.17), nothing at 14.
+- **Use.** The user buys spot only, so this is an exit reason, not a
+  trade: the held/⭐ alert (§22) reports a second day of `short_squeeze`,
+  and the label's text on the web and in the AI guide carries the result.
+  The labels stay descriptions; none is a buy signal.

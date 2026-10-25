@@ -11,7 +11,7 @@ export const FLOW_META: Record<CoinFlow, { label: string; tone: FlowTone; meanin
   spot_led: { label: 'Spot mua dẫn', tone: 'good', meaning: 'Giá tăng, bên mua chủ động trên spot nhiều hơn bên bán, đòn bẩy không tăng mạnh.' },
   spot_and_leverage: { label: 'Spot + đòn bẩy', tone: 'mixed', meaning: 'Giá tăng, spot mua ròng nhưng OI hoặc funding cũng đang nóng lên.' },
   leverage_led: { label: 'Đòn bẩy kéo', tone: 'warn', meaning: 'Giá tăng nhờ OI tăng hoặc long trả funding cao, spot không mua ròng rõ.' },
-  short_squeeze: { label: 'Short bị ép', tone: 'warn', meaning: 'Giá tăng, OI tăng mà funding âm: vị thế mới chủ yếu là short chặn đà tăng. Short đóng lệnh có thể đẩy giá thêm, nhưng khi hết short thì đà tăng thường hụt.' },
+  short_squeeze: { label: 'Short bị ép', tone: 'warn', meaning: 'Giá tăng, OI tăng mà funding âm: vị thế mới chủ yếu là short chặn đà tăng. Short đóng lệnh có thể đẩy giá thêm, nhưng khi hết short thì đà tăng thường hụt. Replay 2024–2026: giữ nhãn này từ 2 ngày trở lên thì 14 ngày sau coin kém coin trung bình khoảng 2,6%.' },
   short_covering: { label: 'Short đóng lệnh', tone: 'warn', meaning: 'Giá tăng trong khi OI giảm: phần lớn là short mua lại để đóng vị thế.' },
   up_unconfirmed: { label: 'Tăng, chưa xác nhận', tone: 'neutral', meaning: 'Giá tăng nhưng không thấy spot mua ròng hay đòn bẩy tăng rõ.' },
   spot_selling: { label: 'Spot bán ròng', tone: 'bad', meaning: 'Giá giảm, bên bán chủ động trên spot nhiều hơn bên mua.' },

@@ -18,6 +18,13 @@ describe('coinWatchChanges', () => {
     expect(changes).toEqual([{ symbol: 'STRKUSDT', watched: held, reasons: ['Nhãn đổi: Short bị ép → Short đóng lệnh.'] }]);
   });
 
+  it('reports a squeeze read on a second day running, not on its first', () => {
+    const watched = new Map([['TIAUSDT', held]]);
+    const [c] = coinWatchChanges([row('TIAUSDT', { flow: 'short_squeeze' })], [row('TIAUSDT', { flow: 'short_squeeze' })], watched, new Set(), T);
+    expect(c?.reasons).toEqual([expect.stringContaining('Short bị ép từ 2 ngày trở lên')]);
+    expect(coinWatchChanges([row('TIAUSDT', { flow: 'short_squeeze' })], [row('TIAUSDT')], watched, new Set(), T)).toEqual([]);
+  });
+
   it('ignores flows that stay put or move somewhere harmless', () => {
     const watched = new Map([['AUSDT', held], ['BUSDT', held]]);
     const today = [row('AUSDT', { flow: 'spot_selling' }), row('BUSDT', { flow: 'spot_led' })];
