@@ -81,6 +81,41 @@ npm run lint
 CI (`.github/workflows/ci.yml`) runs these on every push with Postgres.
 Run them before pushing.
 
+## Review guide for every PR
+
+The owner merges the PRs and a merge deploys straight to production, so a
+PR must be reviewable in about ten minutes without reading every line. Every
+PR description, and the closing chat summary of any code change, ends with a
+**"Hướng dẫn review"** section, written in Vietnamese:
+
+- **Tóm tắt** (3–4 lines): what the user saw, the root cause, and why this
+  change fixes that cause. For a feature: what it does and why this approach
+  over the obvious alternative.
+- **Giả định của test**: the assumption the new tests encode. Tests written
+  in the same PR come from the same understanding as the code, so green CI
+  does not prove the requirement was understood; the owner checks this line.
+- **Đọc file nào**: the one or two files holding the core logic, with the
+  line range that matters, and which files can be skipped (docs, generated
+  files, fixtures).
+- **Rủi ro**: `thấp`, `trung bình` or `cao`, plus what could break. Anything
+  in the high-risk list below is `cao`; say so in the first line of the PR
+  description too.
+- **Kiểm tra sau khi merge**: concrete steps in production and what the
+  owner should see.
+- **Câu hỏi tự kiểm tra**: 2–3 questions the owner should be able to answer
+  before merging (about this change's behaviour, not trivia), with the
+  answers inside a collapsed `<details>` block.
+
+Keep it short and concrete; it replaces reading the whole diff, not the code
+comments or the project docs.
+
+High-risk (`cao`) here: position sizing (`packages/shared/src/sizing.ts`,
+`/risk`), journal stops and R, the exit and stop alerts (`coinWatch.ts`,
+`coinWatchIntraday.ts`), setup alerts, migrations, exchange adapters in
+`packages/market-data`, and anything that changes when or whether a Telegram
+alert is sent. Post-merge checks usually name `GET /api/status` (running
+commit, job health), the affected endpoint or web page, and the bot command.
+
 ## Production
 
 - Default branch: `claude/crypto-market-health-monitor-qlja9s`. Merges
