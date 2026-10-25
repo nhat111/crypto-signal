@@ -70,6 +70,13 @@ export function coinWatchChanges(
     if (EXIT_FLOWS.includes(now.flow) && was.flow !== now.flow) {
       reasons.push(`Nhãn đổi: ${COIN_FLOW_LABEL[was.flow] ?? was.flow} → ${COIN_FLOW_LABEL[now.flow] ?? now.flow}.`);
     }
+    // The one label the replay found to lead anything (ASSUMPTIONS §28):
+    // read on a second day running, the coin trailed the average coin over
+    // the next two weeks. The first day alone did not, so it waits a day,
+    // and it repeats while the squeeze lasts (about 1.6 more days on average).
+    if (now.flow === 'short_squeeze' && was.flow === 'short_squeeze') {
+      reasons.push(`${COIN_FLOW_LABEL.short_squeeze} từ 2 ngày trở lên: trong replay 2024–2026, coin như vậy 14 ngày sau kém coin trung bình khoảng 2,6% (đoạn cuối cú tăng).`);
+    }
     if (was.fundingAvg7dPct !== null && was.fundingAvg7dPct <= thresholds.fundingShortsPayPct && now.fundingAvg7dPct !== null && now.fundingAvg7dPct > 0) {
       reasons.push(`Funding đổi từ âm sang dương (${pct(was.fundingAvg7dPct)} → ${pct(now.fundingAvg7dPct)}/8h): phe short đã rút, giờ là long đuổi giá.`);
     }
