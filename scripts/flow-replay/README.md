@@ -19,7 +19,15 @@ npx tsx scripts/flow-replay/label.ts flow-data labels.csv
 python3 scripts/flow-replay/evaluate.py --data flow-data --labels labels.csv --out report.md
 ```
 
-(`evaluate.py` needs numpy and pandas.) The sources differ from what
+(`evaluate.py` needs numpy and pandas.)
+
+`short.py` turns `short_squeeze` into the trade a reader would take: a
+short on the perpetual after the second labelled day, ATR stop, fees and
+funding, scored in R against a blind short and a within-day shuffle:
+
+```bash
+python3 scripts/flow-replay/short.py --data flow-data --labels labels.csv --perp perp-data --out short-report.md
+``` The sources differ from what
 production read on a given day (it mixes OKX, Binance, Bybit and Gate), so
 this replays the rules, not the stored labels.
 
@@ -41,3 +49,12 @@ one label stands out:
   and gone by 14; "Spot + đòn bẩy" is +1.5% at 14 days (p 0.013) but
   negative in 2024 and with 42 tests one or two such results are
   expected by chance.
+
+## As a short (`short-report-2024-04_2026-10.md`)
+
+77 trades on 25 coins over 14 days. Without a stop the short gains 3.7%
+on average (blind short +0.2%, p 0.016), but the losses are squeezes:
+WLD −62%, four more near −30%. With a stop the edge is gone: 1.5 × ATR
++0.05R against +0.04R for a blind short (p 0.42), 2 × ATR +0.15R (p 0.06),
+2024 and 2026 negative. Short coin + long BTC is +3.0% (win 68%), all of
+it 2024–2025; 2026 −0.4%. Not a trade; it stays an exit reason.

@@ -1250,3 +1250,10 @@ stablecoins: 30 days).
   trade: the held/⭐ alert (§22) reports a second day of `short_squeeze`,
   and the label's text on the web and in the AI guide carries the result.
   The labels stay descriptions; none is a buy signal.
+- **As a short** (`scripts/flow-replay/short.py`, 2026-10-27). Short the
+  perpetual at the open after the second labelled day, ATR(14) stop,
+  14 days, 0.05% per side and funding: 77 trades, 1.5 × ATR +0.05R vs
+  +0.04R for a blind short (p 0.42); 2 × ATR +0.15R (p 0.06), 2024 and
+  2026 negative. Unstopped +3.7% but with −62% (WLD) and −30% squeezes.
+  Hedged with a BTC long +3.0% in 2024–2025, −0.4% in 2026. The relative
+  weakness is real, the stop eats it: no short signal is added.
